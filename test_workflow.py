@@ -11,6 +11,14 @@ class Checks(unittest.TestCase):
     def test_time_rounding(self):
         self.assertEqual(w.timestamp(59.9996), '00:01:00,000')
 
+    def test_speech_input_limit(self):
+        text = 'A small daily step can rebuild your confidence. ' * 30
+        chunks = w.speech_chunks(text)
+        self.assertTrue(all(0 < len(c) <= 200 for c in chunks))
+        self.assertEqual(' '.join(chunks), ' '.join(text.split()))
+        with self.assertRaises(ValueError):
+            w.speech_chunks('x' * 201)
+
     def test_daily_gate(self):
         with patch.dict('os.environ', {}, clear=True):
             with self.assertRaisesRegex(RuntimeError, 'disabled'):
