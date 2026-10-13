@@ -15,8 +15,8 @@ def generate(path):
     seconds = float(sequence['totalQuantizedSteps']) * step + 5
     audio = np.zeros((math.ceil(seconds * rate), 2), dtype=np.float32)
     for index, note in enumerate(sequence['notes']):
-        start = int(note['quantizedStartStep'] * step * rate)
-        length = max(0.16, (note['quantizedEndStep'] - note['quantizedStartStep']) * step)
+        start = int(int(note['quantizedStartStep']) * step * rate)
+        length = max(0.16, (int(note['quantizedEndStep']) - int(note['quantizedStartStep'])) * step)
         count = min(int((length + 2) * rate), len(audio) - start)
         t = np.arange(count, dtype=np.float32) / rate
         hz = 440 * 2 ** ((int(note['pitch']) - 69) / 12)
