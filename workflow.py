@@ -382,6 +382,13 @@ def preflight():
         for module in ('torch', 'diffusers', 'transformers'):
             if importlib.util.find_spec(module) is None:
                 needed.append(module + ' (CPU dependency)')
+    import importlib.util
+    if os.getenv('TTS_BACKEND', 'kokoro') == 'kokoro' and importlib.util.find_spec('kokoro') is None:
+        needed.append('kokoro (CPU dependency)')
+    if os.getenv('CAPTION_BACKEND', 'cpu') == 'cpu' and importlib.util.find_spec('faster_whisper') is None:
+        needed.append('faster_whisper (CPU dependency)')
+    if os.getenv('MUSIC_BACKEND', 'magenta') == 'magenta' and not shutil.which('node'):
+        needed.append('node (CPU music dependency)')
     if os.getenv('UPLOAD_ENABLED') == 'true':
         needed += ['YOUTUBE_TOKEN_JSON', 'EXPECTED_CHANNEL_ID']
     missing = [name for name in needed if not os.getenv(name)]
