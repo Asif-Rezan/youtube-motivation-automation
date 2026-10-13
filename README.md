@@ -22,9 +22,10 @@ revision is pinned. No GPU runner or paid compute service is created.
 
 Images are generated at 768×432 and then scaled into the 1920×1080 video. They are
 not native 1080p images. CPU inference can be slow, and this smaller model may not
-meet the desired cinematic quality or character-continuity standard. The live CPU
-image-check workflow must establish feasibility; visual QA still needs private Drive
-storage access. No claim is made that a complete daily batch has passed yet.
+meet the desired cinematic quality or character-continuity standard. The live GitHub CPU check successfully generated a nonblank 768×432 image with
+10 steps in 115.3 seconds (after model loading). Run 38384808103 passed. This
+establishes single-image execution; visual QA still needs private Drive storage
+access. No claim is made that a complete daily batch has passed yet.
 
 Install CPU torch from its official index and requirements-cpu.txt. Model license:
 https://huggingface.co/segmind/tiny-sd (CreativeML Open RAIL-M); comply with its terms.
