@@ -92,10 +92,22 @@ def make_story(day, previous):
         # Explicit original test story only; daily jobs must generate fresh stories.
         return validate_story(json.loads(Path(os.environ['STORY_FILE']).read_text()))
     model = os.getenv('STORY_MODEL', 'openai/gpt-oss-120b')
-    def ask(prompt, limit):
+    def object_schema(properties):
+        return {'type': 'object', 'properties': properties,
+            'required': list(properties), 'additionalProperties': False}
+    text_schema = {'type': 'string'}
+    scene_schema = object_schema({'summary': text_schema, 'image_prompt': text_schema,
+        'image_prompts': {'type': 'array', 'items': text_schema}})
+    chapter_keys = [f'chapter_{i:02}' for i in range(1, 21)]
+    outline_schema = object_schema({**{k: text_schema for k in
+        ('title', 'description', 'thumbnail_text', 'thumbnail_prompt', 'character_description')},
+        'tags': {'type': 'array', 'items': text_schema},
+        'scenes': object_schema({k: scene_schema for k in chapter_keys})})
+    def ask(prompt, limit, schema):
         result = request_groq('chat/completions', {'model': model,
             'messages': [{'role': 'user', 'content': prompt}],
-            'response_format': {'type': 'json_object'}, 'reasoning_effort': 'low',
+            'response_format': {'type': 'json_schema', 'json_schema': {'name': 'story_payload',
+                'strict': True, 'schema': schema}}, 'reasoning_effort': 'low',
             'temperature': 0.8, 'max_completion_tokens': limit})
         choice = result['choices'][0]
         if choice.get('finish_reason') == 'length':
@@ -110,9 +122,10 @@ def make_story(day, previous):
     Avoid these recent titles: {previous}.
     Return JSON: title (max 100 characters), description (clearly label fictional), tags (list),
     thumbnail_text (2-5 words), thumbnail_prompt, character_description (max 14 words, appearance and outfit),
-    scenes (exactly 20 chapters). Each chapter: summary (max 25 words), image_prompt,
+    scenes (object with chapter_01 through chapter_20). Each chapter: summary (max 25 words), image_prompt,
     image_prompts (four distinct visual beats, each max 8 words). Hand-painted Japanese animation style.
-    Main character keeps the same appearance. Provide ONLY the plan, no full narration yet.''', 4200)
+    Main character keeps the same appearance. Provide ONLY the plan, no full narration yet.''', 5200, outline_schema)
+    outline['scenes'] = [outline['scenes'][k] for k in chapter_keys]
     if len(outline.get('scenes', [])) != 20:
         raise ValueError('Outline requires exactly twenty chapters')
     summaries = [scene['summary'] for scene in outline['scenes']]
@@ -120,11 +133,13 @@ def make_story(day, previous):
     for begin in (0, 5, 10, 15):
         # Separate bursts fit the free plan; never switch to a paid provider.
         time.sleep(60)
+        keys = chapter_keys[begin:begin+5]
+        group_schema = object_schema({'narrations': object_schema({k: text_schema for k in keys})})
         group = ask(f'''Write chapters {begin+1} through {begin+5} of this original fictional story.
         Title: {outline['title']}. Character: {outline['character_description']}.
         Assigned chapter events ONLY: {json.dumps([{'chapter': i+1, 'event': summaries[i]} for i in range(begin, begin+5)])}.
         Previous chapter ending: {prior[-700:]}.
-        Return JSON with narrations: a list of exactly 5 strings in chronological order.
+        Return JSON with narrations: an object with the exact chapter keys {keys}, each value a narration string.
         Each string MUST contain 95-105 English spoken words; total for this request 475-525 words.
         Natural narration with concrete actions and dialogue, not generic advice.
         Begin chapter 1 with the crisis immediately, no welcome or setup preamble.
@@ -132,8 +147,8 @@ def make_story(day, previous):
         Resolve the initial crisis before chapter 20. Chapter 20 must explicitly ask viewers to like,
         comment with their answer to a specific story question, and subscribe.
         Narrate ONLY the five assigned events, one event per chapter in the listed order. Do not jump ahead.\n        No ending, farewell, viewer question, or call to action before chapter 20.
-        Do not add chapter headings or directions to spoken text. No repeated introduction.''', 4200)
-        parts = group.get('narrations', [])
+        Do not add chapter headings or directions to spoken text. No repeated introduction.''', 4200, group_schema)
+        parts = [group['narrations'][k] for k in keys]
         if len(parts) != 5 or not all(isinstance(p, str) for p in parts):
             raise ValueError('Narration batch must contain five strings')
         for scene, narration in zip(outline['scenes'][begin:begin+5], parts):
