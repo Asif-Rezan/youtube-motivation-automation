@@ -19,8 +19,11 @@ Groq original fictional English motivational story plus title/description/tags �
 Hugging Face cinematic images → English AI narration → Whisper word timestamps →
 FFmpeg 1920×1080 video with slow zoom, fades, subtitles and ducked background music
 → generated thumbnail → duration/decode validation → private Drive → private YouTube.
-Speech model/account availability still needs a live check; configured defaults
-follow the documented example and are not guaranteed available on every account.
+English narration uses canopylabs/orpheus-v1-english with the troy voice and
+200-character input chunks. Model/free-tier account access still needs a live check.
+Hugging Face token authorization and FLUX.1-schnell provider availability have been
+verified, but no provider image request has completed. Monthly free inference
+credits are limited and do not establish a free daily image allowance.
 
 ## Music: YouTube Audio Library only
 
@@ -108,8 +111,8 @@ python -m unittest -v
 python workflow.py preflight
 ```
 
-The six original component tests validate an actual 1080p synthetic render, caption
-timing, story validation, time rounding, missing credentials and disabled daily runs.
+The nine component tests validate an actual 1080p synthetic render, caption
+timing, story validation, time rounding, missing credentials disabled daily runs, private Drive access, free storage limits and TTS chunking.
 They are not a completed motivational-video test.
 
 Documentation:
