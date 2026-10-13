@@ -28,7 +28,7 @@ def report_error(name, error):
     failed = True
     status = getattr(getattr(error, 'resp', None), 'status', None)
     safe = str(error) if isinstance(error, RuntimeError) else type(error).__name__
-    if safe not in ('missing_secret', 'invalid_json', 'missing_oauth_fields'):
+    if safe not in ('missing_secret', 'invalid_json', 'missing_oauth_fields', 'channel_mismatch'):
         safe = type(error).__name__
     for code in ('invalid_grant', 'invalid_client', 'access_denied'):
         if code in str(error):
@@ -40,7 +40,7 @@ try:
     creds = credentials('YOUTUBE_TOKEN_JSON')
     client = build('youtube', 'v3', credentials=creds, cache_discovery=False)
     channels = client.channels().list(part='id', mine=True).execute().get('items', [])
-    expected = os.getenv('EXPECTED_CHANNEL_ID') or 'UCYjz7d66SsshimfpxZahlhQ'
+    expected = os.getenv('EXPECTED_CHANNEL_ID') or 'UCztvMrNCT34DO3DtzLPgWaw'
     if expected not in [c['id'] for c in channels]:
         raise RuntimeError('channel_mismatch')
     scopes = set(creds.granted_scopes or [])
