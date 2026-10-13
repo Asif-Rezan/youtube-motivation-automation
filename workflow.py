@@ -96,7 +96,7 @@ def make_story(day, previous):
 
 
 def make_image(prompt, path):
-    prompt = ('Studio Ghibli-inspired hand-painted 2D animation, watercolor background, gentle expressive anime characters, soft natural light, ' + prompt)
+    prompt = ('ghibli style, hand-painted 2D animation, watercolor background, gentle expressive anime characters, soft natural light, ' + prompt)
     if os.getenv('IMAGE_BACKEND', 'cpu') == 'cpu':
         from image_cpu import generate
         generate(prompt + ', cinematic lighting, no lettering or watermarks', path)
