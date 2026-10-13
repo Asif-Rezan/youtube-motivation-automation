@@ -3,6 +3,8 @@
 The original eight-scene video rendered successfully: 264.53 seconds,
 1920×1080, Kokoro English narration, aligned captions, transitions, free
 MusicRNN background music and a generated thumbnail.
+A separate cloud restore from private Drive passed strict full-file decoding
+in saved-video validation run 38404650010.
 
 **The private-upload test has NOT passed.** The current YouTube OAuth token
 authorizes a different channel from the explicitly chosen Rezan Relaxation.
