@@ -6,7 +6,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: youtube-improved-story
+  group: youtube-motivation
   cancel-in-progress: false
 env:
   SAVED_RUN_ID: improved-${{ github.run_id }}

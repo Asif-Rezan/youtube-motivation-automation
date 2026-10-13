@@ -12,19 +12,27 @@
   transitions, original MusicRNN background music and illustrated thumbnails.
 - Private uploads to the user-selected REZAN IT channel. Public publishing remains disabled.
 
-The new-format private test passed in Actions run 38417265115:
-13:37, 1920×1080, 82 distinct illustrated image clips with global ten-second
-boundaries. Complete-file decoding, timeline checks, private REZAN IT upload,
-HD processing, custom thumbnail, title, description and tags all passed.
-The workflow is manual only again. The previous 4:25 video remains unchanged.
+The improved private test passed in Actions run 38450919780:
+13:17, 1920×1080, 80 distinct illustrated clips at global ten-second boundaries.
+DreamShaper 8 replaces the older image model. Complete-file decoding, shot
+checks, private REZAN IT upload, HD processing and custom-thumbnail/metadata
+readback all passed. Background music audibility also passed: the rendered
+music bed measured -27.45 dB RMS, 10.78 dB below the combined track.
+
+The reviewed story has a direct opening crisis, coherent escalating setbacks,
+and a final narrator request to like, comment and subscribe. Future stories
+use Groq GPT-OSS 120B with strict chapter schemas and rate-spaced batches;
+the final CTA is added reliably by the application. Private upload history is
+not included in external story prompts. Daily scheduling remains disabled;
+manual dispatch or an explicit trigger-file update starts a new test.
 
 ## Free cloud infrastructure
 
 Standard GitHub Ubuntu runners perform the work even when the user's computer
 is off. The dedicated illustration model is downloaded as public weights; no
 paid inference provider, GPU runner, vidIQ service or paid storage is used.
-Illustrations are generated at 640×360 then scaled into the 1080p video; they
-are not native 1080p renders. Eight image workers share the work. Subjective
+Illustrations are generated at 768×432 then scaled into the 1080p video; they
+are not native 1080p renders. Sixteen image workers share the work. Subjective
 style quality and character continuity still require review before public release.
 
 Owner-only Google Drive stores the story, prepared audio, captions, images,
