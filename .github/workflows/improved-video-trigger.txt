@@ -1,1 +1,1 @@
-Generate coherent improved story with larger narration response allowance and bounded JSON retry; revision 6.
+Render and privately upload the reviewed original story; revision 7.
