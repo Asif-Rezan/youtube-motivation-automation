@@ -1,5 +1,8 @@
 name: Resume saved private video upload
 on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/resume-private-upload.yml']
   workflow_dispatch:
     inputs:
       saved_run:
@@ -32,10 +35,10 @@ jobs:
           DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
           YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
-          EXPECTED_CHANNEL_ID: UCztvMrNCT34DO3DtzLPgWaw
+          EXPECTED_CHANNEL_ID: UCwNhdtzL9XZMIAMXm81UCbw
           DAILY_ENABLED: 'false'
-          SAVED_RUN_ID: ${{ inputs.saved_run }}
+          SAVED_RUN_ID: ${{ inputs.saved_run || '2026-10-13-free-private-test' }}
         run: |
           python -u free_private_test.py resume
           python -u youtube_verify.py
-# Manual only. No paid generation, no re-render, no public publishing.
+# One authorized private upload to REZAN IT; restore guard prevents duplicates. No paid generation, no re-render, no public publishing.
