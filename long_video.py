@@ -151,18 +151,24 @@ def render_complete(story, root):
 
 
 
+def init_input():
+    store = w.Store()
+    if not store.find('inputs/ghibli-long-story.json'):
+        store.save('inputs/ghibli-long-story.json', {'awaiting_private_input': True})
+    print(json.dumps({'private_input_ready': True}), flush=True)
+
+
 def stage_story():
     ROOT.mkdir(parents=True, exist_ok=True)
     store = w.Store()
-    results = store.client.files().list(
-        q=f"'{store.folder}' in parents and trashed=false and name='ghibli-story.json'",
-        fields='files(id)', pageSize=100).execute().get('files', [])
-    if len(results) != 1:
-        raise RuntimeError('Private story is missing or ambiguous for the workflow account')
-    store.download(results[0]['id'], ROOT/'story.json')
+    file_id = store.find('inputs/ghibli-long-story.json')
+    if not file_id:
+        raise RuntimeError('Private story input is not configured')
+    store.download(file_id, ROOT/'story.json')
     story = w.validate_story(json.loads((ROOT/'story.json').read_text()))
     print(json.dumps({'private_story_accessible': True,
         'words': sum(len(s['narration'].split()) for s in story['scenes'])}), flush=True)
+
 
 def save_preparation():
     store = w.Store()
@@ -235,7 +241,7 @@ def upload():
 if __name__ == '__main__':
     command = sys.argv[1]
     shard = int(sys.argv[2]) if len(sys.argv)>2 else 0
-    actions = {'stage-story': stage_story, 'prepare': prepare, 'save-preparation': save_preparation,
+    actions = {'init-input': init_input, 'stage-story': stage_story, 'prepare': prepare, 'save-preparation': save_preparation,
         'restore-images': lambda: restore_preparation(True), 'generate-shard': lambda: generate_shard(shard),
         'save-shard': lambda: save_shard(shard), 'restore-clips': restore_clips,
         'finish': finish, 'upload': upload}
