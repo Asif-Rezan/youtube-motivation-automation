@@ -1,0 +1,37 @@
+# Example only. Do not rename to render.yaml or deploy until the complete private
+# video test passes and billable cron usage is approved.
+services:
+  - type: cron
+    name: youtube-motivation-daily
+    runtime: docker
+    schedule: "0 3 * * *"
+    dockerCommand: python workflow.py daily
+    envVars:
+      - key: DAILY_ENABLED
+        value: "false"
+      - key: UPLOAD_ENABLED
+        value: "false"
+      - key: GROQ_API_KEY
+        sync: false
+      - key: HF_TOKEN
+        sync: false
+      - key: IMAGE_MODEL
+        sync: false
+      - key: YOUTUBE_TOKEN_JSON
+        sync: false
+      - key: EXPECTED_CHANNEL_ID
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ENDPOINT_URL
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_DEFAULT_REGION
+        value: us-east-1
+      - key: MUSIC_URL
+        sync: false
+      - key: MUSIC_CREDIT
+        sync: false
