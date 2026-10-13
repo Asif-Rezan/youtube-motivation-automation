@@ -26,7 +26,16 @@ def transcribe_audio(path):
     if _whisper is None:
         from faster_whisper import WhisperModel
         _whisper = WhisperModel('base.en', device='cpu', compute_type='int8', cpu_threads=2)
-    segments, info = _whisper.transcribe(str(path), language='en', word_timestamps=True,
+    import soundfile as sf
+    from scipy.signal import resample_poly
+    from math import gcd
+    audio, sample_rate = sf.read(str(path), dtype='float32')
+    if audio.ndim == 2:
+        audio = audio.mean(axis=1)
+    if sample_rate != 16000:
+        divisor = gcd(sample_rate, 16000)
+        audio = resample_poly(audio, 16000//divisor, sample_rate//divisor).astype(np.float32)
+    segments, info = _whisper.transcribe(audio, language='en', word_timestamps=True,
         beam_size=3, vad_filter=False)
     words = [dict(word=w.word, start=w.start, end=w.end) for segment in segments for w in segment.words or []
         if w.end > w.start]
