@@ -1,7 +1,8 @@
 # Private YouTube motivational storytelling cloud workflow
 
-Code is implemented, but no complete AI story video has been rendered/uploaded
-and no daily schedule is active. Component checks pass with synthetic fixtures.
+Complete free-model private test is running in Actions run 38398454994.
+No pass is claimed until the render and private YouTube processing checks finish.
+No daily schedule is active. Component checks pass with synthetic fixtures.
 
 ## Free infrastructure
 
@@ -40,30 +41,28 @@ Groq original fictional English motivational story plus title/description/tags �
 CPU-generated scene images (optional Hugging Face inference) → English AI narration → Whisper word timestamps →
 FFmpeg 1920×1080 video with slow zoom, fades, subtitles and ducked background music
 → generated thumbnail → duration/decode validation → private Drive → private YouTube.
-English narration uses canopylabs/orpheus-v1-english with the troy voice and
-200-character input chunks. Model/free-tier account access still needs a live check.
+The complete free-model test uses Kokoro-82M (am_michael, CPU, Apache-2.0 weights)
+for English narration and Faster-Whisper base.en int8 for aligned word captions.
+Groq narration remains optional using canopylabs/orpheus-v1-english and troy.
+Groq account authorization has not yet passed on a GitHub runner; the test does
+not need a Groq key. Daily fresh-story generation still requires GROQ_API_KEY.
 Hugging Face token authorization and FLUX.1-schnell provider availability have been
 verified, but no provider image request has completed. Monthly free inference
 credits are limited and do not establish a free daily image allowance.
 
-## Music: YouTube Audio Library only
+## Free AI music
 
-Download an instrumental track directly from YouTube Studio → Audio Library.
-Prefer the Attribution not required filter. Record its title, artist and license.
-For Creative Commons tracks, copy the exact attribution from YouTube Studio.
-Do not copy music from arbitrary YouTube videos or commit a library track publicly.
+The private test uses Magenta's 13 MB basic_rnn MusicRNN checkpoint with
+TensorFlow.js CPU inference. It continues a newly composed eight-note phrase,
+then renders the generated notes as additive ambient electric piano with stereo
+delay. No paid music service, vidIQ credit, audio sample library, or API key is
+used. This is model-generated symbolic music, not orchestral audio diffusion.
+The generated 65-second music bed is looped quietly and ducked beneath narration.
 
-Upload the downloaded track and provenance record into your private workflow
-Drive folder from an authorized cloud session:
-
-```
-python setup_music.py /secure/downloads/track.mp3 --title "TRACK TITLE" --artist "ARTIST" --license "YouTube Audio Library License"
-```
-
-For attribution-required tracks add `--attribution-required --attribution "EXACT CREDIT"`.
-The script stores music-manifest.json containing track ID, provenance, license and
-SHA-256. Every live run downloads it privately, verifies the hash and adds required
-attribution to the YouTube description. No library track is installed yet.
+Magenta.js: https://github.com/magenta/magenta-js (Apache-2.0).
+Model checkpoint: https://github.com/magenta/magenta-js/blob/master/music/checkpoints/README.md.
+The code rejects vidIQ music manifests. YouTube Audio Library remains an optional
+free licensed alternative through setup_music.py.
 
 ## Secure configuration
 
@@ -71,7 +70,7 @@ Add the following to GitHub repository Settings → Secrets and variables → Ac
 Do not send passwords, API keys or OAuth tokens in chat or commit them.
 
 Secrets:
-- GROQ_API_KEY: newly rotated key, not the exposed key from chat.
+- GROQ_API_KEY: store directly as a GitHub Actions secret; needed for fresh daily stories, not the free CPU test.
 - HF_TOKEN: optional, only for IMAGE_BACKEND=hf. Not needed for default CPU generation.
 - DRIVE_TOKEN_JSON: authorized-user Google OAuth JSON with refresh token and drive.file scope.
 - DRIVE_FOLDER_ID: optional. The app now creates/discovers its own owner-only YouTubeAutomation folder.
@@ -91,14 +90,23 @@ token expiry may break unattended execution; configure production consent correc
 
 ## Test before scheduling
 
-The cloud-test workflow has only workflow_dispatch; committing it does not run it.
+free-private-test.yml runs the complete original test on a free Ubuntu runner.
+Its push trigger is limited to that workflow file; it also supports manual runs.
+Rendering has no Google secrets in its environment. A separate upload process
+receives only existing Drive and YouTube OAuth secrets after render validation.
+No video/audio/image assets are attached as public GitHub Actions artifacts.
+private-test-story.json is an original fictional 694-word test story; daily mode
+rejects STORY_FILE so it cannot silently repeat this story.
+
+The optional cloud-test workflow has only workflow_dispatch; committing it does not run it.
 Select Actions → Private cloud video test → Run workflow → checks first.
 `render` performs generation and saves privately in Drive. `private-upload` uploads
 privately after channel verification. Both need credentials and imported music.
 No public publishing code exists. Watch the full private video and verify quality.
 A completed private upload records last-private-test.json. Daily generation requires
-this record AND DAILY_ENABLED=true. The pipeline does not check YouTube processing
-or playback end-to-end automatically; that validation is still pending.
+this record AND DAILY_ENABLED=true. The upload now waits for processingStatus=succeeded and uploadStatus=processed,
+while checking privacyStatus=private, before recording a pass. Full subjective
+playback, character consistency, and pronunciation still need human review.
 
 After the complete test passes, register 09:00 Asia/Dhaka (03:00 UTC), cron
 `0 3 * * *`, command `python workflow.py daily`. GitHub scheduled workflows can be
