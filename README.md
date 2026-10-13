@@ -1,85 +1,122 @@
-# YouTube motivational storytelling cloud workflow
+# Private YouTube motivational storytelling cloud workflow
 
-Implementation draft. No cloud service or daily schedule has been activated.
-No finished AI-narrated story has been produced or uploaded yet.
+Code is implemented, but no complete AI story video has been rendered/uploaded
+and no daily schedule is active. Component checks pass with synthetic fixtures.
+
+## Free infrastructure
+
+Use standard GitHub-hosted Ubuntu runners in this public repository for compute.
+Use the existing Google Drive free allowance for owner-only checkpoints and test
+videos. No S3, AWS credentials, paid bucket, Render service, or storage subscription
+is required. Private video files are never committed or attached as GitHub Actions
+artifacts in this public repository. Google Drive storage is shared with Gmail and
+Photos. The pipeline stops near the 15 GB free allowance and never purchases space.
+No automatic deletion is implemented; clear older videos yourself when needed.
 
 ## Pipeline
 
-Groq original English story and metadata → Hugging Face cinematic images → Groq
-speech per scene → Whisper word timestamps → FFmpeg 1920×1080 video with slow
-zoom, fades, subtitles and ducked licensed instrumental music → generated
-thumbnail → validation → private S3-compatible storage → private YouTube upload.
+Groq original fictional English motivational story plus title/description/tags →
+Hugging Face cinematic images → English AI narration → Whisper word timestamps →
+FFmpeg 1920×1080 video with slow zoom, fades, subtitles and ducked background music
+→ generated thumbnail → duration/decode validation → private Drive → private YouTube.
+Speech model/account availability still needs a live check; configured defaults
+follow the documented example and are not guaranteed available on every account.
 
-No public publishing code exists. YouTube OAuth is checked against
-EXPECTED_CHANNEL_ID before upload. Wrong accounts fail closed. Videos outside
-180–600 seconds fail before upload. The test aims for about 5–6 minutes.
+## Music: YouTube Audio Library only
 
-## Current blockers
+Download an instrumental track directly from YouTube Studio → Audio Library.
+Prefer the Attribution not required filter. Record its title, artist and license.
+For Creative Commons tracks, copy the exact attribution from YouTube Studio.
+Do not copy music from arbitrary YouTube videos or commit a library track publicly.
 
-1. Target repository access is now verified. Cloud deployment is not yet created.
-2. GROQ_API_KEY, HF_TOKEN and IMAGE_MODEL must be configured. Confirm current
-   provider/model availability and licenses before live testing. TTS defaults
-   follow the API example but account availability has not been verified.
-3. YouTube authorized-user OAuth JSON must include upload and read permissions,
-   with a refresh token and the intended channel. Create Google Cloud OAuth app,
-   enable YouTube Data API, authorize through a secure consent flow, and place
-   the resulting JSON in the host's secret settings. Never paste secrets in chat
-   or commit them. Google OAuth testing-mode token expiration can interrupt
-   unattended jobs; configure production consent appropriately.
-4. Private S3-compatible bucket and narrowly scoped storage credentials needed.
-5. MUSIC_URL must point to downloadable instrumental music with permission to
-   use on monetized YouTube videos. Put attribution in MUSIC_CREDIT if required.
-6. Budget approval is needed before billable deployment. Free tiers are limited;
-   no cloud AI service here is assumed unlimited or guaranteed free.
-
-## Build and verify in a cloud runner
+Upload the downloaded track and provenance record into your private workflow
+Drive folder from an authorized cloud session:
 
 ```
-docker build -t youtube-motivation .
-docker run --rm youtube-motivation python -m unittest -v
-docker run --rm --env-file /secure/path/workflow.env youtube-motivation python workflow.py preflight
-docker run --rm --env-file /secure/path/workflow.env youtube-motivation python workflow.py test
+python setup_music.py /secure/downloads/track.mp3 --title "TRACK TITLE" --artist "ARTIST" --license "YouTube Audio Library License"
 ```
 
-First keep UPLOAD_ENABLED=false. Inspect rendered video, music balance, character
-consistency, caption timings, pronunciation, thumbnail and metadata. Then enable
-UPLOAD_ENABLED=true for the private test, after inspecting/resetting the test
-checkpoint as necessary. An upload_started checkpoint must be reconciled against
-YouTube before retrying; do not delete it blindly. Verify YouTube processing and
-playback of the entire private video. Only then set DAILY_ENABLED=true and create
-the actual scheduler.
+For attribution-required tracks add `--attribution-required --attribution "EXACT CREDIT"`.
+The script stores music-manifest.json containing track ID, provenance, license and
+SHA-256. Every live run downloads it privately, verifies the hash and adds required
+attribution to the YouTube description. No library track is installed yet.
 
-Daily schedule: 09:00 Asia/Dhaka = 03:00 UTC; cron expression `0 3 * * *`.
-Command: `python workflow.py daily`. Render cron has a minimum monthly charge
-and cannot attach a persistent disk. S3 checkpoints survive individual runs.
-Nothing in this package creates or activates a scheduler automatically.
+## Secure configuration
 
-## Reliability and remaining hardening
+Add the following to GitHub repository Settings → Secrets and variables → Actions.
+Do not send passwords, API keys or OAuth tokens in chat or commit them.
 
-The run key is Bangladesh calendar date. Completed or ambiguous uploads are
-blocked on repeat runs, preventing silent duplicate inserts. Upload uses
-resumable chunks with retries. Story and final assets are kept in private object
-storage; no credentials or provider error bodies are logged. Image generation
-and narration are not automatically retried to avoid repeated credit spending.
-API outages stop the run rather than substitute stock images or synthetic voices.
+Secrets:
+- GROQ_API_KEY: newly rotated key, not the exposed key from chat.
+- HF_TOKEN: Hugging Face token with Inference Providers permission, not a password.
+- DRIVE_TOKEN_JSON: authorized-user Google OAuth JSON with refresh token and drive.file scope.
+- DRIVE_FOLDER_ID: owner-only workflow folder accessible to that OAuth application.
+- YOUTUBE_TOKEN_JSON: authorized-user OAuth JSON with refresh token, youtube.upload and youtube.readonly scopes.
 
-Six component tests pass, including an actual 1920×1080 render, caption timing,
-story validation, time rounding, missing secrets and disabled daily execution.
-Rendering is tested with synthetic fixtures, not claimed as a complete AI video
-test. Local caches resume within a retained workspace; assets generated before a
-failed run are not yet restored from object storage on a fresh worker, so those
-generations may be repeated. The production scheduler must ensure one active
-run per service (Render cron does). No distributed lock is implemented for
-independent manual workers; do not run them concurrently.
+Variables:
+- IMAGE_MODEL: current Hugging Face text-to-image model available to your account.
+- EXPECTED_CHANNEL_ID: intended YouTube channel ID.
+- TTS_MODEL / TTS_VOICE: supported English speech model and voice; optional documented defaults.
 
-Originality includes prompting against recent titles and exact script hashing.
-This does not guarantee semantic uniqueness or quality; production operation
-needs visual review initially and monitoring for repeated plots. Automated final
-audio intelligibility, character consistency, and full video semantic QA remain
-to be implemented/validated. No notification integration is configured.
+Enable Drive API and YouTube Data API in the OAuth project's Google Cloud console.
+Authorize securely with the intended Google account. Limited drive.file access is
+sufficient for files created by/selected for the app. Never broaden token scopes
+without completing the Google consent flow. Existing ChatGPT connector access does
+not automatically provide tokens to a GitHub runner. OAuth testing-mode refresh
+token expiry may break unattended execution; configure production consent correctly.
 
-## Documentation used
+## Test before scheduling
 
+The cloud-test workflow has only workflow_dispatch; committing it does not run it.
+Select Actions → Private cloud video test → Run workflow → checks first.
+`render` performs generation and saves privately in Drive. `private-upload` uploads
+privately after channel verification. Both need credentials and imported music.
+No public publishing code exists. Watch the full private video and verify quality.
+A completed private upload records last-private-test.json. Daily generation requires
+this record AND DAILY_ENABLED=true. The pipeline does not check YouTube processing
+or playback end-to-end automatically; that validation is still pending.
+
+After the complete test passes, register 09:00 Asia/Dhaka (03:00 UTC), cron
+`0 3 * * *`, command `python workflow.py daily`. GitHub scheduled workflows can be
+delayed and do not guarantee exact start time. No schedule is registered now.
+render-cron.example.yaml is a legacy optional billable example, NOT the free path.
+
+## Reliability and limitations
+
+Each Bangladesh date has a run key. Completed or ambiguous uploads block retries.
+Resumable upload chunks retry transient failures without repeating videos.insert.
+A checkpoint marked upload_started needs manual reconciliation before another run.
+One concurrent runner is enforced by the workflow concurrency group. Never run
+independent manual workers simultaneously: no distributed lock exists.
+
+Story history and exact hashes reduce repeated content, but do not guarantee semantic
+originality or quality. Character continuity, pronunciation, music balance and final
+story coherence require review during initial testing. Transcription supplies word
+caption timestamps. Videos outside 180–600 seconds fail before upload.
+
+Generation calls are not automatically retried to avoid repeated credit consumption.
+Scene assets are cached only within one runner; after a failed run they are not yet
+restored into a fresh runner, so new attempts can regenerate limited-credit assets.
+No failure notification integration is configured. Private Drive copies have no
+automatic retention deletion. API generation free tiers are limited and may run out.
+
+## Component checks
+
+```
+pip install -r requirements.txt
+python -m unittest -v
+python workflow.py preflight
+```
+
+The six original component tests validate an actual 1080p synthetic render, caption
+timing, story validation, time rounding, missing credentials and disabled daily runs.
+They are not a completed motivational-video test.
+
+Documentation:
+- https://support.google.com/youtube/answer/3376882
+- https://docs.github.com/en/billing/concepts/product-billing/github-actions
+- https://support.google.com/googleone/answer/2375123
+- https://developers.google.com/workspace/drive/api/guides/api-specific-auth
 - https://console.groq.com/docs/api-reference
 - https://huggingface.co/docs/huggingface_hub/en/package_reference/inference_client
 - https://developers.google.com/youtube/v3/guides/uploading_a_video
