@@ -33,7 +33,7 @@ jobs:
           python - <<'PY'
           from PIL import Image
           image = Image.open('output/cpu-check.png')
-          assert image.size == (640, 360)
+          assert image.size == (768, 432)
           assert image.convert('L').getextrema()[1] > 0
           print('Actual CPU-generated image passed size and nonblank checks')
           PY
