@@ -3,4 +3,3 @@ huggingface-hub>=0.34,<2
 Pillow>=11,<13
 google-api-python-client>=2.170,<3
 google-auth>=2.40,<3
-cryptography>=44,<51
