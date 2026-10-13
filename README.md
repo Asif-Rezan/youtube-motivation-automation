@@ -1,26 +1,21 @@
 # Private YouTube motivational storytelling cloud workflow
 
-The original eight-scene video rendered successfully: 264.53 seconds,
-1920×1080, Kokoro English narration, aligned captions, transitions, free
-MusicRNN background music and a generated thumbnail.
-A separate cloud restore from private Drive passed strict full-file decoding
-in saved-video validation run 38404650010.
+**The complete private-upload test passed on REZAN IT (@rezan_it).**
+The user selected this channel for the completed test video. Cloud upload run
+38405889406 confirmed the actual channel, private visibility, successful HD
+processing, custom thumbnail, title, description and tags.
 
-**The private-upload test has NOT passed.** The current YouTube OAuth token
-authorizes a different channel from the explicitly chosen Rezan Relaxation.
-The channel guard stopped before videos.insert; no YouTube upload was made.
-Completed assets are stored privately in Drive. Their identifiers and links
-are deliberately omitted from this public repository.
+The original video is 264.53 seconds (4:25), 1920×1080, with eight scenes,
+Kokoro English narration, aligned burned-in captions, transitions, free MusicRNN
+background music and an AI-generated thumbnail. Private Drive restore and strict
+complete-file decoding passed before upload. Private asset links are omitted
+from this public repository.
 
-Reauthorize YouTube with the intended Rezan Relaxation channel and replace
-YOUTUBE_TOKEN_JSON directly in Actions secrets. Then run **Resume saved private
-video upload**. The workflow restores existing assets, validates the complete
-video, uploads privately and verifies the actual channel, metadata and HD
-processing. It does not regenerate images, voice or music. Ambiguous or
-completed upload states require reconciliation to prevent duplicates.
-
-GROQ_API_KEY remains absent, so fresh daily story generation is not ready.
-No daily schedule is active. Review CPU-generated image quality before publishing.
+The resume upload workflow is manual only again. A recorded completed upload
+blocks duplicate insertion. No public publishing path was used and no daily
+schedule is active. GROQ_API_KEY remains absent, so fresh daily story generation
+still needs configuration. Review the private video and CPU image quality before
+approving any public release.
 
 ## Free infrastructure
 
