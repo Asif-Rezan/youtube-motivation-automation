@@ -21,4 +21,4 @@ jobs:
       - env:
           DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-        run: python -u long_video.py init-input
+        run: python -u long_video.py stage-story
