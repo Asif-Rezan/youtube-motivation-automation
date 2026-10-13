@@ -118,7 +118,7 @@ def make_story(day, previous):
     No greeting or generic motivational preamble. Give the protagonist one concrete goal, believable setbacks, and earned resolution.
     No random magical trials, repeated mentor lessons, or repeated endings. Escalate choices, setbacks, surprising reversals,
     specific dialogue, and emotional payoffs. Resolve the opening question in the final act.
-    Last chapter ends with a specific reflection question and an explicit like, comment, subscribe CTA.
+    Last chapter ends with an earned resolution and a specific reflection. No viewer calls to action in the story plan.
     Create an original plot and title; avoid generic stock stories.
     Return JSON: title (max 100 characters), description (clearly label fictional), tags (list),
     thumbnail_text (2-5 words), thumbnail_prompt, character_description (max 14 words, appearance and outfit),
@@ -144,8 +144,8 @@ def make_story(day, previous):
         Natural narration with concrete actions and dialogue, not generic advice.
         Begin chapter 1 with the crisis immediately, no welcome or setup preamble.
         Escalate stakes, introduce reversals and emotional payoffs every few chapters.
-        Resolve the initial crisis before chapter 20. Chapter 20 must explicitly ask viewers to like,
-        comment with their answer to a specific story question, and subscribe.
+        Resolve the initial crisis by chapter 20. Do not include any viewer call to action in any chapter;
+        the application adds a final like, comment, and subscribe request separately.
         Narrate ONLY the five assigned events, one event per chapter in the listed order. Do not jump ahead.\n        No ending, farewell, viewer question, or call to action before chapter 20.
         Do not add chapter headings or directions to spoken text. No repeated introduction.''', 4200, group_schema)
         parts = [group['narrations'][k] for k in keys]
@@ -154,6 +154,9 @@ def make_story(day, previous):
         for scene, narration in zip(outline['scenes'][begin:begin+5], parts):
             scene['narration'] = narration
         prior = parts[-1]
+    outline['scenes'][-1]['narration'] += (' Which choice would you have made in the protagonist\'s place? '
+        'Leave a comment with your answer, like this video if it inspired you, '
+        'and subscribe for more stories of courage and growth.')
     from long_video import validate_engagement
     validate_engagement(outline)
     return validate_story(outline)
