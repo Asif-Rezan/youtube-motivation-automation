@@ -55,7 +55,7 @@ class Checks(unittest.TestCase):
     def test_story_validation(self):
         story = dict(title='The Last Step', description='An original fictional story.', tags=['motivation'],
                      thumbnail_text='ONE MORE STEP', thumbnail_prompt='A determined runner',
-                     scenes=[dict(narration=' '.join(['word']*130), image_prompt='cinematic road') for _ in range(4)])
+                     scenes=[dict(narration=' '.join(['word']*450), image_prompt='cinematic road') for _ in range(4)])
         self.assertEqual(w.validate_story(story), story)
         story['title'] = 'x'*101
         with self.assertRaises(ValueError):
@@ -77,7 +77,7 @@ class Checks(unittest.TestCase):
             w.shell('ffmpeg','-y','-f','lavfi','-i','sine=frequency=440:duration=2',str(root/'audio.wav'))
             length = w.render_scene(root/'image.png',root/'audio.wav',root/'clip.mp4')
             self.assertAlmostEqual(length, 2, places=1)
-            metadata = w.check_video(root/'clip.mp4', min_duration=1)
+            metadata = w.check_video(root/'clip.mp4', min_duration=1, max_duration=900)
             self.assertEqual(metadata['streams'][0]['width'],1920)
             with self.assertRaises(AssertionError):
                 w.check_video(root/'clip.mp4')
