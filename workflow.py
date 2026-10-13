@@ -91,6 +91,12 @@ def make_story(day, previous):
 
 
 def make_image(prompt, path):
+    if os.getenv('IMAGE_BACKEND', 'cpu') == 'cpu':
+        from image_cpu import generate
+        generate(prompt + ', cinematic lighting, no lettering or watermarks', path)
+        return
+    if os.getenv('IMAGE_BACKEND') != 'hf':
+        raise ValueError('IMAGE_BACKEND must be cpu or hf')
     from huggingface_hub import InferenceClient
     image = InferenceClient(api_key=required('HF_TOKEN')).text_to_image(
         prompt=prompt + ', cinematic lighting, landscape composition, no text or watermarks',
@@ -320,7 +326,14 @@ def upload_private(video, thumbnail, story, state, store, key, music_credit=''):
 
 
 def preflight():
-    needed = ['GROQ_API_KEY', 'HF_TOKEN', 'IMAGE_MODEL', 'DRIVE_TOKEN_JSON', 'DRIVE_FOLDER_ID']
+    needed = ['GROQ_API_KEY', 'DRIVE_TOKEN_JSON', 'DRIVE_FOLDER_ID']
+    if os.getenv('IMAGE_BACKEND', 'cpu') == 'hf':
+        needed += ['HF_TOKEN', 'IMAGE_MODEL']
+    else:
+        import importlib.util
+        for module in ('torch', 'diffusers', 'transformers'):
+            if importlib.util.find_spec(module) is None:
+                needed.append(module + ' (CPU dependency)')
     if os.getenv('UPLOAD_ENABLED') == 'true':
         needed += ['YOUTUBE_TOKEN_JSON', 'EXPECTED_CHANNEL_ID']
     missing = [name for name in needed if not os.getenv(name)]
