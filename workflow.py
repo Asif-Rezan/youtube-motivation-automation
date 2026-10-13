@@ -119,7 +119,7 @@ def make_story(day, previous):
     No random magical trials, repeated mentor lessons, or repeated endings. Escalate choices, setbacks, surprising reversals,
     specific dialogue, and emotional payoffs. Resolve the opening question in the final act.
     Last chapter ends with a specific reflection question and an explicit like, comment, subscribe CTA.
-    Avoid these recent titles: {previous}.
+    Create an original plot and title; avoid generic stock stories.
     Return JSON: title (max 100 characters), description (clearly label fictional), tags (list),
     thumbnail_text (2-5 words), thumbnail_prompt, character_description (max 14 words, appearance and outfit),
     scenes (object with chapter_01 through chapter_20). Each chapter: summary (max 25 words), image_prompt,
