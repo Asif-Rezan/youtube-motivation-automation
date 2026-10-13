@@ -11,6 +11,10 @@ import workflow as w
 ROOT = Path('output/free-private-test')
 
 
+def saved_run_id():
+    return os.getenv('SAVED_RUN_ID') or (dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat() + '-free-private-test')
+
+
 def render():
     from PIL import Image, ImageDraw, ImageFont, ImageOps
     from music_cpu import generate
@@ -66,7 +70,7 @@ def upload():
         raise RuntimeError('No validated rendered video')
     w.check_video(ROOT/'video.mp4')
     store = w.Store()
-    run_id = dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat() + '-free-private-test'
+    run_id = saved_run_id()
     key = f'runs/{run_id}/state.json'
     if store.load(key, {}).get('phase') in ('upload_started', 'uploaded', 'complete'):
         raise RuntimeError('Upload exists or needs reconciliation; refusing duplicate insertion')
@@ -91,7 +95,7 @@ def upload():
 def restore():
     ROOT.mkdir(parents=True, exist_ok=True)
     store = w.Store()
-    run_id = dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat() + '-free-private-test'
+    run_id = saved_run_id()
     key = f'runs/{run_id}/state.json'
     state = store.load(key, None)
     if not state or not state.get('validation', {}).get('render_passed'):
@@ -114,7 +118,7 @@ def resume():
 if __name__ == '__main__':
     import sys
     try:
-        {'render': render, 'upload': upload, 'resume': resume}[sys.argv[1]]()
+        {'render': render, 'upload': upload, 'resume': resume, 'restore': restore}[sys.argv[1]]()
     except Exception as error:
         # Keep API response bodies and credentials out of public Actions logs.
         print(json.dumps({'private_test_passed': False, 'error_type': type(error).__name__,
