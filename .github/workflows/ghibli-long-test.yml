@@ -6,7 +6,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: youtube-motivation
+  group: youtube-improved-story
   cancel-in-progress: false
 env:
   SAVED_RUN_ID: improved-${{ github.run_id }}
@@ -24,6 +24,7 @@ env:
   MKL_NUM_THREADS: '4'
   DAILY_ENABLED: 'false'
   GENERATE_FRESH_STORY: 'true'
+  STORY_MODEL: openai/gpt-oss-120b
   CPU_IMAGE_MODEL: Lykon/dreamshaper-8
 jobs:
   prepare:
