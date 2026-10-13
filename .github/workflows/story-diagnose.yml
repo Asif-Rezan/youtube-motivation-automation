@@ -1,0 +1,35 @@
+name: Free story API diagnosis
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/story-diagnose.yml']
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - name: Check available story models without exposing secrets
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          python - <<'PY'
+          import os, requests, json
+          key = os.environ.get('GROQ_API_KEY', '')
+          response = requests.get('https://api.groq.com/openai/v1/models', headers={'Authorization': 'Bearer '+key}, timeout=45)
+          print(json.dumps({'check': 'Groq models', 'configured': bool(key), 'http_status': response.status_code}))
+          if response.ok:
+              print(json.dumps({'story_models': [m['id'] for m in response.json()['data'] if any(x in m['id'] for x in ('llama-3.3', 'gpt-oss'))]}))
+          else:
+              print(json.dumps({'api_error': response.json().get('error', {}).get('code')}))
+              raise SystemExit(1)
+          payload = {'model': 'llama-3.3-70b-versatile', 'messages': [{'role': 'user', 'content': 'Reply with one word: Ready'}], 'max_completion_tokens': 16}
+          response = requests.post('https://api.groq.com/openai/v1/chat/completions', headers={'Authorization':'Bearer '+key}, json=payload, timeout=45)
+          print(json.dumps({'check':'Old story model access', 'http_status':response.status_code, 'api_error':response.json().get('error', {}).get('code')}))
+          PY
