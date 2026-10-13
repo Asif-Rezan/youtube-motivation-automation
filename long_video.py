@@ -47,7 +47,7 @@ def shot_plan(story, lengths):
 
 def prepare(story=None, root=ROOT):
     root.mkdir(parents=True, exist_ok=True)
-    story = story or json.loads(Path(os.getenv('STORY_FILE', 'ghibli-story.json')).read_text())
+    story = story or json.loads(Path(os.getenv('STORY_FILE', str(root/'story.json'))).read_text())
     w.validate_story(story)
     (root/'story.json').write_text(json.dumps(story, indent=2))
     lengths, word_lists, audios = [], [], []
@@ -150,6 +150,20 @@ def render_complete(story, root):
     return finish(root)
 
 
+
+def stage_story():
+    ROOT.mkdir(parents=True, exist_ok=True)
+    store = w.Store()
+    results = store.client.files().list(
+        q=f"'{store.folder}' in parents and trashed=false and name='ghibli-story.json'",
+        fields='files(id)', pageSize=100).execute().get('files', [])
+    if len(results) != 1:
+        raise RuntimeError('Private story is missing or ambiguous for the workflow account')
+    store.download(results[0]['id'], ROOT/'story.json')
+    story = w.validate_story(json.loads((ROOT/'story.json').read_text()))
+    print(json.dumps({'private_story_accessible': True,
+        'words': sum(len(s['narration'].split()) for s in story['scenes'])}), flush=True)
+
 def save_preparation():
     store = w.Store()
     key = f'runs/{run_id()}/state.json'
@@ -221,7 +235,7 @@ def upload():
 if __name__ == '__main__':
     command = sys.argv[1]
     shard = int(sys.argv[2]) if len(sys.argv)>2 else 0
-    actions = {'prepare': prepare, 'save-preparation': save_preparation,
+    actions = {'stage-story': stage_story, 'prepare': prepare, 'save-preparation': save_preparation,
         'restore-images': lambda: restore_preparation(True), 'generate-shard': lambda: generate_shard(shard),
         'save-shard': lambda: save_shard(shard), 'restore-clips': restore_clips,
         'finish': finish, 'upload': upload}
