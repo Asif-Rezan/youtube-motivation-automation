@@ -444,8 +444,8 @@ def run(daily=False):
     shell('ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', str(playlist), '-c', 'copy', str(root/'joined.mp4'))
     video = root/'video.mp4'
     shell('ffmpeg', '-y', '-i', str(root/'joined.mp4'), '-stream_loop', '-1', '-i', str(root/'music.audio'),
-        '-filter_complex', '[0:a]loudnorm=I=-16:TP=-1.5:LRA=11[v];[1:a]volume=0.08[m];'
-        '[m][v]sidechaincompress=threshold=0.02:ratio=8[duck];[0:a][duck]amix=inputs=2:duration=first:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11[a]',
+        '-filter_complex', '[0:a]loudnorm=I=-16:TP=-1.5:LRA=11,asplit=2[voice][side];[1:a]volume=0.09[music];'
+        '[music][side]sidechaincompress=threshold=0.02:ratio=8[duck];[voice][duck]amix=inputs=2:duration=first:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11[a]',
         '-vf', f"subtitles={root/'captions.srt'}:force_style='FontName=DejaVu Sans,FontSize=22,Outline=2,MarginV=35'",
         '-map', '0:v', '-map', '[a]', '-t', str(sum(lengths)), '-c:v', 'libx264', '-preset', 'fast',
         '-crf', '21', '-c:a', 'aac', '-movflags', '+faststart', str(video))
