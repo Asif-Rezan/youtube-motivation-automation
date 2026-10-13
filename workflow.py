@@ -68,11 +68,22 @@ def validate_story(data):
 def request_groq(endpoint, payload, binary=False):
     import requests
     # Generation calls are not automatically repeated: repeats can consume credits.
-    response = requests.post('https://api.groq.com/openai/v1/' + endpoint,
-        headers={'Authorization': 'Bearer ' + required('GROQ_API_KEY')}, json=payload, timeout=180)
-    if not response.ok:
-        print(json.dumps({'check': 'Groq generation', 'http_status': response.status_code}), flush=True)
-        raise RuntimeError(f'Groq request failed with HTTP {response.status_code}')
+    for attempt in range(2):
+        response = requests.post('https://api.groq.com/openai/v1/' + endpoint,
+            headers={'Authorization': 'Bearer ' + required('GROQ_API_KEY')}, json=payload, timeout=180)
+        if response.ok:
+            break
+        try:
+            error_code = response.json().get('error', {}).get('code')
+        except ValueError:
+            error_code = None
+        print(json.dumps({'check': 'Groq generation', 'http_status': response.status_code,
+            'api_error_code': error_code, 'attempt': attempt+1}), flush=True)
+        if attempt == 0 and (response.status_code == 429 or
+                (response.status_code == 400 and error_code == 'json_validate_failed')):
+            time.sleep(60)
+            continue
+        raise RuntimeError(f'Groq request failed with HTTP {response.status_code}; code={error_code}')
     return response.content if binary else response.json()
 
 
