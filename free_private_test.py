@@ -22,9 +22,9 @@ def render():
     for i, scene in enumerate(story['scenes']):
         print(json.dumps({'scene': i+1, 'of': len(story['scenes']), 'phase': 'generating'}), flush=True)
         image, audio, clip = [ROOT/f'{i:02}.{ext}' for ext in ('png', 'wav', 'mp4')]
-        w.make_image(scene['image_prompt'], image)
         w.make_narration(scene['narration'], audio)
         words = w.transcribe(audio)
+        w.make_image(scene['image_prompt'], image)
         word_lists.append(words)
         lengths.append(w.render_scene(image, audio, clip))
         clips.append(clip)
