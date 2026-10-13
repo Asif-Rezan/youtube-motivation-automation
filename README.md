@@ -1,10 +1,24 @@
 # Private YouTube motivational storytelling cloud workflow
 
-Complete free-model private test is running in Actions run 38399752265.
-Earlier attempts exposed decoder/dependency issues; the current run uses direct
-FFmpeg waveform decoding for Faster-Whisper. No upload occurred in those attempts.
-No pass is claimed until the render and private YouTube processing checks finish.
-No daily schedule is active. Component checks pass with synthetic fixtures.
+The original eight-scene video rendered successfully: 264.53 seconds,
+1920×1080, Kokoro English narration, aligned captions, transitions, free
+MusicRNN background music and a generated thumbnail.
+
+**The private-upload test has NOT passed.** The current YouTube OAuth token
+authorizes a different channel from the explicitly chosen Rezan Relaxation.
+The channel guard stopped before videos.insert; no YouTube upload was made.
+Completed assets are stored privately in Drive. Their identifiers and links
+are deliberately omitted from this public repository.
+
+Reauthorize YouTube with the intended Rezan Relaxation channel and replace
+YOUTUBE_TOKEN_JSON directly in Actions secrets. Then run **Resume saved private
+video upload**. The workflow restores existing assets, validates the complete
+video, uploads privately and verifies the actual channel, metadata and HD
+processing. It does not regenerate images, voice or music. Ambiguous or
+completed upload states require reconciliation to prevent duplicates.
+
+GROQ_API_KEY remains absent, so fresh daily story generation is not ready.
+No daily schedule is active. Review CPU-generated image quality before publishing.
 
 ## Free infrastructure
 
