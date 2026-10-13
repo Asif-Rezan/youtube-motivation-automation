@@ -1,4 +1,4 @@
-name: Free strict story generation check
+name: Free strict story generation check # reliable final narrator CTA
 on:
   workflow_dispatch:
   push:
