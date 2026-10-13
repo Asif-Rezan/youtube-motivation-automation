@@ -209,7 +209,7 @@ def stage_story():
         print(json.dumps({'fresh_story_ready': True, 'title': story['title'],
             'words': sum(len(s['narration'].split()) for s in story['scenes'])}), flush=True)
         return
-    file_id = store.find('inputs/ghibli-long-story.json')
+    file_id = store.find(os.getenv('PRIVATE_STORY_KEY', 'inputs/ghibli-long-story.json'))
     if not file_id:
         raise RuntimeError('Private story input is not configured')
     store.download(file_id, ROOT/'story.json')
