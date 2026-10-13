@@ -197,6 +197,7 @@ def init_input():
 def stage_story():
     ROOT.mkdir(parents=True, exist_ok=True)
     store = w.Store()
+    print(json.dumps({'check': 'Private Drive store', 'passed': True}), flush=True)
     if os.getenv('GENERATE_FRESH_STORY') == 'true':
         history = store.load('history.json', [])
         story = w.make_story(run_id(), [h.get('title') for h in history[-20:]])
@@ -293,7 +294,8 @@ if __name__ == '__main__':
         actions[command]()
     except Exception as error:
         print(json.dumps({'command': command, 'passed': False, 'error_type': type(error).__name__,
-            'http_status': getattr(getattr(error, 'resp', None), 'status', None)}), flush=True)
+            'http_status': getattr(getattr(error, 'resp', None), 'status', None),
+            'reason': str(error) if isinstance(error, (RuntimeError, ValueError)) else type(error).__name__}), flush=True)
         if command in ('prepare', 'generate-shard', 'finish'):
             raise
         raise SystemExit(1)
