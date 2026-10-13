@@ -98,6 +98,37 @@ def make_image(prompt, path):
     image.save(path)
 
 
+def speech_chunks(text, limit=200):
+    chunks, current = [], ''
+    for word in text.split():
+        if len(word) > limit:
+            raise ValueError('Narration contains a word longer than the TTS input limit')
+        candidate = (current + ' ' + word).strip()
+        if len(candidate) > limit:
+            chunks.append(current)
+            current = word
+        else:
+            current = candidate
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def make_narration(text, path):
+    parts = []
+    for index, chunk in enumerate(speech_chunks(text)):
+        part = path.with_name(path.stem + f'-part-{index:03}.wav')
+        if not part.exists():
+            part.write_bytes(request_groq('audio/speech', {
+                'model': os.getenv('TTS_MODEL') or 'canopylabs/orpheus-v1-english',
+                'voice': os.getenv('TTS_VOICE') or 'troy', 'input': chunk, 'response_format': 'wav'}, True))
+        parts.append(part)
+    playlist = path.with_suffix('.txt')
+    playlist.write_text(''.join(f"file '{p.name}'\n" for p in parts))
+    shell('ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', str(playlist), '-ar', '48000',
+          '-ac', '2', '-c:a', 'pcm_s16le', str(path))
+
+
 def transcribe(audio):
     import requests
     with audio.open('rb') as stream:
@@ -328,8 +359,7 @@ def run(daily=False):
         if not image.exists():
             make_image(scene['image_prompt'], image)
         if not audio.exists():
-            audio.write_bytes(request_groq('audio/speech', {'model': (os.getenv('TTS_MODEL') or 'playai-tts'),
-                'voice': (os.getenv('TTS_VOICE') or 'Fritz-PlayAI'), 'input': scene['narration'], 'response_format': 'wav'}, True))
+            make_narration(scene['narration'], audio)
         lengths.append(render_scene(image, audio, clip))
         clips.append(clip)
         words_file = root/f'{i:02}-words.json'
