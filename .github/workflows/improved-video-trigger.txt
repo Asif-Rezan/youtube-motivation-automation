@@ -1,1 +1,1 @@
-Generate fresh improved story after Groq secret configuration; safe diagnostics revision 2.
+Generate improved story with available free GPT-OSS model; revision 3.
