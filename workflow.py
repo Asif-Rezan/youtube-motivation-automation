@@ -210,7 +210,21 @@ class Store:
         from googleapiclient.discovery import build
         self.client = build('drive', 'v3', credentials=Credentials.from_authorized_user_info(
             json.loads(required('DRIVE_TOKEN_JSON'))), cache_discovery=False)
-        self.folder = required('DRIVE_FOLDER_ID')
+        self.folder = os.getenv('DRIVE_FOLDER_ID')
+        if not self.folder:
+            query = ("trashed = false and mimeType = 'application/vnd.google-apps.folder' and "
+                     "appProperties has { key='youtube_automation_root' and value='v1' }")
+            roots = self.client.files().list(q=query, fields='files(id)', pageSize=100).execute()['files']
+            if len(roots) > 1:
+                raise RuntimeError('Multiple workflow folders require reconciliation')
+            if roots:
+                self.folder = roots[0]['id']
+            else:
+                self.folder = self.client.files().create(body={
+                    'name': 'YouTubeAutomation',
+                    'mimeType': 'application/vnd.google-apps.folder',
+                    'appProperties': {'youtube_automation_root': 'v1'}
+                }, fields='id').execute()['id']
         info = self.client.files().get(fileId=self.folder, fields='mimeType,trashed').execute()
         if info.get('trashed') or info['mimeType'] != 'application/vnd.google-apps.folder':
             raise RuntimeError('DRIVE_FOLDER_ID must identify an accessible active folder')
@@ -326,7 +340,7 @@ def upload_private(video, thumbnail, story, state, store, key, music_credit=''):
 
 
 def preflight():
-    needed = ['GROQ_API_KEY', 'DRIVE_TOKEN_JSON', 'DRIVE_FOLDER_ID']
+    needed = ['GROQ_API_KEY', 'DRIVE_TOKEN_JSON']
     if os.getenv('IMAGE_BACKEND', 'cpu') == 'hf':
         needed += ['HF_TOKEN', 'IMAGE_MODEL']
     else:
