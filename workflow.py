@@ -75,6 +75,9 @@ def request_groq(endpoint, payload, binary=False):
 
 
 def make_story(day, previous):
+    if os.getenv('STORY_FILE'):
+        # Explicit original test story only; daily jobs must generate fresh stories.
+        return validate_story(json.loads(Path(os.environ['STORY_FILE']).read_text()))
     prompt = f'''Write an original fictional English motivational story for {day}.
     Use a concrete protagonist, difficult choice, believable setbacks and earned resolution.
     Avoid imitating existing videos, fabricated true-story claims, or guaranteed success claims.
@@ -121,6 +124,10 @@ def speech_chunks(text, limit=200):
 
 
 def make_narration(text, path):
+    if os.getenv('TTS_BACKEND', 'groq') == 'kokoro':
+        from voice_cpu import generate
+        generate(text, path)
+        return
     parts = []
     for index, chunk in enumerate(speech_chunks(text)):
         part = path.with_name(path.stem + f'-part-{index:03}.wav')
@@ -136,6 +143,9 @@ def make_narration(text, path):
 
 
 def transcribe(audio):
+    if os.getenv('CAPTION_BACKEND', 'groq') == 'cpu':
+        from voice_cpu import transcribe_audio
+        return transcribe_audio(audio)
     import requests
     with audio.open('rb') as stream:
         response = requests.post('https://api.groq.com/openai/v1/audio/transcriptions',
@@ -295,6 +305,11 @@ class Store:
 
 
 def load_music(store, root):
+    # CPU music generation uses no API credits or paid provider.
+    if os.getenv('MUSIC_BACKEND') == 'magenta':
+        from music_cpu import generate
+        generate(root/'music.audio')
+        return 'Background music: original Magenta MusicRNN melody with synthesized ambient piano.'
     # Only free sources. vidIQ-generated assets are not accepted.
     manifest = store.load('music-manifest.json', None)
     if not manifest or manifest.get('source') not in ('YouTube Audio Library', 'AI-generated (free local model)'):
@@ -340,10 +355,9 @@ def upload_private(video, thumbnail, story, state, store, key, music_credit=''):
 
 
 def preflight():
-    if not os.getenv('GROQ_API_KEY') and os.getenv('DRIVE_TOKEN_JSON'):
-        from runtime_config import load_runtime_environment
-        load_runtime_environment(Store())
-    needed = ['GROQ_API_KEY', 'DRIVE_TOKEN_JSON']
+    needed = ['DRIVE_TOKEN_JSON']
+    if not os.getenv('STORY_FILE') or os.getenv('TTS_BACKEND', 'groq') == 'groq' or os.getenv('CAPTION_BACKEND', 'groq') == 'groq':
+        needed.append('GROQ_API_KEY')
     if os.getenv('IMAGE_BACKEND', 'cpu') == 'hf':
         needed += ['HF_TOKEN', 'IMAGE_MODEL']
     else:
@@ -360,6 +374,8 @@ def preflight():
 
 
 def run(daily=False):
+    if daily and os.getenv('STORY_FILE'):
+        raise RuntimeError('Daily automation cannot reuse a fixed test story')
     if daily and os.getenv('DAILY_ENABLED') != 'true':
         raise RuntimeError('Daily automation is disabled until the complete private test passes')
     preflight()
