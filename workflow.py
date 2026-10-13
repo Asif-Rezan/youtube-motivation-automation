@@ -41,8 +41,8 @@ def timestamp(seconds):
 
 
 def validate_story(data):
-    if not isinstance(data, dict) or not 4 <= len(data.get('scenes', [])) <= 20:
-        raise ValueError('Story must contain 4–20 scenes')
+    if not isinstance(data, dict) or not 4 <= len(data.get('scenes', [])) <= 32:
+        raise ValueError('Story must contain 4–32 narration chapters')
     if not isinstance(data.get('title'), str) or not 1 <= len(data['title']) <= 100:
         raise ValueError('Invalid title')
     if not isinstance(data.get('description'), str) or len(data['description']) > 4500:
@@ -56,8 +56,8 @@ def validate_story(data):
             if not isinstance(scene.get(field), str) or not scene[field].strip():
                 raise ValueError(f'Missing scene {field}')
         words += len(scene['narration'].split())
-    if not 500 <= words <= 1200:
-        raise ValueError(f'Expected 500–1200 narrated words; received {words}')
+    if not 1500 <= words <= 2500:
+        raise ValueError(f'Expected 1500–2500 narrated words; received {words}')
     if not isinstance(data.get('thumbnail_text'), str) or len(data['thumbnail_text']) > 45:
         raise ValueError('Invalid thumbnail text')
     if not isinstance(data.get('thumbnail_prompt'), str):
@@ -82,19 +82,21 @@ def make_story(day, previous):
     prompt = f'''Write an original fictional English motivational story for {day}.
     Use a concrete protagonist, difficult choice, believable setbacks and earned resolution.
     Avoid imitating existing videos, fabricated true-story claims, or guaranteed success claims.
-    650–850 spoken words, 8–12 scenes. Strong opening hook; natural narration; understated ending.
-    Keep the same character appearance across all cinematic 16:9 image prompts.
+    1800–2200 spoken words, 18–24 narration chapters, targeting 10–15 minutes. Strong opening hook; natural narration; understated ending.
+    Keep the same original character appearance across all Ghibli-inspired hand-painted 2D image prompts.
+    Every chapter needs image_prompt and image_prompts (4 different visual moments) for 10-second shots.
     Avoid these recent titles and concepts: {previous}.
     Return JSON with title, description, tags (list), thumbnail_text (2–5 words),
     thumbnail_prompt, scenes (list of objects with narration and image_prompt).
     Description must clearly label the story fictional. No timestamps until audio is generated.'''
     result = request_groq('chat/completions', {'model': os.getenv('STORY_MODEL', 'llama-3.3-70b-versatile'),
         'messages': [{'role': 'user', 'content': prompt}], 'response_format': {'type': 'json_object'},
-        'temperature': 0.9, 'max_completion_tokens': 6000})
+        'temperature': 0.9, 'max_completion_tokens': 12000})
     return validate_story(json.loads(result['choices'][0]['message']['content']))
 
 
 def make_image(prompt, path):
+    prompt = ('Studio Ghibli-inspired hand-painted 2D animation, watercolor background, gentle expressive anime characters, soft natural light, ' + prompt)
     if os.getenv('IMAGE_BACKEND', 'cpu') == 'cpu':
         from image_cpu import generate
         generate(prompt + ', cinematic lighting, no lettering or watermarks', path)
@@ -204,11 +206,11 @@ def subtitles(scenes, lengths, path):
     path.write_text('\n'.join(cues), encoding='utf-8')
 
 
-def check_video(path, min_duration=180):
+def check_video(path, min_duration=600, max_duration=900):
     metadata = probe(path)
     video = next(s for s in metadata['streams'] if s['codec_type'] == 'video')
     assert (video['width'], video['height']) == (1920, 1080), 'Wrong output dimensions'
-    assert min_duration <= float(metadata['format']['duration']) <= 600, 'Duration outside required range'
+    assert min_duration <= float(metadata['format']['duration']) <= max_duration, 'Duration outside required range'
     assert any(s['codec_type'] == 'audio' for s in metadata['streams']), 'Missing audio'
     shell('ffmpeg', '-v', 'error', '-xerror', '-i', str(path), '-f', 'null', '-')
     return metadata
@@ -403,14 +405,13 @@ def run(daily=False):
     if daily and os.getenv('DAILY_ENABLED') != 'true':
         raise RuntimeError('Daily automation is disabled until the complete private test passes')
     preflight()
-    from PIL import Image, ImageDraw, ImageFont, ImageOps
     day = dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat()
     run_id = day if daily else day + '-test'
     root = Path('output') / run_id
     root.mkdir(parents=True, exist_ok=True)
     store, key = Store(), f'runs/{run_id}/state.json'
     test_record = store.load('last-private-test.json', {}) if daily else {}
-    if daily and (not test_record.get('passed') or not test_record.get('remote_verification', {}).get('private_test_passed')):
+    if daily and (not test_record.get('passed') or not test_record.get('remote_verification', {}).get('private_test_passed') or test_record.get('validation', {}).get('image_interval_seconds') != 10 or test_record.get('validation', {}).get('style') != 'ghibli-inspired'):
         raise RuntimeError('No fully verified private HD upload test is recorded')
     state = store.load(key, {})
     if state.get('phase') in ('upload_started', 'uploaded', 'complete'):
@@ -424,45 +425,12 @@ def run(daily=False):
     state.update(story=story, phase='generating', hash=digest)
     store.save(key, state)
     (root/'story.json').write_text(json.dumps(story, indent=2))
-    lengths, clips, word_lists = [], [], []
-    for i, scene in enumerate(story['scenes']):
-        image, audio, clip = [root/f'{i:02}.{ext}' for ext in ('png', 'wav', 'mp4')]
-        if not image.exists():
-            make_image(scene['image_prompt'], image)
-        if not audio.exists():
-            make_narration(scene['narration'], audio)
-        lengths.append(render_scene(image, audio, clip))
-        clips.append(clip)
-        words_file = root/f'{i:02}-words.json'
-        if not words_file.exists():
-            words_file.write_text(json.dumps(transcribe(audio)))
-        word_lists.append(json.loads(words_file.read_text()))
-    if not 180 <= sum(lengths) <= 600:
-        raise RuntimeError('Narration length outside 3–10 minutes; revise story before upload')
-    aligned_subtitles(word_lists, lengths, root/'captions.srt')
-    playlist = root/'clips.txt'
-    playlist.write_text(''.join(f"file '{p.name}'\n" for p in clips))
-    shell('ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', str(playlist), '-c', 'copy', str(root/'joined.mp4'))
-    video = root/'video.mp4'
-    shell('ffmpeg', '-y', '-i', str(root/'joined.mp4'), '-stream_loop', '-1', '-i', str(root/'music.audio'),
-        '-filter_complex', '[0:a]loudnorm=I=-16:TP=-1.5:LRA=11,asplit=2[voice][side];[1:a]volume=0.09[music];'
-        '[music][side]sidechaincompress=threshold=0.02:ratio=8[duck];[voice][duck]amix=inputs=2:duration=first:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11[a]',
-        '-vf', f"subtitles={root/'captions.srt'}:force_style='FontName=DejaVu Sans,FontSize=22,Outline=2,MarginV=35'",
-        '-map', '0:v', '-map', '[a]', '-t', str(sum(lengths)), '-c:v', 'libx264', '-preset', 'fast',
-        '-crf', '21', '-c:a', 'aac', '-movflags', '+faststart', str(video))
-    check_video(video)
-    thumb_source, thumb = root/'thumbnail-source.png', root/'thumbnail.jpg'
-    make_image(story['thumbnail_prompt'], thumb_source)
-    image = ImageOps.fit(Image.open(thumb_source).convert('RGB'), (1280, 720))
-    draw = ImageDraw.Draw(image)
-    font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 72)
-    draw.rectangle((0, 470, 1280, 720), fill=(15, 18, 24))
-    draw.multiline_text((55, 500), '\n'.join(textwrap.wrap(story['thumbnail_text'].upper(), 22)),
-                        font=font, fill='white', stroke_width=2, stroke_fill='black')
-    image.save(thumb, quality=90)
-    assert thumb.stat().st_size < 2*1024*1024
-    for path in (video, thumb, root/'captions.srt', root/'story.json'):
-        store.upload(path, f'runs/{run_id}/{path.name}')
+    from long_video import render_complete
+    report = render_complete(story, root)
+    video, thumb = root/'video.mp4', root/'thumbnail.jpg'
+    for name in ('video.mp4', 'thumbnail.jpg', 'captions.srt', 'story.json', 'validation.json', 'plan.json'):
+        store.upload(root/name, f'runs/{run_id}/{name}')
+    state['validation'] = report
     state['phase'] = 'rendered'
     store.save(key, state)
     if os.getenv('UPLOAD_ENABLED') == 'true':
@@ -471,7 +439,7 @@ def run(daily=False):
         history.append({'title': story['title'], 'hash': digest, 'run': run_id})
         store.save('history.json', history)
         if not daily:
-            store.save('last-private-test.json', {'passed': True, 'run': run_id, 'video_id': state['video_id']})
+            store.save('last-private-test.json', {'passed': True, 'run': run_id, 'video_id': state['video_id'], 'validation': state['validation']})
     print(json.dumps({'run': run_id, 'phase': state['phase'], 'video_id': state.get('video_id')}))
 
 
