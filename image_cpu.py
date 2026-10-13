@@ -8,15 +8,15 @@ import os
 from pathlib import Path
 import time
 
-MODEL = 'segmind/tiny-sd'
-REVISION = 'cad0bd7495fa6c4bcca01b19a723dc91627fe84f'
+MODEL = 'nitrosocke/Ghibli-Diffusion'
+REVISION = '7600fd7538c9030fb60fa7bca17bf048c86466b3'
 _pipeline = None
 
 
 def generate(prompt, path):
     global _pipeline
     import torch
-    from diffusers import DiffusionPipeline
+    from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
     torch.set_num_threads(min(os.cpu_count() or 2, 4))
     model = os.getenv('CPU_IMAGE_MODEL') or MODEL
     revision = os.getenv('CPU_MODEL_REVISION') or (REVISION if model == MODEL else 'main')
@@ -25,12 +25,14 @@ def generate(prompt, path):
         # Pinned public model repository. Torch >=2.6 is required for safer
         # weights-only loading of the legacy tensor files used by this model.
         _pipeline = DiffusionPipeline.from_pretrained(model, revision=revision,
-            torch_dtype=torch.float32, use_safetensors=False, trust_remote_code=False)
+            torch_dtype=torch.float32, use_safetensors=True, trust_remote_code=False)
+        _pipeline.scheduler = DPMSolverMultistepScheduler.from_config(
+            _pipeline.scheduler.config, algorithm_type='dpmsolver++', use_karras_sigmas=True)
         _pipeline.to('cpu')
         _pipeline.enable_attention_slicing()
         _pipeline.enable_vae_slicing()
-    width = int(os.getenv('CPU_IMAGE_WIDTH', '768'))
-    height = int(os.getenv('CPU_IMAGE_HEIGHT', '432'))
+    width = int(os.getenv('CPU_IMAGE_WIDTH', '640'))
+    height = int(os.getenv('CPU_IMAGE_HEIGHT', '360'))
     steps = int(os.getenv('CPU_IMAGE_STEPS', '20'))
     if width % 8 or height % 8 or not 256 <= width <= 1024 or not 256 <= height <= 1024:
         raise ValueError('CPU image dimensions must be multiples of eight in 256–1024')
