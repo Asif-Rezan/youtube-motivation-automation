@@ -85,13 +85,14 @@ def make_story(day, previous):
     1800–2200 spoken words, 18–24 narration chapters, targeting 10–15 minutes. Strong opening hook; natural narration; understated ending.
     Keep the same original character appearance across all Ghibli-inspired hand-painted 2D image prompts.
     Every chapter needs image_prompt and image_prompts (4 different visual moments) for 10-second shots.
+    Keep each visual prompt concise: at most 12 words, describing a distinct action or setting.
     Avoid these recent titles and concepts: {previous}.
     Return JSON with title, description, tags (list), thumbnail_text (2–5 words),
-    thumbnail_prompt, scenes (list of objects with narration and image_prompt).
+    thumbnail_prompt, scenes (list of objects with narration, image_prompt and image_prompts).
     Description must clearly label the story fictional. No timestamps until audio is generated.'''
     result = request_groq('chat/completions', {'model': os.getenv('STORY_MODEL', 'llama-3.3-70b-versatile'),
         'messages': [{'role': 'user', 'content': prompt}], 'response_format': {'type': 'json_object'},
-        'temperature': 0.9, 'max_completion_tokens': 12000})
+        'temperature': 0.9, 'max_completion_tokens': 5500})
     return validate_story(json.loads(result['choices'][0]['message']['content']))
 
 
