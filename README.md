@@ -7,7 +7,7 @@ and no daily schedule is active. Component checks pass with synthetic fixtures.
 
 Use standard GitHub-hosted Ubuntu runners in this public repository for compute.
 Use the existing Google Drive free allowance for owner-only checkpoints and test
-videos. No S3, AWS credentials, paid bucket, Render service, or storage subscription
+videos. Drive authorization and private folder setup are verified. No S3, AWS credentials, paid bucket, Render service, or storage subscription
 is required. Private video files are never committed or attached as GitHub Actions
 artifacts in this public repository. Google Drive storage is shared with Gmail and
 Photos. The pipeline stops near the 15 GB free allowance and never purchases space.
@@ -74,7 +74,7 @@ Secrets:
 - GROQ_API_KEY: newly rotated key, not the exposed key from chat.
 - HF_TOKEN: optional, only for IMAGE_BACKEND=hf. Not needed for default CPU generation.
 - DRIVE_TOKEN_JSON: authorized-user Google OAuth JSON with refresh token and drive.file scope.
-- DRIVE_FOLDER_ID: owner-only workflow folder accessible to that OAuth application.
+- DRIVE_FOLDER_ID: optional. The app now creates/discovers its own owner-only YouTubeAutomation folder.
 - YOUTUBE_TOKEN_JSON: authorized-user OAuth JSON with refresh token, youtube.upload and youtube.readonly scopes.
 
 Variables:
