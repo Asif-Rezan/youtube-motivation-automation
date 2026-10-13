@@ -13,10 +13,30 @@ artifacts in this public repository. Google Drive storage is shared with Gmail a
 Photos. The pipeline stops near the 15 GB free allowance and never purchases space.
 No automatic deletion is implemented; clear older videos yourself when needed.
 
+## Image generation without a paid API
+
+Default IMAGE_BACKEND=cpu loads segmind/tiny-sd directly on the GitHub cloud runner.
+Hugging Face hosts the public model weights, but no Hugging Face account/API token,
+Inference Provider call or image credit is required for this backend. The model
+revision is pinned. No GPU runner or paid compute service is created.
+
+Images are generated at 768×432 and then scaled into the 1920×1080 video. They are
+not native 1080p images. CPU inference can be slow, and this smaller model may not
+meet the desired cinematic quality or character-continuity standard. The live CPU
+image-check workflow must establish feasibility; visual QA still needs private Drive
+storage access. No claim is made that a complete daily batch has passed yet.
+
+Install CPU torch from its official index and requirements-cpu.txt. Model license:
+https://huggingface.co/segmind/tiny-sd (CreativeML Open RAIL-M); comply with its terms.
+Optional IMAGE_BACKEND=hf retains provider inference if better quality is needed.
+
+ChatGPT's interactive image tool is not callable by this repository. Running a
+free model inside Actions is the implemented alternative.
+
 ## Pipeline
 
 Groq original fictional English motivational story plus title/description/tags →
-Hugging Face cinematic images → English AI narration → Whisper word timestamps →
+CPU-generated scene images (optional Hugging Face inference) → English AI narration → Whisper word timestamps →
 FFmpeg 1920×1080 video with slow zoom, fades, subtitles and ducked background music
 → generated thumbnail → duration/decode validation → private Drive → private YouTube.
 English narration uses canopylabs/orpheus-v1-english with the troy voice and
@@ -51,13 +71,13 @@ Do not send passwords, API keys or OAuth tokens in chat or commit them.
 
 Secrets:
 - GROQ_API_KEY: newly rotated key, not the exposed key from chat.
-- HF_TOKEN: Hugging Face token with Inference Providers permission, not a password.
+- HF_TOKEN: optional, only for IMAGE_BACKEND=hf. Not needed for default CPU generation.
 - DRIVE_TOKEN_JSON: authorized-user Google OAuth JSON with refresh token and drive.file scope.
 - DRIVE_FOLDER_ID: owner-only workflow folder accessible to that OAuth application.
 - YOUTUBE_TOKEN_JSON: authorized-user OAuth JSON with refresh token, youtube.upload and youtube.readonly scopes.
 
 Variables:
-- IMAGE_MODEL: current Hugging Face text-to-image model available to your account.
+- IMAGE_MODEL: optional, only for IMAGE_BACKEND=hf.
 - EXPECTED_CHANNEL_ID: intended YouTube channel ID.
 - TTS_MODEL / TTS_VOICE: supported English speech model and voice; optional documented defaults.
 
