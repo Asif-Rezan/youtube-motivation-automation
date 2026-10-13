@@ -8,6 +8,38 @@ import workflow as w
 
 
 class Checks(unittest.TestCase):
+
+    def test_global_ten_second_timeline(self):
+        from long_video import shot_plan
+        story = {'scenes': [{'image_prompt': 'first chapter'}, {'image_prompt': 'second chapter'}]}
+        plan = shot_plan(story, [330.5, 280])
+        self.assertEqual(len(plan['shots']), 62)
+        self.assertEqual([s['start'] for s in plan['shots']], list(range(0, 620, 10)))
+        self.assertTrue(all(s['duration'] == 10 for s in plan['shots'][:-1]))
+        self.assertEqual(plan['shots'][-1]['duration'], .5)
+        self.assertEqual(plan['shots'][33]['chapter'], 0)
+        self.assertEqual(plan['shots'][34]['chapter'], 1)
+
+    def test_actual_ten_second_image_change(self):
+        from long_video import picture_clip
+        import subprocess
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for i, color in enumerate(((230, 20, 20), (20, 20, 230))):
+                Image.new('RGB', (640, 360), color).save(root/f'{i}.png')
+                picture_clip(root/f'{i}.png', 10, root/f'{i}.mp4')
+                self.assertAlmostEqual(w.duration(root/f'{i}.mp4'), 10, places=2)
+            (root/'list.txt').write_text("file '0.mp4'\nfile '1.mp4'\n")
+            w.shell('ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', str(root/'list.txt'),
+                '-c', 'copy', str(root/'joined.mp4'))
+            def pixel(at):
+                return subprocess.check_output(['ffmpeg', '-v', 'error', '-ss', str(at),
+                    '-i', str(root/'joined.mp4'), '-frames:v', '1', '-s', '1x1',
+                    '-pix_fmt', 'rgb24', '-f', 'rawvideo', 'pipe:1'])
+            before, after = pixel(9), pixel(11)
+            self.assertGreater(before[0], before[2])
+            self.assertGreater(after[2], after[0])
+
     def test_time_rounding(self):
         self.assertEqual(w.timestamp(59.9996), '00:01:00,000')
 
