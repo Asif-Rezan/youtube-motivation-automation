@@ -87,10 +87,34 @@ def upload():
         'url': 'https://www.youtube.com/watch?v='+state['video_id'], **report}), flush=True)
 
 
+
+def restore():
+    ROOT.mkdir(parents=True, exist_ok=True)
+    store = w.Store()
+    run_id = dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat() + '-free-private-test'
+    key = f'runs/{run_id}/state.json'
+    state = store.load(key, None)
+    if not state or not state.get('validation', {}).get('render_passed'):
+        raise RuntimeError('No validated saved render for this date')
+    if state.get('phase') != 'rendered':
+        raise RuntimeError('Upload state needs reconciliation; refusing a duplicate insertion')
+    for name in ('video.mp4', 'thumbnail.jpg', 'captions.srt', 'story.json', 'music.audio', 'validation.json'):
+        file_id = store.find(f'runs/{run_id}/{name}')
+        if not file_id:
+            raise RuntimeError('Saved render asset is missing')
+        store.download(file_id, ROOT/name)
+    w.check_video(ROOT/'video.mp4')
+    print(json.dumps({'restored_render': True, 'run': run_id}), flush=True)
+
+
+def resume():
+    restore()
+    upload()
+
 if __name__ == '__main__':
     import sys
     try:
-        {'render': render, 'upload': upload}[sys.argv[1]]()
+        {'render': render, 'upload': upload, 'resume': resume}[sys.argv[1]]()
     except Exception as error:
         # Keep API response bodies and credentials out of public Actions logs.
         print(json.dumps({'private_test_passed': False, 'error_type': type(error).__name__,
