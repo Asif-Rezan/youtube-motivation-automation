@@ -39,7 +39,9 @@ def report_error(name, error):
 try:
     creds = credentials('YOUTUBE_TOKEN_JSON')
     client = build('youtube', 'v3', credentials=creds, cache_discovery=False)
-    channels = client.channels().list(part='id', mine=True).execute().get('items', [])
+    channels = client.channels().list(part='id,snippet', mine=True).execute().get('items', [])
+    print(json.dumps({'check': 'Authorized YouTube channels', 'channels': [
+        {'id': c['id'], 'title': c['snippet']['title'], 'handle': c['snippet'].get('customUrl')} for c in channels]}), flush=True)
     expected = os.getenv('EXPECTED_CHANNEL_ID') or 'UCztvMrNCT34DO3DtzLPgWaw'
     if expected not in [c['id'] for c in channels]:
         raise RuntimeError('channel_mismatch')
