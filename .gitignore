@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 token.json
 client_secrets.json
+node_modules/
