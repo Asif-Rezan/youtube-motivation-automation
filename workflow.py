@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import textwrap
+import time
 from zoneinfo import ZoneInfo
 
 
@@ -348,8 +349,24 @@ def upload_private(video, thumbnail, story, state, store, key, music_credit=''):
     state.update(phase='uploaded', video_id=result['id'])
     store.save(key, state)
     client.thumbnails().set(videoId=result['id'], media_body=MediaFileUpload(str(thumbnail))).execute()
-    remote = client.videos().list(part='status', id=result['id']).execute()['items'][0]
-    assert remote['status']['privacyStatus'] == 'private', 'Upload privacy validation failed'
+    deadline = time.monotonic() + 1200
+    while True:
+        items = client.videos().list(part='status,processingDetails', id=result['id']).execute().get('items', [])
+        if not items:
+            raise RuntimeError('Uploaded video is not accessible for verification')
+        remote = items[0]
+        assert remote['status']['privacyStatus'] == 'private', 'Upload privacy validation failed'
+        processing = remote.get('processingDetails', {}).get('processingStatus')
+        upload_status = remote['status'].get('uploadStatus')
+        if processing in ('failed', 'terminated') or upload_status in ('failed', 'rejected', 'deleted'):
+            raise RuntimeError('YouTube rejected or failed to process the private video')
+        if processing == 'succeeded' and upload_status == 'processed':
+            break
+        if time.monotonic() >= deadline:
+            raise RuntimeError('YouTube processing is still pending; private test is not passed')
+        print(json.dumps({'check': 'YouTube processing', 'status': processing}), flush=True)
+        time.sleep(20)
+    state['processing_status'] = 'succeeded'
     state['phase'] = 'complete'
     store.save(key, state)
 
