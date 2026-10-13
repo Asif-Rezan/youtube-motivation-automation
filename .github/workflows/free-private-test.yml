@@ -57,3 +57,5 @@ jobs:
           UPLOAD_ENABLED: 'true'
         run: python -u free_private_test.py upload
 # No public artifacts, no public publishing, and no daily schedule.
+
+# WAV decoding is performed by soundfile before CPU Whisper inference.
