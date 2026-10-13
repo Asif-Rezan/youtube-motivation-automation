@@ -28,7 +28,7 @@ def report_error(name, error):
     failed = True
     status = getattr(getattr(error, 'resp', None), 'status', None)
     safe = str(error) if isinstance(error, RuntimeError) else type(error).__name__
-    if safe not in ('missing_secret', 'invalid_json', 'missing_oauth_fields', 'channel_mismatch'):
+    if safe not in ('missing_secret', 'invalid_json', 'missing_oauth_fields', 'channel_mismatch', 'scope_check_failed', 'upload_scope_missing'):
         safe = type(error).__name__
     for code in ('invalid_grant', 'invalid_client', 'access_denied'):
         if code in str(error):
@@ -44,6 +44,17 @@ try:
     if expected not in [c['id'] for c in channels]:
         raise RuntimeError('channel_mismatch')
     scopes = set(creds.granted_scopes or [])
+    if not scopes:
+        import requests
+        # Diagnostic token goes only to Google's official tokeninfo endpoint.
+        # Never print the request URL, token or raw response.
+        info = requests.get('https://oauth2.googleapis.com/tokeninfo',
+            params={'access_token': creds.token}, timeout=30)
+        if info.status_code != 200:
+            raise RuntimeError('scope_check_failed')
+        scopes = set(info.json().get('scope', '').split())
+    if 'https://www.googleapis.com/auth/youtube.upload' not in scopes:
+        raise RuntimeError('upload_scope_missing')
     print(json.dumps({'check': 'YouTube OAuth and expected channel', 'passed': True,
         'upload_scope': 'verified' if 'https://www.googleapis.com/auth/youtube.upload' in scopes else 'not_confirmed'}))
 except Exception as error:
