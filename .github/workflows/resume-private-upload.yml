@@ -1,6 +1,11 @@
 name: Resume saved private video upload
 on:
   workflow_dispatch:
+    inputs:
+      saved_run:
+        description: Saved original video run to restore
+        type: string
+        default: '2026-10-13-free-private-test'
 permissions:
   contents: read
 concurrency:
@@ -29,6 +34,7 @@ jobs:
           YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
           EXPECTED_CHANNEL_ID: UCztvMrNCT34DO3DtzLPgWaw
           DAILY_ENABLED: 'false'
+          SAVED_RUN_ID: ${{ inputs.saved_run }}
         run: |
           python -u free_private_test.py resume
           python -u youtube_verify.py
