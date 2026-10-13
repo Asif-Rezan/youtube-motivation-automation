@@ -21,17 +21,7 @@ services:
         sync: false
       - key: EXPECTED_CHANNEL_ID
         sync: false
-      - key: S3_BUCKET
+      - key: DRIVE_TOKEN_JSON
         sync: false
-      - key: S3_ENDPOINT_URL
-        sync: false
-      - key: AWS_ACCESS_KEY_ID
-        sync: false
-      - key: AWS_SECRET_ACCESS_KEY
-        sync: false
-      - key: AWS_DEFAULT_REGION
-        value: us-east-1
-      - key: MUSIC_URL
-        sync: false
-      - key: MUSIC_CREDIT
+      - key: DRIVE_FOLDER_ID
         sync: false
