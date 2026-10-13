@@ -23,7 +23,8 @@ env:
   OMP_NUM_THREADS: '4'
   MKL_NUM_THREADS: '4'
   DAILY_ENABLED: 'false'
-  GENERATE_FRESH_STORY: 'true'
+  GENERATE_FRESH_STORY: 'false'
+  PRIVATE_STORY_KEY: inputs/improved-reviewed-story.json
   STORY_MODEL: openai/gpt-oss-120b
   CPU_IMAGE_MODEL: Lykon/dreamshaper-8
 jobs:
