@@ -7,7 +7,7 @@
 - A newly generated image at 0, 10, 20, 30 seconds and every ten seconds thereafter.
   The final image lasts only for the remaining duration. Chapter boundaries do not reset this timeline.
 - Ghibli-inspired hand-painted 2D illustrations, using pinned public
-  nitrosocke/Ghibli-Diffusion safetensors weights on cloud CPUs.
+  Lykon/dreamshaper-8 safetensors weights on cloud CPUs.
 - Kokoro English narration, Faster-Whisper aligned burned-in captions, zoom/fade
   transitions, original MusicRNN background music and illustrated thumbnails.
 - Private uploads to the user-selected REZAN IT channel. Public publishing remains disabled.
@@ -97,7 +97,7 @@ and on cloud runners. They do not replace the full private-video upload test.
 
 ## Model documentation
 
-- https://huggingface.co/nitrosocke/Ghibli-Diffusion (CreativeML OpenRAIL-M)
+- https://huggingface.co/Lykon/dreamshaper-8 (CreativeML OpenRAIL-M)
 - https://huggingface.co/hexgrad/Kokoro-82M (Apache-2.0)
 - https://github.com/magenta/magenta-js (Apache-2.0)
 - https://developers.google.com/youtube/v3/guides/uploading_a_video

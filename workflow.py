@@ -82,7 +82,13 @@ def make_story(day, previous):
     prompt = f'''Write an original fictional English motivational story for {day}.
     Use a concrete protagonist, difficult choice, believable setbacks and earned resolution.
     Avoid imitating existing videos, fabricated true-story claims, or guaranteed success claims.
-    1800–2200 spoken words, 18–24 narration chapters, targeting 10–15 minutes. Strong opening hook; natural narration; understated ending.
+    1800–2200 spoken words, 18–24 narration chapters, targeting 10–15 minutes. Open immediately with a vivid crisis, impossible choice, or surprising consequence in the first 20 seconds.
+    No greeting, channel intro, or generic motivational preamble. Create a clear unanswered question.
+    Build escalating stakes, specific dialogue, reversals, and small payoffs every 45–60 seconds.
+    Show choices and consequences rather than repeating advice. Resolve the opening question with an earned emotional payoff.
+    Close with a short reflection, then explicitly ask viewers to like, comment on a specific story question, and subscribe.
+    The final narration must contain the words like, comment, and subscribe.
+    Include character_description (one concise consistent appearance and outfit) at the top level.
     Keep the same original character appearance across all Ghibli-inspired hand-painted 2D image prompts.
     Every chapter needs image_prompt and image_prompts (4 different visual moments) for 10-second shots.
     Keep each visual prompt concise: at most 12 words, describing a distinct action or setting.
@@ -92,12 +98,12 @@ def make_story(day, previous):
     Description must clearly label the story fictional. No timestamps until audio is generated.'''
     result = request_groq('chat/completions', {'model': os.getenv('STORY_MODEL', 'llama-3.3-70b-versatile'),
         'messages': [{'role': 'user', 'content': prompt}], 'response_format': {'type': 'json_object'},
-        'temperature': 0.9, 'max_completion_tokens': 5500})
+        'temperature': 0.9, 'max_completion_tokens': 11000})
     return validate_story(json.loads(result['choices'][0]['message']['content']))
 
 
 def make_image(prompt, path):
-    prompt = ('ghibli style, hand-painted 2D animation, watercolor background, gentle expressive anime characters, soft natural light, ' + prompt)
+    prompt = ('hand-painted Japanese animation, watercolor landscape, expressive 2D characters, warm cinematic light, ' + prompt)
     if os.getenv('IMAGE_BACKEND', 'cpu') == 'cpu':
         from image_cpu import generate
         generate(prompt + ', cinematic lighting, no lettering or watermarks', path)

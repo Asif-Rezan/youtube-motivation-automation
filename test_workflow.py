@@ -40,6 +40,32 @@ class Checks(unittest.TestCase):
             self.assertGreater(before[0], before[2])
             self.assertGreater(after[2], after[0])
 
+    def test_music_is_present_and_balanced(self):
+        from long_video import mix_audio
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            w.shell('ffmpeg', '-y', '-f', 'lavfi', '-i',
+                'sine=frequency=220:duration=5', str(root/'voice.wav'))
+            w.shell('ffmpeg', '-y', '-f', 'lavfi', '-i',
+                'sine=frequency=660:duration=2', str(root/'music.wav'))
+            result = mix_audio(root/'voice.wav', root/'music.wav', root/'mix.wav', 5)
+            self.assertTrue(result['music_audibility_passed'])
+            self.assertTrue(5 < result['music_gap_db'] < 22)
+            self.assertAlmostEqual(w.duration(root/'mix.wav'), 5, places=1)
+            w.shell('ffmpeg', '-y', '-f', 'lavfi', '-i',
+                'anullsrc=r=24000:cl=stereo', '-t', '2', str(root/'silent.wav'))
+            with self.assertRaisesRegex(RuntimeError, 'inaudible'):
+                mix_audio(root/'voice.wav', root/'silent.wav', root/'bad.wav', 5)
+
+    def test_closing_cta_is_required(self):
+        from long_video import validate_engagement
+        story = {'character_description': 'a young carpenter in a blue coat',
+            'scenes': [{'narration': 'Like this story, comment with your next step, and subscribe.'}]}
+        validate_engagement(story)
+        story['scenes'][0]['narration'] = 'Thank you for watching.'
+        with self.assertRaisesRegex(ValueError, 'like, comment, and subscribe'):
+            validate_engagement(story)
+
     def test_time_rounding(self):
         self.assertEqual(w.timestamp(59.9996), '00:01:00,000')
 

@@ -17,7 +17,7 @@ ASSETS = ('story.json', 'plan.json', 'narration.wav', 'captions.srt')
 
 
 def run_id():
-    return os.getenv('SAVED_RUN_ID') or (dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat()+'-ghibli-long-test')
+    return os.getenv('SAVED_RUN_ID') or (dt.datetime.now(ZoneInfo('Asia/Dhaka')).strftime('%Y-%m-%d-%H%M%S')+'-improved-story')
 
 
 def shot_plan(story, lengths):
@@ -38,7 +38,7 @@ def shot_plan(story, lengths):
         # Vary framing even when a chapter runs longer than its provided beats.
         camera = ('wide establishing composition', 'medium character view',
                   'intimate detail composition', 'over-the-shoulder composition')[index%4]
-        prompt = beat+', '+camera
+        prompt = (story.get('character_description', '') + ', ' if story.get('character_description') else '') + beat+', '+camera
         shots.append({'index': index, 'start': start, 'duration': min(INTERVAL, total-start),
             'chapter': chapter, 'prompt': prompt, 'seed': 1700+index})
     return {'duration_seconds': total, 'image_interval_seconds': INTERVAL,
@@ -101,6 +101,44 @@ def generate_shard(shard, root=ROOT, count=SHARDS):
         print(json.dumps({'shard': shard, 'shot': index+1, 'total': len(plan['shots']), 'rendered': True}), flush=True)
 
 
+def validate_engagement(story):
+    import re
+    ending = story['scenes'][-1]['narration'].lower()
+    if not all(re.search(r'\b'+word+r'\b', ending) for word in ('like', 'comment', 'subscribe')):
+        raise ValueError('Closing narration must request like, comment, and subscribe')
+    if not story.get('character_description', '').strip():
+        raise ValueError('Fresh story requires a consistent character description')
+
+
+def mix_audio(voice, music, target, seconds):
+    """Normalize music first and use mild ducking; verify its actual contribution."""
+    import numpy as np
+    import subprocess
+    bed = target.with_name('music-bed.wav')
+    w.shell('ffmpeg', '-y', '-i', str(voice), '-stream_loop', '-1', '-i', str(music),
+        '-filter_complex',
+        '[0:a]loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000,asplit=2[voice][side];'
+        '[1:a]loudnorm=I=-27:TP=-3:LRA=7,aresample=48000[music];'
+        '[music][side]sidechaincompress=threshold=0.08:ratio=2:attack=100:release=700:mix=0.35,asplit=2[bed][check];'
+        '[voice][bed]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95:level=0[a]',
+        '-map', '[a]', '-t', str(seconds), '-ac', '2', '-c:a', 'pcm_s16le', str(target),
+        '-map', '[check]', '-t', str(seconds), '-ac', '2', '-c:a', 'pcm_s16le', str(bed))
+    def rms_db(path):
+        raw = subprocess.check_output(['ffmpeg', '-v', 'error', '-i', str(path),
+            '-ac', '1', '-ar', '8000', '-f', 'f32le', 'pipe:1'])
+        audio = np.frombuffer(raw, dtype='<f4')
+        if not len(audio) or not np.isfinite(audio).all():
+            raise RuntimeError('Invalid audio samples')
+        rms = float(np.sqrt(np.mean(audio**2)))
+        return 20*math.log10(max(rms, 1e-12))
+    bed_db, mix_db = rms_db(bed), rms_db(target)
+    gap = mix_db-bed_db
+    if not -40 < bed_db < -18 or not 5 < gap < 22:
+        raise RuntimeError(f'Music mix is inaudible or too loud: bed={bed_db:.1f}dB, gap={gap:.1f}dB')
+    return {'music_bed_rms_db': round(bed_db, 2), 'mix_rms_db': round(mix_db, 2),
+        'music_gap_db': round(gap, 2), 'music_audibility_passed': True}
+
+
 def finish(root=ROOT):
     from PIL import Image, ImageDraw, ImageFont, ImageOps
     from music_cpu import generate
@@ -115,13 +153,10 @@ def finish(root=ROOT):
     w.shell('ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', str(root/'clips.txt'), '-c', 'copy', str(root/'joined.mp4'))
     if not (root/'music.audio').exists():
         generate(root/'music.audio')
-    w.shell('ffmpeg', '-y', '-i', str(root/'joined.mp4'), '-i', str(root/'narration.wav'),
-        '-stream_loop', '-1', '-i', str(root/'music.audio'), '-filter_complex',
-        '[1:a]loudnorm=I=-16:TP=-1.5:LRA=11,asplit=2[voice][side];[2:a]volume=0.09[music];'
-        '[music][side]sidechaincompress=threshold=0.02:ratio=8[duck];'
-        '[voice][duck]amix=inputs=2:duration=first:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11[a]',
+    audio_report = mix_audio(root/'narration.wav', root/'music.audio', root/'mixed.wav', plan['duration_seconds'])
+    w.shell('ffmpeg', '-y', '-i', str(root/'joined.mp4'), '-i', str(root/'mixed.wav'),
         '-vf', f"subtitles={root/'captions.srt'}:force_style='FontName=DejaVu Sans,FontSize=22,Outline=2,MarginV=35'",
-        '-map', '0:v', '-map', '[a]', '-t', str(plan['duration_seconds']), '-ar', '48000',
+        '-map', '0:v', '-map', '1:a', '-t', str(plan['duration_seconds']), '-ar', '48000',
         '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-c:a', 'aac', '-movflags', '+faststart', str(root/'video.mp4'))
     metadata = w.check_video(root/'video.mp4')
     story = json.loads((root/'story.json').read_text())
@@ -138,7 +173,8 @@ def finish(root=ROOT):
     report = {'render_passed': True, 'duration_seconds': float(metadata['format']['duration']),
         'width': 1920, 'height': 1080, 'images': len(clips), 'image_interval_seconds': 10,
         'style': 'ghibli-inspired', 'privacy': 'private', 'voice': 'Kokoro am_michael',
-        'music': 'Magenta MusicRNN', 'timeline_verified': True}
+        'music': 'Magenta MusicRNN', 'image_model': os.getenv('CPU_IMAGE_MODEL', 'Lykon/dreamshaper-8'),
+        'audio_validation': audio_report, 'timeline_verified': True}
     (root/'validation.json').write_text(json.dumps(report))
     print(json.dumps(report), flush=True)
     return report
@@ -161,6 +197,14 @@ def init_input():
 def stage_story():
     ROOT.mkdir(parents=True, exist_ok=True)
     store = w.Store()
+    if os.getenv('GENERATE_FRESH_STORY') == 'true':
+        history = store.load('history.json', [])
+        story = w.make_story(run_id(), [h.get('title') for h in history[-20:]])
+        validate_engagement(story)
+        (ROOT/'story.json').write_text(json.dumps(story, indent=2))
+        print(json.dumps({'fresh_story_ready': True, 'title': story['title'],
+            'words': sum(len(s['narration'].split()) for s in story['scenes'])}), flush=True)
+        return
     file_id = store.find('inputs/ghibli-long-story.json')
     if not file_id:
         raise RuntimeError('Private story input is not configured')

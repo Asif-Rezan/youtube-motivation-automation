@@ -8,8 +8,8 @@ import os
 from pathlib import Path
 import time
 
-MODEL = 'nitrosocke/Ghibli-Diffusion'
-REVISION = '7600fd7538c9030fb60fa7bca17bf048c86466b3'
+MODEL = 'Lykon/dreamshaper-8'
+REVISION = 'a7e52b98680b1ba8ff7bce97c7f9f2e2e5337917'
 _pipeline = None
 
 
@@ -31,9 +31,9 @@ def generate(prompt, path):
         _pipeline.to('cpu')
         _pipeline.enable_attention_slicing()
         _pipeline.enable_vae_slicing()
-    width = int(os.getenv('CPU_IMAGE_WIDTH', '640'))
-    height = int(os.getenv('CPU_IMAGE_HEIGHT', '360'))
-    steps = int(os.getenv('CPU_IMAGE_STEPS', '20'))
+    width = int(os.getenv('CPU_IMAGE_WIDTH', '768'))
+    height = int(os.getenv('CPU_IMAGE_HEIGHT', '432'))
+    steps = int(os.getenv('CPU_IMAGE_STEPS', '28'))
     if width % 8 or height % 8 or not 256 <= width <= 1024 or not 256 <= height <= 1024:
         raise ValueError('CPU image dimensions must be multiples of eight in 256–1024')
     if not 1 <= steps <= 50:

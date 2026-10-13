@@ -1,26 +1,30 @@
-name: Ghibli long private video test
+name: Improved illustrated long private video
 on:
   workflow_dispatch:
+  push:
+    paths: ['.github/workflows/improved-video-trigger.txt']
 permissions:
   contents: read
 concurrency:
   group: youtube-motivation
   cancel-in-progress: false
 env:
-  SAVED_RUN_ID: 2026-10-13-ghibli-long-test
+  SAVED_RUN_ID: improved-${{ github.run_id }}
   OUTPUT_DIR: output/ghibli-long-test
   TTS_BACKEND: kokoro
   CAPTION_BACKEND: cpu
   MUSIC_BACKEND: magenta
   IMAGE_BACKEND: cpu
   CPU_TTS_VOICE: am_michael
-  CPU_IMAGE_WIDTH: '640'
-  CPU_IMAGE_HEIGHT: '360'
-  CPU_IMAGE_STEPS: '20'
+  CPU_IMAGE_WIDTH: '768'
+  CPU_IMAGE_HEIGHT: '432'
+  CPU_IMAGE_STEPS: '28'
   HF_HUB_DISABLE_XET: '1'
   OMP_NUM_THREADS: '4'
   MKL_NUM_THREADS: '4'
   DAILY_ENABLED: 'false'
+  GENERATE_FRESH_STORY: 'true'
+  CPU_IMAGE_MODEL: Lykon/dreamshaper-8
 jobs:
   prepare:
     runs-on: ubuntu-latest
@@ -41,10 +45,11 @@ jobs:
           pip install -r requirements-cpu.txt
       - name: Validate global timing and rendering helpers
         run: python -m unittest -v
-      - name: Load private unpublished story
+      - name: Generate fresh engaging story with opening hook and closing CTA
         env:
           DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: python -u long_video.py stage-story
       - name: Generate narration and subtitles without Google credentials
         run: python -u long_video.py prepare
@@ -61,7 +66,7 @@ jobs:
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
