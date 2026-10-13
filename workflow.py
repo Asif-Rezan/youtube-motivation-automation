@@ -92,7 +92,8 @@ def make_story(day, previous):
         return json.loads(choice['message']['content'])
     outline = ask(f'''Plan an original fictional English motivational story for {day}.
     A vivid crisis or impossible choice must open the FIRST sentence, with an unanswered question.
-    No greeting or generic motivational preamble. Escalate choices, setbacks, surprising reversals,
+    No greeting or generic motivational preamble. Give the protagonist one concrete goal, believable setbacks, and earned resolution.
+    No random magical trials, repeated mentor lessons, or repeated endings. Escalate choices, setbacks, surprising reversals,
     specific dialogue, and emotional payoffs. Resolve the opening question in the final act.
     Last chapter ends with a specific reflection question and an explicit like, comment, subscribe CTA.
     Avoid these recent titles: {previous}.
@@ -105,27 +106,30 @@ def make_story(day, previous):
         raise ValueError('Outline requires exactly twenty chapters')
     summaries = [scene['summary'] for scene in outline['scenes']]
     prior = ''
-    for begin in (0, 10):
+    for begin in (0, 5, 10, 15):
         # Separate bursts fit the free plan; never switch to a paid provider.
         time.sleep(60)
-        group = ask(f'''Write chapters {begin+1} through {begin+10} of this original fictional story.
+        group = ask(f'''Write chapters {begin+1} through {begin+5} of this original fictional story.
         Title: {outline['title']}. Character: {outline['character_description']}.
-        Complete plot: {json.dumps(summaries)}.
+        Assigned chapter events ONLY: {json.dumps([{'chapter': i+1, 'event': summaries[i]} for i in range(begin, begin+5)])}.
         Previous chapter ending: {prior[-700:]}.
-        Return JSON with narrations: a list of exactly 10 strings in chronological order.
-        Each string MUST contain 95-105 English spoken words; total for this request 950-1050 words.
+        Return JSON with narrations: a list of exactly 5 strings in chronological order.
+        Each string MUST contain 95-105 English spoken words; total for this request 475-525 words.
         Natural narration with concrete actions and dialogue, not generic advice.
         Begin chapter 1 with the crisis immediately, no welcome or setup preamble.
         Escalate stakes, introduce reversals and emotional payoffs every few chapters.
         Resolve the initial crisis before chapter 20. Chapter 20 must explicitly ask viewers to like,
         comment with their answer to a specific story question, and subscribe.
+        Narrate ONLY the five assigned events, one event per chapter in the listed order. Do not jump ahead.\n        No ending, farewell, viewer question, or call to action before chapter 20.
         Do not add chapter headings or directions to spoken text. No repeated introduction.''', 4200)
         parts = group.get('narrations', [])
-        if len(parts) != 10 or not all(isinstance(p, str) for p in parts):
-            raise ValueError('Narration batch must contain ten strings')
-        for scene, narration in zip(outline['scenes'][begin:begin+10], parts):
+        if len(parts) != 5 or not all(isinstance(p, str) for p in parts):
+            raise ValueError('Narration batch must contain five strings')
+        for scene, narration in zip(outline['scenes'][begin:begin+5], parts):
             scene['narration'] = narration
         prior = parts[-1]
+    from long_video import validate_engagement
+    validate_engagement(outline)
     return validate_story(outline)
 
 
