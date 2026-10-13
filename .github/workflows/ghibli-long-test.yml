@@ -1,8 +1,5 @@
 name: Ghibli long private video test
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/ghibli-long-test.yml']
   workflow_dispatch:
 permissions:
   contents: read
