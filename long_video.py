@@ -103,6 +103,9 @@ def generate_shard(shard, root=ROOT, count=SHARDS):
 
 def validate_engagement(story):
     import re
+    for scene in story['scenes'][:-1]:
+        if re.search(r'\bsubscribe\b', scene['narration'], re.IGNORECASE):
+            raise ValueError('Premature call to action before the final chapter')
     ending = story['scenes'][-1]['narration'].lower()
     if not all(re.search(r'\b'+word+r'\b', ending) for word in ('like', 'comment', 'subscribe')):
         raise ValueError('Closing narration must request like, comment, and subscribe')
