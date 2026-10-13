@@ -295,9 +295,9 @@ class Store:
 
 
 def load_music(store, root):
-    # Licensed Audio Library or generated original tracks with recorded provenance.
+    # Only free sources. vidIQ-generated assets are not accepted.
     manifest = store.load('music-manifest.json', None)
-    if not manifest or manifest.get('source') not in ('YouTube Audio Library', 'AI-generated (vidIQ)'):
+    if not manifest or manifest.get('source') not in ('YouTube Audio Library', 'AI-generated (free local model)'):
         raise RuntimeError('Missing verified background music manifest in Drive')
     if manifest.get('attribution_required') and not manifest.get('attribution', '').strip():
         raise RuntimeError('Audio Library track requires attribution')
