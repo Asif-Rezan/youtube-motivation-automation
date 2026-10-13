@@ -71,6 +71,7 @@ def request_groq(endpoint, payload, binary=False):
     response = requests.post('https://api.groq.com/openai/v1/' + endpoint,
         headers={'Authorization': 'Bearer ' + required('GROQ_API_KEY')}, json=payload, timeout=180)
     if not response.ok:
+        print(json.dumps({'check': 'Groq generation', 'http_status': response.status_code}), flush=True)
         raise RuntimeError(f'Groq request failed with HTTP {response.status_code}')
     return response.content if binary else response.json()
 
