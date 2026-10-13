@@ -29,11 +29,11 @@ jobs:
         env:
           CPU_IMAGE_STEPS: '10'
         run: |
-          python image_cpu.py --prompt 'A young clock repairer in a navy shirt and leather apron patiently repairing a brass alarm clock in a modest workshop, morning window light, cinematic photograph' --output output/cpu-check.png
+          python image_cpu.py --prompt 'ghibli style, hand-painted 2D animation, a young woman in a teal jacket beside a peaceful village school garden, watercolor hills, soft natural light' --output output/cpu-check.png
           python - <<'PY'
           from PIL import Image
           image = Image.open('output/cpu-check.png')
-          assert image.size == (768, 432)
+          assert image.size == (640, 360)
           assert image.convert('L').getextrema()[1] > 0
           print('Actual CPU-generated image passed size and nonblank checks')
           PY
