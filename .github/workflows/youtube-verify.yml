@@ -25,5 +25,5 @@ jobs:
           DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
           YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
-          EXPECTED_CHANNEL_ID: UCztvMrNCT34DO3DtzLPgWaw
+          EXPECTED_CHANNEL_ID: UCwNhdtzL9XZMIAMXm81UCbw
         run: python -u youtube_verify.py
