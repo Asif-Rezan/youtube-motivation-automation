@@ -2,7 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from PIL import Image
 import workflow as w
 
@@ -20,6 +20,29 @@ class Checks(unittest.TestCase):
         with patch.dict('os.environ', {}, clear=True):
             with self.assertRaisesRegex(RuntimeError, 'GROQ_API_KEY'):
                 w.preflight()
+
+    def test_free_drive_quota_guard(self):
+        store = w.Store.__new__(w.Store)
+        store.client = MagicMock()
+        query = store.client.about.return_value.get.return_value.execute
+        query.return_value = {'storageQuota': {'limit': str(15*1024**3), 'usage': '0'}}
+        store.check_quota(1024)
+        query.return_value['storageQuota']['usage'] = str(15*1024**3 - 50*1024**2)
+        with self.assertRaisesRegex(RuntimeError, 'Free storage'):
+            store.check_quota(1024)
+        query.return_value = {'storageQuota': {'usage': '0'}}
+        with self.assertRaisesRegex(RuntimeError, 'Cannot verify'):
+            store.check_quota(1024)
+
+    def test_shared_drive_file_rejected(self):
+        store = w.Store.__new__(w.Store)
+        store.client = MagicMock()
+        query = store.client.permissions.return_value.list.return_value.execute
+        query.return_value = {'permissions': [{'type': 'user', 'role': 'owner'}]}
+        store.check_private('folder')
+        query.return_value['permissions'].append({'type': 'anyone', 'role': 'reader'})
+        with self.assertRaisesRegex(RuntimeError, 'private'):
+            store.check_private('folder')
 
     def test_story_validation(self):
         story = dict(title='The Last Step', description='An original fictional story.', tags=['motivation'],
