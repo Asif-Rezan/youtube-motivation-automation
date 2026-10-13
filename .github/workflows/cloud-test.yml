@@ -18,7 +18,7 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -46,7 +46,7 @@ jobs:
           DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
           YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
-          EXPECTED_CHANNEL_ID: ${{ vars.EXPECTED_CHANNEL_ID || 'UCztvMrNCT34DO3DtzLPgWaw' }}
+          EXPECTED_CHANNEL_ID: UCwNhdtzL9XZMIAMXm81UCbw
           IMAGE_MODEL: ${{ vars.IMAGE_MODEL }}
           TTS_MODEL: ${{ vars.TTS_MODEL }}
           TTS_VOICE: ${{ vars.TTS_VOICE }}
