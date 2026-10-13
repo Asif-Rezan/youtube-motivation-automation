@@ -12,7 +12,7 @@ import workflow as w
 
 ROOT = Path(os.getenv('OUTPUT_DIR', 'output/ghibli-long-test'))
 INTERVAL = 10
-SHARDS = 8
+SHARDS = 16
 ASSETS = ('story.json', 'plan.json', 'narration.wav', 'captions.srt')
 
 
