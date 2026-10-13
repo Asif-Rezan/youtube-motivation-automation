@@ -125,7 +125,7 @@ def speech_chunks(text, limit=200):
 
 
 def make_narration(text, path):
-    if os.getenv('TTS_BACKEND', 'groq') == 'kokoro':
+    if os.getenv('TTS_BACKEND', 'kokoro') == 'kokoro':
         from voice_cpu import generate
         generate(text, path)
         return
@@ -144,7 +144,7 @@ def make_narration(text, path):
 
 
 def transcribe(audio):
-    if os.getenv('CAPTION_BACKEND', 'groq') == 'cpu':
+    if os.getenv('CAPTION_BACKEND', 'cpu') == 'cpu':
         from voice_cpu import transcribe_audio
         return transcribe_audio(audio)
     import requests
@@ -307,7 +307,7 @@ class Store:
 
 def load_music(store, root):
     # CPU music generation uses no API credits or paid provider.
-    if os.getenv('MUSIC_BACKEND') == 'magenta':
+    if os.getenv('MUSIC_BACKEND', 'magenta') == 'magenta':
         from music_cpu import generate
         generate(root/'music.audio')
         return 'Background music: original Magenta MusicRNN melody with synthesized ambient piano.'
@@ -373,7 +373,7 @@ def upload_private(video, thumbnail, story, state, store, key, music_credit=''):
 
 def preflight():
     needed = ['DRIVE_TOKEN_JSON']
-    if not os.getenv('STORY_FILE') or os.getenv('TTS_BACKEND', 'groq') == 'groq' or os.getenv('CAPTION_BACKEND', 'groq') == 'groq':
+    if not os.getenv('STORY_FILE') or os.getenv('TTS_BACKEND', 'kokoro') == 'groq' or os.getenv('CAPTION_BACKEND', 'cpu') == 'groq':
         needed.append('GROQ_API_KEY')
     if os.getenv('IMAGE_BACKEND', 'cpu') == 'hf':
         needed += ['HF_TOKEN', 'IMAGE_MODEL']
