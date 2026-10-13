@@ -1,6 +1,8 @@
 # Private YouTube motivational storytelling cloud workflow
 
-Complete free-model private test is running in Actions run 38398454994.
+Complete free-model private test is running in Actions run 38399752265.
+Earlier attempts exposed decoder/dependency issues; the current run uses direct
+FFmpeg waveform decoding for Faster-Whisper. No upload occurred in those attempts.
 No pass is claimed until the render and private YouTube processing checks finish.
 No daily schedule is active. Component checks pass with synthetic fixtures.
 
@@ -101,7 +103,8 @@ rejects STORY_FILE so it cannot silently repeat this story.
 The optional cloud-test workflow has only workflow_dispatch; committing it does not run it.
 Select Actions → Private cloud video test → Run workflow → checks first.
 `render` performs generation and saves privately in Drive. `private-upload` uploads
-privately after channel verification. Both need credentials and imported music.
+privately after channel verification. Both need credentials for fresh-story generation and private Drive storage;
+background music is now generated free with MusicRNN by default.
 No public publishing code exists. Watch the full private video and verify quality.
 A completed private upload records last-private-test.json. Daily generation requires
 this record AND DAILY_ENABLED=true. The upload now waits for processingStatus=succeeded and uploadStatus=processed,
