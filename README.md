@@ -1,168 +1,102 @@
-# Private YouTube motivational storytelling cloud workflow
+# Private motivational storytelling workflow
 
-**The complete private-upload test passed on REZAN IT (@rezan_it).**
-The user selected this channel for the completed test video. Cloud upload run
-38405889406 confirmed the actual channel, private visibility, successful HD
-processing, custom thumbnail, title, description and tags.
+## Current format
 
-The original video is 264.53 seconds (4:25), 1920×1080, with eight scenes,
-Kokoro English narration, aligned burned-in captions, transitions, free MusicRNN
-background music and an AI-generated thumbnail. Private Drive restore and strict
-complete-file decoding passed before upload. Private asset links are omitted
-from this public repository.
+- Original English motivational stories targeting 10–15 minutes (600–900 seconds).
+- 1920×1080 output at 30 fps.
+- A newly generated image at 0, 10, 20, 30 seconds and every ten seconds thereafter.
+  The final image lasts only for the remaining duration. Chapter boundaries do not reset this timeline.
+- Ghibli-inspired hand-painted 2D illustrations, using pinned public
+  nitrosocke/Ghibli-Diffusion safetensors weights on cloud CPUs.
+- Kokoro English narration, Faster-Whisper aligned burned-in captions, zoom/fade
+  transitions, original MusicRNN background music and illustrated thumbnails.
+- Private uploads to the user-selected REZAN IT channel. Public publishing remains disabled.
 
-The resume upload workflow is manual only again. A recorded completed upload
-blocks duplicate insertion. No public publishing path was used and no daily
-schedule is active. GROQ_API_KEY remains absent, so fresh daily story generation
-still needs configuration. Review the private video and CPU image quality before
-approving any public release.
+The previous 4:25 private video passed its upload/HD/metadata test. The new-format
+test is now running in Actions run 38417265115. A new pass is not claimed until
+the 10–15 minute render, global timing and private HD upload checks all finish.
 
-## Free infrastructure
+## Free cloud infrastructure
 
-Use standard GitHub-hosted Ubuntu runners in this public repository for compute.
-Use the existing Google Drive free allowance for owner-only checkpoints and test
-videos. Drive authorization and private folder setup are verified. No S3, AWS credentials, paid bucket, Render service, or storage subscription
-is required. Private video files are never committed or attached as GitHub Actions
-artifacts in this public repository. Google Drive storage is shared with Gmail and
-Photos. The pipeline stops near the 15 GB free allowance and never purchases space.
-No automatic deletion is implemented; clear older videos yourself when needed.
+Standard GitHub Ubuntu runners perform the work even when the user's computer
+is off. The dedicated illustration model is downloaded as public weights; no
+paid inference provider, GPU runner, vidIQ service or paid storage is used.
+Illustrations are generated at 640×360 then scaled into the 1080p video; they
+are not native 1080p renders. Eight image workers share the work. Subjective
+style quality and character continuity still require review before public release.
 
-## Image generation without a paid API
+Owner-only Google Drive stores the story, prepared audio, captions, images,
+clips, final video, thumbnail and checkpoints. No private media artifacts,
+unpublished story payload, signed URLs or private Drive identifiers belong in
+this public repository. Files are checked for owner-only permissions and the
+pipeline stops near the free 15 GB storage allowance. No automatic deletion
+or paid storage upgrade is performed.
 
-Default IMAGE_BACKEND=cpu loads segmind/tiny-sd directly on the GitHub cloud runner.
-Hugging Face hosts the public model weights, but no Hugging Face account/API token,
-Inference Provider call or image credit is required for this backend. The model
-revision is pinned. No GPU runner or paid compute service is created.
+The Drive OAuth app can only see files authorized to it. Unpublished test stories
+are transferred into an app-created private input slot. Another authorized Drive
+connection may replace that input's content in place, preserving its ID and
+access. The workflow reads the input privately and never prints story text.
 
-Images are generated at 768×432 and then scaled into the 1920×1080 video. They are
-not native 1080p images. CPU inference can be slow, and this smaller model may not
-meet the desired cinematic quality or character-continuity standard. The live GitHub CPU check successfully generated a nonblank 768×432 image with
-10 steps in 115.3 seconds (after model loading). Run 38384808103 passed. This
-establishes single-image execution; visual QA still needs private Drive storage
-access. No claim is made that a complete daily batch has passed yet.
+## New private test
 
-Install CPU torch from its official index and requirements-cpu.txt. Model license:
-https://huggingface.co/segmind/tiny-sd (CreativeML Open RAIL-M); comply with its terms.
-Optional IMAGE_BACKEND=hf retains provider inference if better quality is needed.
+Use **Ghibli long private video test** in Actions.
+Preparation generates narration and measures the real duration before generating
+images. Runs outside 600–900 seconds stop before image generation or upload.
+The global shot plan is computed from measured narration; eight CPU workers
+generate distinct illustrations and exact-duration silent clips. Each worker
+stores outputs privately in Drive. Final assembly combines continuous narration,
+music, transitions and captions, validates every clip's duration and decodes the
+complete 1080p MP4 with strict FFmpeg error handling.
 
-ChatGPT's interactive image tool is not callable by this repository. Running a
-free model inside Actions is the implemented alternative.
+Model generation stages have no Google credentials in their environment.
+Separate storage/upload steps receive the existing OAuth secrets.
+The upload checks the expected channel, stores an upload-started checkpoint,
+uploads privately, sets a custom thumbnail and waits for YouTube processing.
+The final readback verifies the actual video's channel, private visibility,
+HD status, title, description and tags.
 
-## Pipeline
+## Configuration and daily readiness
 
-Groq original fictional English motivational story plus title/description/tags →
-CPU-generated scene images (optional Hugging Face inference) → English AI narration → Whisper word timestamps →
-FFmpeg 1920×1080 video with slow zoom, fades, subtitles and ducked background music
-→ generated thumbnail → duration/decode validation → private Drive → private YouTube.
-The complete free-model test uses Kokoro-82M (am_michael, CPU, Apache-2.0 weights)
-for English narration and Faster-Whisper base.en int8 for aligned word captions.
-Groq narration remains optional using canopylabs/orpheus-v1-english and troy.
-Groq account authorization has not yet passed on a GitHub runner; the test does
-not need a Groq key. Daily fresh-story generation still requires GROQ_API_KEY.
-Hugging Face token authorization and FLUX.1-schnell provider availability have been
-verified, but no provider image request has completed. Monthly free inference
-credits are limited and do not establish a free daily image allowance.
+Set GitHub Actions secrets directly; do not commit real credentials:
+- DRIVE_TOKEN_JSON: authorized Google OAuth JSON. The owner-only workflow
+  folder is automatically discovered; DRIVE_FOLDER_ID is optional.
+- YOUTUBE_TOKEN_JSON: authorized Google OAuth JSON with upload/read access
+  for REZAN IT. The expected channel ID is UCwNhdtzL9XZMIAMXm81UCbw.
+- GROQ_API_KEY: required for fresh unattended daily story generation. This
+  secret was still absent at the last cloud check. The private test uses an
+  original AI-authored story provided through private Drive.
 
-## Free AI music
+IMAGE_BACKEND=cpu, TTS_BACKEND=kokoro, CAPTION_BACKEND=cpu and
+MUSIC_BACKEND=magenta are free-model defaults. See .env.example.
 
-The private test uses Magenta's 13 MB basic_rnn MusicRNN checkpoint with
-TensorFlow.js CPU inference. It continues a newly composed eight-note phrase,
-then renders the generated notes as additive ambient electric piano with stereo
-delay. No paid music service, vidIQ credit, audio sample library, or API key is
-used. This is model-generated symbolic music, not orchestral audio diffusion.
-The generated 65-second music bed is looped quietly and ducked beneath narration.
+No daily schedule is registered. Daily mode requires DAILY_ENABLED=true and
+a completed private HD test with validation proving the new ten-second,
+Ghibli-inspired format. A fixed test story cannot be used in daily mode.
+Before unattended operation, resolve OAuth Testing refresh-token expiry.
+The requested 09:00 Asia/Dhaka start corresponds to 03:00 UTC; GitHub schedules
+can be delayed. Scheduler activation remains pending.
 
-Magenta.js: https://github.com/magenta/magenta-js (Apache-2.0).
-Model checkpoint: https://github.com/magenta/magenta-js/blob/master/music/checkpoints/README.md.
-The code rejects vidIQ music manifests. YouTube Audio Library remains an optional
-free licensed alternative through setup_music.py.
+The standard workflow.py test/daily commands use the same long-video renderer.
+The parallel test workflow is the recommended new-format integration test.
+Older fixture workflows are historical and do not demonstrate this format.
 
-## Secure configuration
+## Reliability and verification
 
-Add the following to GitHub repository Settings → Secrets and variables → Actions.
-Do not send passwords, API keys or OAuth tokens in chat or commit them.
+Completed or ambiguous upload checkpoints prevent duplicate insertion.
+Resumable chunks retry transient transfer failures. Ambiguous uploads require
+reconciliation instead of repeating videos.insert. One workflow-level concurrency
+group prevents overlapping complete video runs; image workers use separate keys.
+Exact story hashes and history guard repeated scripts.
 
-Secrets:
-- GROQ_API_KEY: store directly as a GitHub Actions secret; needed for fresh daily stories, not the free CPU test.
-- HF_TOKEN: optional, only for IMAGE_BACKEND=hf. Not needed for default CPU generation.
-- DRIVE_TOKEN_JSON: authorized-user Google OAuth JSON with refresh token and drive.file scope.
-- DRIVE_FOLDER_ID: optional. The app now creates/discovers its own owner-only YouTubeAutomation folder.
-- YOUTUBE_TOKEN_JSON: authorized-user OAuth JSON with refresh token, youtube.upload and youtube.readonly scopes.
+Eleven component checks cover private storage/quota rules, speech chunking,
+caption bounds, story validation, real 1080p rendering, the global shot plan and
+an actual image change across a ten-second boundary. These checks pass locally
+and on cloud runners. They do not replace the full private-video upload test.
 
-Variables:
-- IMAGE_MODEL: optional, only for IMAGE_BACKEND=hf.
-- EXPECTED_CHANNEL_ID: intended YouTube channel ID.
-- TTS_MODEL / TTS_VOICE: supported English speech model and voice; optional documented defaults.
+## Model documentation
 
-Enable Drive API and YouTube Data API in the OAuth project's Google Cloud console.
-Authorize securely with the intended Google account. Limited drive.file access is
-sufficient for files created by/selected for the app. Never broaden token scopes
-without completing the Google consent flow. Existing ChatGPT connector access does
-not automatically provide tokens to a GitHub runner. OAuth testing-mode refresh
-token expiry may break unattended execution; configure production consent correctly.
-
-## Test before scheduling
-
-free-private-test.yml runs the complete original test on a free Ubuntu runner.
-Its push trigger is limited to that workflow file; it also supports manual runs.
-Rendering has no Google secrets in its environment. A separate upload process
-receives only existing Drive and YouTube OAuth secrets after render validation.
-No video/audio/image assets are attached as public GitHub Actions artifacts.
-private-test-story.json is an original fictional 694-word test story; daily mode
-rejects STORY_FILE so it cannot silently repeat this story.
-
-The optional cloud-test workflow has only workflow_dispatch; committing it does not run it.
-Select Actions → Private cloud video test → Run workflow → checks first.
-`render` performs generation and saves privately in Drive. `private-upload` uploads
-privately after channel verification. Both need credentials for fresh-story generation and private Drive storage;
-background music is now generated free with MusicRNN by default.
-No public publishing code exists. Watch the full private video and verify quality.
-A completed private upload records last-private-test.json. Daily generation requires
-this record AND DAILY_ENABLED=true. The upload now waits for processingStatus=succeeded and uploadStatus=processed,
-while checking privacyStatus=private, before recording a pass. Full subjective
-playback, character consistency, and pronunciation still need human review.
-
-After the complete test passes, register 09:00 Asia/Dhaka (03:00 UTC), cron
-`0 3 * * *`, command `python workflow.py daily`. GitHub scheduled workflows can be
-delayed and do not guarantee exact start time. No schedule is registered now.
-render-cron.example.yaml is a legacy optional billable example, NOT the free path.
-
-## Reliability and limitations
-
-Each Bangladesh date has a run key. Completed or ambiguous uploads block retries.
-Resumable upload chunks retry transient failures without repeating videos.insert.
-A checkpoint marked upload_started needs manual reconciliation before another run.
-One concurrent runner is enforced by the workflow concurrency group. Never run
-independent manual workers simultaneously: no distributed lock exists.
-
-Story history and exact hashes reduce repeated content, but do not guarantee semantic
-originality or quality. Character continuity, pronunciation, music balance and final
-story coherence require review during initial testing. Transcription supplies word
-caption timestamps. Videos outside 180–600 seconds fail before upload.
-
-Generation calls are not automatically retried to avoid repeated credit consumption.
-Scene assets are cached only within one runner; after a failed run they are not yet
-restored into a fresh runner, so new attempts can regenerate limited-credit assets.
-No failure notification integration is configured. Private Drive copies have no
-automatic retention deletion. API generation free tiers are limited and may run out.
-
-## Component checks
-
-```
-pip install -r requirements.txt
-python -m unittest -v
-python workflow.py preflight
-```
-
-The nine component tests validate an actual 1080p synthetic render, caption
-timing, story validation, time rounding, missing credentials disabled daily runs, private Drive access, free storage limits and TTS chunking.
-They are not a completed motivational-video test.
-
-Documentation:
-- https://support.google.com/youtube/answer/3376882
-- https://docs.github.com/en/billing/concepts/product-billing/github-actions
-- https://support.google.com/googleone/answer/2375123
-- https://developers.google.com/workspace/drive/api/guides/api-specific-auth
-- https://console.groq.com/docs/api-reference
-- https://huggingface.co/docs/huggingface_hub/en/package_reference/inference_client
+- https://huggingface.co/nitrosocke/Ghibli-Diffusion (CreativeML OpenRAIL-M)
+- https://huggingface.co/hexgrad/Kokoro-82M (Apache-2.0)
+- https://github.com/magenta/magenta-js (Apache-2.0)
 - https://developers.google.com/youtube/v3/guides/uploading_a_video
+- https://docs.github.com/en/billing/concepts/product-billing/github-actions
