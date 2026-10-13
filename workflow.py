@@ -295,10 +295,10 @@ class Store:
 
 
 def load_music(store, root):
-    # Only downloaded YouTube Audio Library tracks with recorded provenance.
+    # Licensed Audio Library or generated original tracks with recorded provenance.
     manifest = store.load('music-manifest.json', None)
-    if not manifest or manifest.get('source') != 'YouTube Audio Library':
-        raise RuntimeError('Missing verified YouTube Audio Library music manifest in Drive')
+    if not manifest or manifest.get('source') not in ('YouTube Audio Library', 'AI-generated (vidIQ)'):
+        raise RuntimeError('Missing verified background music manifest in Drive')
     if manifest.get('attribution_required') and not manifest.get('attribution', '').strip():
         raise RuntimeError('Audio Library track requires attribution')
     target = root/'music.audio'
@@ -340,6 +340,9 @@ def upload_private(video, thumbnail, story, state, store, key, music_credit=''):
 
 
 def preflight():
+    if not os.getenv('GROQ_API_KEY') and os.getenv('DRIVE_TOKEN_JSON'):
+        from runtime_config import load_runtime_environment
+        load_runtime_environment(Store())
     needed = ['GROQ_API_KEY', 'DRIVE_TOKEN_JSON']
     if os.getenv('IMAGE_BACKEND', 'cpu') == 'hf':
         needed += ['HF_TOKEN', 'IMAGE_MODEL']
