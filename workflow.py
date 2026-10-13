@@ -80,27 +80,53 @@ def make_story(day, previous):
     if os.getenv('STORY_FILE'):
         # Explicit original test story only; daily jobs must generate fresh stories.
         return validate_story(json.loads(Path(os.environ['STORY_FILE']).read_text()))
-    prompt = f'''Write an original fictional English motivational story for {day}.
-    Use a concrete protagonist, difficult choice, believable setbacks and earned resolution.
-    Avoid imitating existing videos, fabricated true-story claims, or guaranteed success claims.
-    1800–2200 spoken words, 18–24 narration chapters, targeting 10–15 minutes. Open immediately with a vivid crisis, impossible choice, or surprising consequence in the first 20 seconds.
-    No greeting, channel intro, or generic motivational preamble. Create a clear unanswered question.
-    Build escalating stakes, specific dialogue, reversals, and small payoffs every 45–60 seconds.
-    Show choices and consequences rather than repeating advice. Resolve the opening question with an earned emotional payoff.
-    Close with a short reflection, then explicitly ask viewers to like, comment on a specific story question, and subscribe.
-    The final narration must contain the words like, comment, and subscribe.
-    Include character_description (one concise consistent appearance and outfit) at the top level.
-    Keep the same original character appearance across all Ghibli-inspired hand-painted 2D image prompts.
-    Every chapter needs image_prompt and image_prompts (4 different visual moments) for 10-second shots.
-    Keep each visual prompt concise: at most 12 words, describing a distinct action or setting.
-    Avoid these recent titles and concepts: {previous}.
-    Return JSON with title, description, tags (list), thumbnail_text (2–5 words),
-    thumbnail_prompt, scenes (list of objects with narration, image_prompt and image_prompts).
-    Description must clearly label the story fictional. No timestamps until audio is generated.'''
-    result = request_groq('chat/completions', {'model': os.getenv('STORY_MODEL', 'llama-3.3-70b-versatile'),
-        'messages': [{'role': 'user', 'content': prompt}], 'response_format': {'type': 'json_object'},
-        'temperature': 0.9, 'max_completion_tokens': 11000})
-    return validate_story(json.loads(result['choices'][0]['message']['content']))
+    model = os.getenv('STORY_MODEL', 'openai/gpt-oss-120b')
+    def ask(prompt, limit):
+        result = request_groq('chat/completions', {'model': model,
+            'messages': [{'role': 'user', 'content': prompt}],
+            'response_format': {'type': 'json_object'}, 'reasoning_effort': 'low',
+            'temperature': 0.8, 'max_completion_tokens': limit})
+        choice = result['choices'][0]
+        if choice.get('finish_reason') == 'length':
+            raise RuntimeError('Story response was truncated; refusing incomplete script')
+        return json.loads(choice['message']['content'])
+    outline = ask(f'''Plan an original fictional English motivational story for {day}.
+    A vivid crisis or impossible choice must open the FIRST sentence, with an unanswered question.
+    No greeting or generic motivational preamble. Escalate choices, setbacks, surprising reversals,
+    specific dialogue, and emotional payoffs. Resolve the opening question in the final act.
+    Last chapter ends with a specific reflection question and an explicit like, comment, subscribe CTA.
+    Avoid these recent titles: {previous}.
+    Return JSON: title (max 100 characters), description (clearly label fictional), tags (list),
+    thumbnail_text (2-5 words), thumbnail_prompt, character_description (max 14 words, appearance and outfit),
+    scenes (exactly 20 chapters). Each chapter: summary (max 25 words), image_prompt,
+    image_prompts (four distinct visual beats, each max 8 words). Hand-painted Japanese animation style.
+    Main character keeps the same appearance. Provide ONLY the plan, no full narration yet.''', 4200)
+    if len(outline.get('scenes', [])) != 20:
+        raise ValueError('Outline requires exactly twenty chapters')
+    summaries = [scene['summary'] for scene in outline['scenes']]
+    prior = ''
+    for begin in (0, 10):
+        # Separate bursts fit the free plan; never switch to a paid provider.
+        time.sleep(60)
+        group = ask(f'''Write chapters {begin+1} through {begin+10} of this original fictional story.
+        Title: {outline['title']}. Character: {outline['character_description']}.
+        Complete plot: {json.dumps(summaries)}.
+        Previous chapter ending: {prior[-700:]}.
+        Return JSON with narrations: a list of exactly 10 strings in chronological order.
+        Each string MUST contain 95-105 English spoken words; total for this request 950-1050 words.
+        Natural narration with concrete actions and dialogue, not generic advice.
+        Begin chapter 1 with the crisis immediately, no welcome or setup preamble.
+        Escalate stakes, introduce reversals and emotional payoffs every few chapters.
+        Resolve the initial crisis before chapter 20. Chapter 20 must explicitly ask viewers to like,
+        comment with their answer to a specific story question, and subscribe.
+        Do not add chapter headings or directions to spoken text. No repeated introduction.''', 4200)
+        parts = group.get('narrations', [])
+        if len(parts) != 10 or not all(isinstance(p, str) for p in parts):
+            raise ValueError('Narration batch must contain ten strings')
+        for scene, narration in zip(outline['scenes'][begin:begin+10], parts):
+            scene['narration'] = narration
+        prior = parts[-1]
+    return validate_story(outline)
 
 
 def make_image(prompt, path):
