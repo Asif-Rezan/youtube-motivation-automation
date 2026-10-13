@@ -167,28 +167,98 @@ def check_video(path, min_duration=180):
 
 
 class Store:
+    """Private Google Drive storage; never purchases additional quota."""
     def __init__(self):
-        import boto3
-        self.client = boto3.client('s3', endpoint_url=os.getenv('S3_ENDPOINT_URL') or None)
-        self.bucket = required('S3_BUCKET')
+        from google.oauth2.credentials import Credentials
+        from googleapiclient.discovery import build
+        self.client = build('drive', 'v3', credentials=Credentials.from_authorized_user_info(
+            json.loads(required('DRIVE_TOKEN_JSON'))), cache_discovery=False)
+        self.folder = required('DRIVE_FOLDER_ID')
+        info = self.client.files().get(fileId=self.folder, fields='mimeType,trashed').execute()
+        if info.get('trashed') or info['mimeType'] != 'application/vnd.google-apps.folder':
+            raise RuntimeError('DRIVE_FOLDER_ID must identify an accessible active folder')
+        self.check_private(self.folder)
+
+    def check_private(self, file_id):
+        permissions = self.client.permissions().list(fileId=file_id,
+            fields='permissions(type,role)', pageSize=100).execute().get('permissions', [])
+        if any(p.get('role') != 'owner' for p in permissions):
+            raise RuntimeError('Workflow storage must be private to its owner')
+
+    def find(self, key):
+        # Query using only an internal SHA-256 key, never interpolated user input.
+        digest = hashlib.sha256(key.encode()).hexdigest()
+        q = (f"'{self.folder}' in parents and trashed = false and "
+             f"appProperties has {{ key='workflow_key' and value='{digest}' }}")
+        items = self.client.files().list(q=q, fields='files(id)', pageSize=100).execute()['files']
+        if len(items) > 1:
+            raise RuntimeError('Duplicate checkpoint files require reconciliation')
+        if items:
+            self.check_private(items[0]['id'])
+            return items[0]['id']
+        return None
 
     def load(self, key, default):
-        from botocore.exceptions import ClientError
-        try:
-            return json.loads(self.client.get_object(Bucket=self.bucket, Key=key)['Body'].read())
-        except ClientError as error:
-            if error.response['Error']['Code'] == 'NoSuchKey':
-                return default
-            raise
+        file_id = self.find(key)
+        if not file_id:
+            return default
+        return json.loads(self.client.files().get_media(fileId=file_id).execute())
+
+    def check_quota(self, size):
+        quota = self.client.about().get(fields='storageQuota').execute()['storageQuota']
+        if 'limit' not in quota:
+            raise RuntimeError('Cannot verify free storage allowance; stop before upload')
+        limit = min(int(quota['limit']), 15 * 1024**3)
+        if int(quota.get('usage', 0)) + size + 100 * 1024**2 > limit:
+            raise RuntimeError('Free storage allowance nearly full; no paid upgrade will be requested')
+
+    def put(self, key, media, size):
+        self.check_private(self.folder)
+        self.check_quota(size)
+        file_id = self.find(key)
+        if file_id:
+            return self.client.files().update(fileId=file_id, media_body=media, fields='id').execute()
+        metadata = {'name': key.replace('/', '__'), 'parents': [self.folder],
+                    'appProperties': {'workflow_key': hashlib.sha256(key.encode()).hexdigest()}}
+        return self.client.files().create(body=metadata, media_body=media, fields='id').execute()
 
     def save(self, key, value):
-        self.client.put_object(Bucket=self.bucket, Key=key, Body=json.dumps(value).encode(), ContentType='application/json')
+        import io
+        from googleapiclient.http import MediaIoBaseUpload
+        payload = json.dumps(value).encode()
+        self.put(key, MediaIoBaseUpload(io.BytesIO(payload), mimetype='application/json', resumable=True), len(payload))
 
     def upload(self, path, key):
-        self.client.upload_file(str(path), self.bucket, key)
+        from googleapiclient.http import MediaFileUpload
+        self.put(key, MediaFileUpload(str(path), resumable=True), path.stat().st_size)
+
+    def download(self, file_id, path):
+        import io
+        from googleapiclient.http import MediaIoBaseDownload
+        self.check_private(file_id)
+        with path.open('wb') as output:
+            request = MediaIoBaseDownload(output, self.client.files().get_media(fileId=file_id))
+            done = False
+            while not done:
+                _, done = request.next_chunk(num_retries=3)
 
 
-def upload_private(video, thumbnail, story, state, store, key):
+def load_music(store, root):
+    # Only downloaded YouTube Audio Library tracks with recorded provenance.
+    manifest = store.load('music-manifest.json', None)
+    if not manifest or manifest.get('source') != 'YouTube Audio Library':
+        raise RuntimeError('Missing verified YouTube Audio Library music manifest in Drive')
+    if manifest.get('attribution_required') and not manifest.get('attribution', '').strip():
+        raise RuntimeError('Audio Library track requires attribution')
+    target = root/'music.audio'
+    store.download(manifest['file_id'], target)
+    if hashlib.sha256(target.read_bytes()).hexdigest() != manifest['sha256']:
+        raise RuntimeError('Music file differs from the licensed track in the manifest')
+    duration(target)  # Reject unreadable files.
+    return manifest.get('attribution', '')
+
+
+def upload_private(video, thumbnail, story, state, store, key, music_credit=''):
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
@@ -203,7 +273,7 @@ def upload_private(video, thumbnail, story, state, store, key):
     store.save(key, state)
     request = client.videos().insert(part='snippet,status', notifySubscribers=False,
         body={'snippet': {'title': story['title'], 'description': story['description'] +
-             '\n\n' + os.getenv('MUSIC_CREDIT', ''), 'tags': story['tags'], 'categoryId': '22',
+             '\n\n' + music_credit, 'tags': story['tags'], 'categoryId': '22',
              'defaultLanguage': 'en'}, 'status': {'privacyStatus': 'private', 'selfDeclaredMadeForKids': False}},
         media_body=MediaFileUpload(str(video), chunksize=8*1024*1024, resumable=True))
     result = None
@@ -219,8 +289,7 @@ def upload_private(video, thumbnail, story, state, store, key):
 
 
 def preflight():
-    needed = ['GROQ_API_KEY', 'HF_TOKEN', 'IMAGE_MODEL', 'MUSIC_URL', 'S3_BUCKET',
-              'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY']
+    needed = ['GROQ_API_KEY', 'HF_TOKEN', 'IMAGE_MODEL', 'DRIVE_TOKEN_JSON', 'DRIVE_FOLDER_ID']
     if os.getenv('UPLOAD_ENABLED') == 'true':
         needed += ['YOUTUBE_TOKEN_JSON', 'EXPECTED_CHANNEL_ID']
     missing = [name for name in needed if not os.getenv(name)]
@@ -233,16 +302,18 @@ def run(daily=False):
     if daily and os.getenv('DAILY_ENABLED') != 'true':
         raise RuntimeError('Daily automation is disabled until the complete private test passes')
     preflight()
-    import requests
     from PIL import Image, ImageDraw, ImageFont, ImageOps
     day = dt.datetime.now(ZoneInfo('Asia/Dhaka')).date().isoformat()
     run_id = day if daily else day + '-test'
     root = Path('output') / run_id
     root.mkdir(parents=True, exist_ok=True)
     store, key = Store(), f'runs/{run_id}/state.json'
+    if daily and not store.load('last-private-test.json', {}).get('passed'):
+        raise RuntimeError('No completed private upload test is recorded')
     state = store.load(key, {})
     if state.get('phase') in ('upload_started', 'uploaded', 'complete'):
         raise RuntimeError('Run already uploaded or needs upload reconciliation; inspect state before continuing')
+    music_credit = load_music(store, root)
     history = store.load('history.json', [])
     story = state.get('story') or make_story(day, history[-30:])
     digest = hashlib.sha256(' '.join(s['narration'] for s in story['scenes']).encode()).hexdigest()
@@ -257,8 +328,8 @@ def run(daily=False):
         if not image.exists():
             make_image(scene['image_prompt'], image)
         if not audio.exists():
-            audio.write_bytes(request_groq('audio/speech', {'model': os.getenv('TTS_MODEL', 'playai-tts'),
-                'voice': os.getenv('TTS_VOICE', 'Fritz-PlayAI'), 'input': scene['narration'], 'response_format': 'wav'}, True))
+            audio.write_bytes(request_groq('audio/speech', {'model': (os.getenv('TTS_MODEL') or 'playai-tts'),
+                'voice': (os.getenv('TTS_VOICE') or 'Fritz-PlayAI'), 'input': scene['narration'], 'response_format': 'wav'}, True))
         lengths.append(render_scene(image, audio, clip))
         clips.append(clip)
         words_file = root/f'{i:02}-words.json'
@@ -271,12 +342,6 @@ def run(daily=False):
     playlist = root/'clips.txt'
     playlist.write_text(''.join(f"file '{p.name}'\n" for p in clips))
     shell('ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', str(playlist), '-c', 'copy', str(root/'joined.mp4'))
-    music_url = required('MUSIC_URL')
-    if not music_url.startswith('https://'):
-        raise RuntimeError('MUSIC_URL must be HTTPS')
-    response = requests.get(music_url, timeout=120)
-    response.raise_for_status()
-    (root/'music.audio').write_bytes(response.content)
     video = root/'video.mp4'
     shell('ffmpeg', '-y', '-i', str(root/'joined.mp4'), '-stream_loop', '-1', '-i', str(root/'music.audio'),
         '-filter_complex', '[0:a]loudnorm=I=-16:TP=-1.5:LRA=11[v];[1:a]volume=0.08[m];'
@@ -300,9 +365,12 @@ def run(daily=False):
     state['phase'] = 'rendered'
     store.save(key, state)
     if os.getenv('UPLOAD_ENABLED') == 'true':
-        upload_private(video, thumb, story, state, store, key)
-    history.append({'title': story['title'], 'hash': digest, 'run': run_id})
-    store.save('history.json', history)
+        upload_private(video, thumb, story, state, store, key, music_credit)
+    if state['phase'] == 'complete':
+        history.append({'title': story['title'], 'hash': digest, 'run': run_id})
+        store.save('history.json', history)
+        if not daily:
+            store.save('last-private-test.json', {'passed': True, 'run': run_id, 'video_id': state['video_id']})
     print(json.dumps({'run': run_id, 'phase': state['phase'], 'video_id': state.get('video_id')}))
 
 
