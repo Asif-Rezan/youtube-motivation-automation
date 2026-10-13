@@ -1,0 +1,27 @@
+name: Prepare private runtime transfer
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/runtime-key.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: youtube-motivation
+  cancel-in-progress: false
+jobs:
+  key:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt cryptography
+      - name: Prepare public encryption key with private key retained in Drive
+        env:
+          DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+        run: python runtime_config.py create-key
