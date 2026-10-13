@@ -37,7 +37,7 @@ def generate(prompt, path):
     if not 1 <= steps <= 50:
         raise ValueError('CPU generation requires 1–50 steps')
     start = time.monotonic()
-    result = _pipeline(prompt=prompt, width=width, height=height,
+    result = _pipeline(prompt=prompt, negative_prompt='photograph, photorealistic, live action, 3D render, CGI, extra arms, extra legs, deformed hands, duplicate person, watermark, lettering', width=width, height=height,
         num_inference_steps=steps, guidance_scale=7.5,
         generator=torch.Generator(device='cpu').manual_seed(int(os.getenv('IMAGE_SEED', '42'))))
     if any(result.nsfw_content_detected or []):
