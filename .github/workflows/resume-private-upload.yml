@@ -1,8 +1,5 @@
 name: Resume saved private video upload
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/resume-private-upload.yml']
   workflow_dispatch:
     inputs:
       saved_run:
@@ -41,4 +38,4 @@ jobs:
         run: |
           python -u free_private_test.py resume
           python -u youtube_verify.py
-# One authorized private upload to REZAN IT; restore guard prevents duplicates. No paid generation, no re-render, no public publishing.
+# Manual only; completed or ambiguous upload states prevent duplicate insertion. No paid generation, no re-render, no public publishing.
