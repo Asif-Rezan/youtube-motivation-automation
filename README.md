@@ -12,9 +12,11 @@
   transitions, original MusicRNN background music and illustrated thumbnails.
 - Private uploads to the user-selected REZAN IT channel. Public publishing remains disabled.
 
-The previous 4:25 private video passed its upload/HD/metadata test. The new-format
-test is now running in Actions run 38417265115. A new pass is not claimed until
-the 10–15 minute render, global timing and private HD upload checks all finish.
+The new-format private test passed in Actions run 38417265115:
+13:37, 1920×1080, 82 distinct illustrated image clips with global ten-second
+boundaries. Complete-file decoding, timeline checks, private REZAN IT upload,
+HD processing, custom thumbnail, title, description and tags all passed.
+The workflow is manual only again. The previous 4:25 video remains unchanged.
 
 ## Free cloud infrastructure
 
