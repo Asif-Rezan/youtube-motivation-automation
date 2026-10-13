@@ -64,24 +64,6 @@ def main():
     payload = unwrap(store, envelope)
     store.save('runtime-config-envelope.json', envelope)
     load_runtime_environment(store)
-    music = payload['music']
-    if not music['audioUrl'].startswith('https://'):
-        raise RuntimeError('Music download requires HTTPS')
-    with tempfile.TemporaryDirectory() as temp:
-        path = Path(temp)/'generated-score.wav'
-        response = requests.get(music['audioUrl'], timeout=180)
-        if response.status_code != 200:
-            raise RuntimeError('Music provider download failed')
-        path.write_bytes(response.content)
-        actual_duration = duration(path)
-        result = store.put('music/generated-score.wav',
-            MediaFileUpload(str(path), resumable=True), path.stat().st_size)
-        store.save('music-manifest.json', {'source': 'AI-generated (vidIQ)',
-            'title': 'Quiet Steps', 'artist': 'AI-generated with vidIQ',
-            'license': 'Royalty-free original track per vidIQ music generation service',
-            'provider_music_id': music['musicId'], 'duration_seconds': actual_duration,
-            'attribution_required': False, 'attribution': '',
-            'sha256': hashlib.sha256(path.read_bytes()).hexdigest(), 'file_id': result['id']})
     response = requests.get('https://api.groq.com/openai/v1/models',
         headers={'Authorization': 'Bearer ' + os.environ['GROQ_API_KEY']}, timeout=30)
     if response.status_code != 200:
@@ -89,7 +71,7 @@ def main():
             'http_status': response.status_code}))
         raise SystemExit(1)
     ids = {model['id'] for model in response.json().get('data', [])}
-    print(json.dumps({'check': 'Encrypted runtime credentials and generated music',
+    print(json.dumps({'check': 'Encrypted runtime credentials',
         'passed': True, 'groq_authorized': True,
         'story_model_available': 'llama-3.3-70b-versatile' in ids,
         'speech_model_available': 'canopylabs/orpheus-v1-english' in ids}), flush=True)
