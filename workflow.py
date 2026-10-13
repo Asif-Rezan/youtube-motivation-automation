@@ -409,8 +409,9 @@ def run(daily=False):
     root = Path('output') / run_id
     root.mkdir(parents=True, exist_ok=True)
     store, key = Store(), f'runs/{run_id}/state.json'
-    if daily and not store.load('last-private-test.json', {}).get('passed'):
-        raise RuntimeError('No completed private upload test is recorded')
+    test_record = store.load('last-private-test.json', {}) if daily else {}
+    if daily and (not test_record.get('passed') or not test_record.get('remote_verification', {}).get('private_test_passed')):
+        raise RuntimeError('No fully verified private HD upload test is recorded')
     state = store.load(key, {})
     if state.get('phase') in ('upload_started', 'uploaded', 'complete'):
         raise RuntimeError('Run already uploaded or needs upload reconciliation; inspect state before continuing')
