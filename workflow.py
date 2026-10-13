@@ -210,7 +210,7 @@ def check_video(path, min_duration=180):
     assert (video['width'], video['height']) == (1920, 1080), 'Wrong output dimensions'
     assert min_duration <= float(metadata['format']['duration']) <= 600, 'Duration outside required range'
     assert any(s['codec_type'] == 'audio' for s in metadata['streams']), 'Missing audio'
-    shell('ffmpeg', '-v', 'error', '-i', str(path), '-f', 'null', '-')
+    shell('ffmpeg', '-v', 'error', '-xerror', '-i', str(path), '-f', 'null', '-')
     return metadata
 
 
