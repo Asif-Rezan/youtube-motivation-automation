@@ -67,6 +67,12 @@ try:
     print(json.dumps({'check': 'Drive OAuth', 'passed': True,
         'storage_limit_available': 'limit' in quota}))
     folder = os.getenv('DRIVE_FOLDER_ID')
+    if not folder:
+        roots = client.files().list(q=("trashed = false and mimeType = 'application/vnd.google-apps.folder' and "
+            "appProperties has { key='youtube_automation_root' and value='v1' }"),
+            fields='files(id)',pageSize=100).execute().get('files', [])
+        if len(roots) == 1:
+            folder = roots[0]['id']
     if folder:
         info = client.files().get(fileId=folder, fields='mimeType,trashed').execute()
         permissions = client.permissions().list(fileId=folder,fields='permissions(role,type)').execute().get('permissions', [])
