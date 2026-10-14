@@ -1,5 +1,4 @@
-"""10–15 minute videos with a distinct illustrated image every ten seconds."""
-import bisect
+"""10–15 minute videos with a distinct illustrated image every seven seconds."""
 import datetime as dt
 import hashlib
 import json
@@ -11,7 +10,7 @@ from zoneinfo import ZoneInfo
 import workflow as w
 
 ROOT = Path(os.getenv('OUTPUT_DIR', 'output/ghibli-long-test'))
-INTERVAL = 10
+INTERVAL = 7
 SHARDS = 16
 ASSETS = ('story.json', 'plan.json', 'narration.wav', 'captions.srt')
 
@@ -20,29 +19,95 @@ def run_id():
     return os.getenv('SAVED_RUN_ID') or (dt.datetime.now(ZoneInfo('Asia/Dhaka')).strftime('%Y-%m-%d-%H%M%S')+'-improved-story')
 
 
-def shot_plan(story, lengths):
+def shot_plan(story, lengths, word_lists):
+    """Anchor every visual to words actually spoken in its global seven-second window."""
+    if len(lengths) != len(word_lists) or len(lengths) != len(story['scenes']):
+        raise ValueError('Chapter audio, transcript and story must agree')
     total = sum(lengths)
-    ends, acc = [], 0
-    for length in lengths:
-        acc += length
-        ends.append(acc)
+    timeline, offset = [], 0.0
+    for chapter, (length, words) in enumerate(zip(lengths, word_lists)):
+        for word in words:
+            start, end = float(word['start']), float(word['end'])
+            if not 0 <= start < end <= length + .1:
+                raise ValueError('Word timing outside measured narration')
+            timeline.append({'start': offset+start, 'end': offset+min(end, length),
+                             'word': word['word'].strip(), 'chapter': chapter})
+        offset += length
+    if not timeline:
+        raise ValueError('Cannot synchronize images without word timings')
     shots = []
     for index in range(math.ceil(total/INTERVAL)):
-        start = index*INTERVAL
-        chapter = min(bisect.bisect_right(ends, start), len(lengths)-1)
-        offset = 0 if chapter == 0 else ends[chapter-1]
-        scene = story['scenes'][chapter]
-        beats = scene.get('image_prompts') or [scene['image_prompt']]
-        local = int((start-offset)//INTERVAL)
-        beat = beats[min(local, len(beats)-1)]
-        # Vary framing even when a chapter runs longer than its provided beats.
-        camera = ('wide establishing composition', 'medium character view',
-                  'intimate detail composition', 'over-the-shoulder composition')[index%4]
-        prompt = (story.get('character_description', '') + ', ' if story.get('character_description') else '') + beat+', '+camera
-        shots.append({'index': index, 'start': start, 'duration': min(INTERVAL, total-start),
-            'chapter': chapter, 'prompt': prompt, 'seed': 1700+index})
+        start, end = index*INTERVAL, min((index+1)*INTERVAL, total)
+        spoken = [word for word in timeline if word['end'] > start and word['start'] < end]
+        # Silence keeps the nearest narrated event, never an unrelated chapter beat.
+        anchor = spoken or [min(timeline, key=lambda word: abs(word['start']-start))]
+        chapter = max(set(word['chapter'] for word in anchor),
+                      key=lambda c: sum(max(0, min(end, word['end'])-max(start, word['start']))
+                                        for word in anchor if word['chapter'] == c))
+        shots.append({'index': index, 'start': start, 'duration': end-start,
+            'chapter': chapter, 'narration': ' '.join(word['word'] for word in anchor),
+            'seed': 1700+index})
     return {'duration_seconds': total, 'image_interval_seconds': INTERVAL,
-        'style': 'ghibli-inspired', 'shots': shots}
+        'style': 'ghibli-inspired', 'alignment': 'measured-word-timestamps', 'shots': shots}
+
+
+def storyboard(root=ROOT, ask=None, pause=None):
+    """Create concrete visual prompts AFTER narration timing, never from outline beats."""
+    import time
+    ask = ask or w.request_groq
+    pause = pause or time.sleep
+    story = json.loads((root/'story.json').read_text())
+    plan = json.loads((root/'plan.json').read_text())
+    character = story.get('character_description', '').strip()
+    if not character:
+        raise ValueError('Visual synchronization needs a character description')
+    character = ' '.join(character.split()[:14])
+    shots = plan['shots']
+    for begin in range(0, len(shots), 8):
+        if begin:
+            pause(60)
+        batch = shots[begin:begin+8]
+        properties = {f"shot_{shot['index']:03}": {'type': 'string'} for shot in batch}
+        schema = {'type': 'object', 'properties': properties,
+                  'required': list(properties), 'additionalProperties': False}
+        context = {str(shot['chapter']): story['scenes'][shot['chapter']]['narration'] for shot in batch}
+        prompt = f"""Storyboard this fictional narrated story. Return one image prompt per exact shot key.
+Each shot is a measured seven-second narration window. Depict ONLY the concrete action, location,
+objects and emotion being spoken in that window. Chapter text resolves pronouns and continuity only;
+NEVER illustrate a later or earlier chapter event in place of the current window.
+For abstract reflection or dialogue, show the current character in the current physical scene.
+No metaphorical mountains, gardens or random scenery unless literally present in that event.
+Keep recurring characters and clothes consistent. Main character design: {character}.
+Each prompt MUST be 12-22 English words: subject and concrete action FIRST, then relevant objects
+and location. Describe one simple drawable composition. Include other people only when narrated.
+Do not put style, camera lists, narration text, typography or character design into the prompt;
+the renderer adds character design and illustration style. Do not replace specific objects with generic ones.
+Chapter context: {json.dumps(context)}
+Exact shot windows: {json.dumps([{'key': f"shot_{shot['index']:03}", 'spoken': shot['narration']} for shot in batch])}
+"""
+        result = ask('chat/completions', {'model': os.getenv('STORY_MODEL', 'openai/gpt-oss-120b'),
+            'messages': [{'role': 'user', 'content': prompt}],
+            'response_format': {'type': 'json_schema', 'json_schema': {'name': 'aligned_shots',
+                'strict': True, 'schema': schema}}, 'reasoning_effort': 'low',
+            'temperature': .2, 'max_completion_tokens': 1800})
+        choice = result['choices'][0]
+        if choice.get('finish_reason') == 'length':
+            raise RuntimeError('Storyboard response truncated')
+        values = json.loads(choice['message']['content'])
+        if set(values) != set(properties):
+            raise ValueError('Storyboard must cover every narration window exactly once')
+        for shot in batch:
+            visual = values[f"shot_{shot['index']:03}"]
+            if not isinstance(visual, str) or not 5 <= len(visual.split()) <= 30:
+                raise ValueError('Visual prompt must be a concise concrete scene')
+            shot['visual_action'] = visual
+            shot['prompt'] = visual + '. Character: ' + character
+        # Private local checkpoint; do not log unpublished narration or prompts.
+        (root/'plan.json').write_text(json.dumps(plan, indent=2))
+        print(json.dumps({'aligned_shots': min(begin+8, len(shots)), 'total': len(shots)}), flush=True)
+    plan['storyboard_verified'] = True
+    (root/'plan.json').write_text(json.dumps(plan, indent=2))
+    return plan
 
 
 def prepare(story=None, root=ROOT):
@@ -72,7 +137,7 @@ def prepare(story=None, root=ROOT):
     (root/'audio-list.txt').write_text(''.join(f"file '{p.name}'\n" for p in audios))
     w.shell('ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', str(root/'audio-list.txt'),
         '-ar', '48000', '-ac', '2', '-c:a', 'pcm_s16le', str(root/'narration.wav'))
-    plan = shot_plan(story, lengths)
+    plan = shot_plan(story, lengths, word_lists)
     (root/'plan.json').write_text(json.dumps(plan, indent=2))
     print(json.dumps({'audio_ready': True, 'seconds': total, 'images': len(plan['shots'])}), flush=True)
     return plan
@@ -89,6 +154,8 @@ def picture_clip(image, seconds, target):
 
 def generate_shard(shard, root=ROOT, count=SHARDS):
     plan = json.loads((root/'plan.json').read_text())
+    if not plan.get('storyboard_verified') or not all(s.get('prompt') for s in plan['shots']):
+        raise RuntimeError('Narration-aligned storyboard is required before image generation')
     shots = [s for s in plan['shots'] if s['index']%count == shard]
     for shot in shots:
         index = shot['index']
@@ -148,10 +215,10 @@ def finish(root=ROOT):
     plan = json.loads((root/'plan.json').read_text())
     clips = [root/f"shot-{s['index']:03}.mp4" for s in plan['shots']]
     if not all(p.exists() for p in clips):
-        raise RuntimeError('Not every ten-second image clip exists')
+        raise RuntimeError('Not every seven-second image clip exists')
     for shot, clip in zip(plan['shots'], clips):
         if abs(w.duration(clip)-shot['duration']) > .04:
-            raise RuntimeError('Shot timing differs from the global ten-second plan')
+            raise RuntimeError('Shot timing differs from the global seven-second plan')
     (root/'clips.txt').write_text(''.join(f"file '{p.name}'\n" for p in clips))
     w.shell('ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', str(root/'clips.txt'), '-c', 'copy', str(root/'joined.mp4'))
     if not (root/'music.audio').exists():
@@ -174,10 +241,11 @@ def finish(root=ROOT):
     if (root/'thumbnail.jpg').stat().st_size >= 2*1024*1024:
         raise RuntimeError('Thumbnail exceeds size limit')
     report = {'render_passed': True, 'duration_seconds': float(metadata['format']['duration']),
-        'width': 1920, 'height': 1080, 'images': len(clips), 'image_interval_seconds': 10,
+        'width': 1920, 'height': 1080, 'images': len(clips), 'image_interval_seconds': INTERVAL,
         'style': 'ghibli-inspired', 'privacy': 'private', 'voice': 'Kokoro am_michael',
         'music': 'Magenta MusicRNN', 'image_model': os.getenv('CPU_IMAGE_MODEL', 'Lykon/dreamshaper-8'),
-        'audio_validation': audio_report, 'timeline_verified': True}
+        'audio_validation': audio_report, 'timeline_verified': True, 'storyboard_verified': plan.get('storyboard_verified', False),
+        'alignment': plan.get('alignment')}
     (root/'validation.json').write_text(json.dumps(report))
     print(json.dumps(report), flush=True)
     return report
@@ -185,6 +253,7 @@ def finish(root=ROOT):
 
 def render_complete(story, root):
     prepare(story, root)
+    storyboard(root)
     generate_shard(0, root, count=1)
     return finish(root)
 
@@ -256,13 +325,13 @@ def restore_clips():
         name = f"shot-{shot['index']:03}.mp4"
         file_id = store.find(f'runs/{run_id()}/{name}')
         if not file_id:
-            raise RuntimeError('Saved ten-second clip missing')
+            raise RuntimeError('Saved seven-second clip missing')
         store.download(file_id, ROOT/name)
 
 
 def upload():
     report = json.loads((ROOT/'validation.json').read_text())
-    if not report.get('render_passed') or report.get('image_interval_seconds') != 10:
+    if not report.get('render_passed') or report.get('image_interval_seconds') != INTERVAL or not report.get('storyboard_verified'):
         raise RuntimeError('New-format render has not passed validation')
     w.check_video(ROOT/'video.mp4')
     store, key = w.Store(), f'runs/{run_id()}/state.json'
@@ -289,7 +358,7 @@ def upload():
 if __name__ == '__main__':
     command = sys.argv[1]
     shard = int(sys.argv[2]) if len(sys.argv)>2 else 0
-    actions = {'init-input': init_input, 'stage-story': stage_story, 'prepare': prepare, 'save-preparation': save_preparation,
+    actions = {'init-input': init_input, 'stage-story': stage_story, 'prepare': prepare, 'storyboard': storyboard, 'save-preparation': save_preparation,
         'restore-images': lambda: restore_preparation(True), 'generate-shard': lambda: generate_shard(shard),
         'save-shard': lambda: save_shard(shard), 'restore-clips': restore_clips,
         'finish': finish, 'upload': upload}

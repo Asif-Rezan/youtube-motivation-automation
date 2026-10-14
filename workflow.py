@@ -163,10 +163,10 @@ def make_story(day, previous):
 
 
 def make_image(prompt, path):
-    prompt = ('hand-painted Japanese animation, watercolor landscape, expressive 2D characters, warm cinematic light, ' + prompt)
+    prompt = prompt + ', hand-painted Japanese animation, expressive 2D illustration, warm light'
     if os.getenv('IMAGE_BACKEND', 'cpu') == 'cpu':
         from image_cpu import generate
-        generate(prompt + ', cinematic lighting, no lettering or watermarks', path)
+        generate(prompt + ', no text, no watermark', path)
         return
     if os.getenv('IMAGE_BACKEND') != 'hf':
         raise ValueError('IMAGE_BACKEND must be cpu or hf')
@@ -478,7 +478,7 @@ def run(daily=False):
     root.mkdir(parents=True, exist_ok=True)
     store, key = Store(), f'runs/{run_id}/state.json'
     test_record = store.load('last-private-test.json', {}) if daily else {}
-    if daily and (not test_record.get('passed') or not test_record.get('remote_verification', {}).get('private_test_passed') or test_record.get('validation', {}).get('image_interval_seconds') != 10 or test_record.get('validation', {}).get('style') != 'ghibli-inspired'):
+    if daily and (not test_record.get('passed') or not test_record.get('remote_verification', {}).get('private_test_passed') or test_record.get('validation', {}).get('image_interval_seconds') != 7 or not test_record.get('validation', {}).get('storyboard_verified') or test_record.get('validation', {}).get('style') != 'ghibli-inspired'):
         raise RuntimeError('No fully verified private HD upload test is recorded')
     state = store.load(key, {})
     if state.get('phase') in ('upload_started', 'uploaded', 'complete'):

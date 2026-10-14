@@ -4,7 +4,7 @@
 
 - Original English motivational stories targeting 10–15 minutes (600–900 seconds).
 - 1920×1080 output at 30 fps.
-- A newly generated image at 0, 10, 20, 30 seconds and every ten seconds thereafter.
+- A newly generated image at 0, 7, 14, 21 seconds and every seven seconds thereafter.
   The final image lasts only for the remaining duration. Chapter boundaries do not reset this timeline.
 - Ghibli-inspired hand-painted 2D illustrations, using pinned public
   Lykon/dreamshaper-8 safetensors weights on cloud CPUs.
@@ -12,12 +12,14 @@
   transitions, original MusicRNN background music and illustrated thumbnails.
 - Private uploads to the user-selected REZAN IT channel. Public publishing remains disabled.
 
-The improved private test passed in Actions run 38450919780:
-13:17, 1920×1080, 80 distinct illustrated clips at global ten-second boundaries.
-DreamShaper 8 replaces the older image model. Complete-file decoding, shot
-checks, private REZAN IT upload, HD processing and custom-thumbnail/metadata
-readback all passed. Background music audibility also passed: the rendered
-music bed measured -27.45 dB RMS, 10.78 dB below the combined track.
+The previous ten-second private test passed in Actions run 38450919780.
+The current seven-second update derives each visual from actual measured word
+timestamps after speech generation, including windows crossing chapter boundaries.
+Groq produces concise scene prompts using the exact words spoken in that window
+and chapter context for pronouns and continuity. Image generation refuses a plan
+without full narration-window coverage. Subject/action/object prompts precede style
+text so the image model prioritizes the story. The final shorter shot covers the
+remaining narration. A fresh private integration test is required for this format.
 
 The reviewed story has a direct opening crisis, coherent escalating setbacks,
 and a final narrator request to like, comment and subscribe. Future stories
@@ -52,7 +54,7 @@ access. The workflow reads the input privately and never prints story text.
 Use **Ghibli long private video test** in Actions.
 Preparation generates narration and measures the real duration before generating
 images. Runs outside 600–900 seconds stop before image generation or upload.
-The global shot plan is computed from measured narration; eight CPU workers
+The global shot plan is computed from measured narration; sixteen CPU workers
 generate distinct illustrations and exact-duration silent clips. Each worker
 stores outputs privately in Drive. Final assembly combines continuous narration,
 music, transitions and captions, validates every clip's duration and decodes the
@@ -72,15 +74,15 @@ Set GitHub Actions secrets directly; do not commit real credentials:
   folder is automatically discovered; DRIVE_FOLDER_ID is optional.
 - YOUTUBE_TOKEN_JSON: authorized Google OAuth JSON with upload/read access
   for REZAN IT. The expected channel ID is UCwNhdtzL9XZMIAMXm81UCbw.
-- GROQ_API_KEY: required for fresh unattended daily story generation. This
-  secret was still absent at the last cloud check. The private test uses an
-  original AI-authored story provided through private Drive.
+- GROQ_API_KEY: required for fresh unattended daily story generation. It is also
+  required for narration-aligned scene prompts. Fresh tests generate an original
+  story and store all unpublished content privately.
 
 IMAGE_BACKEND=cpu, TTS_BACKEND=kokoro, CAPTION_BACKEND=cpu and
 MUSIC_BACKEND=magenta are free-model defaults. See .env.example.
 
 No daily schedule is registered. Daily mode requires DAILY_ENABLED=true and
-a completed private HD test with validation proving the new ten-second,
+a completed private HD test with validation proving the new seven-second,
 Ghibli-inspired format. A fixed test story cannot be used in daily mode.
 Before unattended operation, resolve OAuth Testing refresh-token expiry.
 The requested 09:00 Asia/Dhaka start corresponds to 03:00 UTC; GitHub schedules
@@ -98,9 +100,9 @@ reconciliation instead of repeating videos.insert. One workflow-level concurrenc
 group prevents overlapping complete video runs; image workers use separate keys.
 Exact story hashes and history guard repeated scripts.
 
-Eleven component checks cover private storage/quota rules, speech chunking,
+Fourteen component checks cover private storage/quota rules, speech chunking,
 caption bounds, story validation, real 1080p rendering, the global shot plan and
-an actual image change across a ten-second boundary. These checks pass locally
+an actual image change across a seven-second boundary. These checks pass locally
 and on cloud runners. They do not replace the full private-video upload test.
 
 ## Model documentation

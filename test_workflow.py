@@ -9,26 +9,60 @@ import workflow as w
 
 class Checks(unittest.TestCase):
 
-    def test_global_ten_second_timeline(self):
+    def test_global_seven_second_timeline_and_spoken_events(self):
         from long_video import shot_plan
-        story = {'scenes': [{'image_prompt': 'first chapter'}, {'image_prompt': 'second chapter'}]}
-        plan = shot_plan(story, [330.5, 280])
-        self.assertEqual(len(plan['shots']), 62)
-        self.assertEqual([s['start'] for s in plan['shots']], list(range(0, 620, 10)))
-        self.assertTrue(all(s['duration'] == 10 for s in plan['shots'][:-1]))
-        self.assertEqual(plan['shots'][-1]['duration'], .5)
-        self.assertEqual(plan['shots'][33]['chapter'], 0)
-        self.assertEqual(plan['shots'][34]['chapter'], 1)
+        story = {'scenes': [{'narration': 'She lifts a red suitcase.'},
+                            {'narration': 'He repairs a broken clock.'}]}
+        words = [[dict(word='suitcase', start=0, end=7.2)],
+                 [dict(word='clock', start=0, end=8.3)]]
+        plan = shot_plan(story, [7.2, 8.3], words)
+        self.assertEqual([s['start'] for s in plan['shots']], [0, 7, 14])
+        self.assertEqual([s['duration'] for s in plan['shots']], [7, 7, 1.5])
+        self.assertEqual(plan['shots'][0]['narration'], 'suitcase')
+        self.assertEqual(plan['shots'][1]['narration'], 'suitcase clock')
+        self.assertEqual(plan['shots'][1]['chapter'], 1)
+        self.assertEqual(plan['shots'][2]['narration'], 'clock')
+        self.assertNotIn('prompt', plan['shots'][0])
+        with self.assertRaises(ValueError):
+            shot_plan(story, [7.2, 8.3], [[], []])
 
-    def test_actual_ten_second_image_change(self):
+    def test_storyboard_uses_spoken_window_and_refuses_missing_shots(self):
+        from long_video import shot_plan, storyboard, generate_shard
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            story = {'character_description': 'Maya, black hair, blue coat',
+                     'scenes': [{'narration': 'Maya opens the red suitcase beside the station bench.'}]}
+            plan = shot_plan(story, [8], [[dict(word='red suitcase', start=0, end=6),
+                                         dict(word='station bench', start=7, end=8)]])
+            (root/'story.json').write_text(json.dumps(story))
+            (root/'plan.json').write_text(json.dumps(plan))
+            with self.assertRaisesRegex(RuntimeError, 'storyboard'):
+                generate_shard(0, root)
+            def ask(endpoint, payload):
+                source = payload['messages'][0]['content']
+                self.assertIn('red suitcase', source)
+                self.assertIn('station bench', source)
+                values = {'shot_000': 'Maya opens a red suitcase beside the wooden station bench.',
+                          'shot_001': 'Maya sits beside the station bench holding her open red suitcase.'}
+                return {'choices': [{'message': {'content': json.dumps(values)}}]}
+            aligned = storyboard(root, ask=ask, pause=lambda _: None)
+            self.assertTrue(aligned['storyboard_verified'])
+            self.assertIn('red suitcase', aligned['shots'][0]['prompt'])
+            self.assertIn('blue coat', aligned['shots'][0]['prompt'])
+            def incomplete(endpoint, payload):
+                return {'choices': [{'message': {'content': '{}'}}]}
+            with self.assertRaisesRegex(ValueError, 'every narration window'):
+                storyboard(root, ask=incomplete, pause=lambda _: None)
+
+    def test_actual_seven_second_image_change(self):
         from long_video import picture_clip
         import subprocess
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             for i, color in enumerate(((230, 20, 20), (20, 20, 230))):
                 Image.new('RGB', (640, 360), color).save(root/f'{i}.png')
-                picture_clip(root/f'{i}.png', 10, root/f'{i}.mp4')
-                self.assertAlmostEqual(w.duration(root/f'{i}.mp4'), 10, places=2)
+                picture_clip(root/f'{i}.png', 7, root/f'{i}.mp4')
+                self.assertAlmostEqual(w.duration(root/f'{i}.mp4'), 7, places=2)
             (root/'list.txt').write_text("file '0.mp4'\nfile '1.mp4'\n")
             w.shell('ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', str(root/'list.txt'),
                 '-c', 'copy', str(root/'joined.mp4'))
@@ -36,7 +70,7 @@ class Checks(unittest.TestCase):
                 return subprocess.check_output(['ffmpeg', '-v', 'error', '-ss', str(at),
                     '-i', str(root/'joined.mp4'), '-frames:v', '1', '-s', '1x1',
                     '-pix_fmt', 'rgb24', '-f', 'rawvideo', 'pipe:1'])
-            before, after = pixel(9), pixel(11)
+            before, after = pixel(6.8), pixel(7.2)
             self.assertGreater(before[0], before[2])
             self.assertGreater(after[2], after[0])
 
