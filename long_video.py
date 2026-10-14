@@ -414,7 +414,7 @@ def upload():
     store.save(key, state)
     w.upload_private(ROOT/'video.mp4', ROOT/'thumbnail.jpg', story, state, store, key,
         'Background music: original Magenta MusicRNN melody with synthesized ambient piano.')
-    history.append({'title': story['title'], 'hash': digest, 'run': run_id()})
+    history.append({'title': story['title'], 'hash': digest, 'run': run_id(), 'video_id': state['video_id']})
     store.save('history.json', history)
     store.save('last-private-test.json', {'passed': True, 'run': run_id(),
         'video_id': state['video_id'], 'validation': report, 'processing_status': state['processing_status']})

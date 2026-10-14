@@ -112,3 +112,44 @@ and on cloud runners. They do not replace the full private-video upload test.
 - https://github.com/magenta/magenta-js (Apache-2.0)
 - https://developers.google.com/youtube/v3/guides/uploading_a_video
 - https://docs.github.com/en/billing/concepts/product-billing/github-actions
+
+## Daily financial storytelling publishing
+
+`.github/workflows/daily-upload.yml` starts at **01:00 Asia/Dhaka** daily
+(`0 19 * * *` UTC, previous calendar day), and supports manual dispatch.
+GitHub may delay scheduled starts. The workflow must be on the default branch,
+with Actions and scheduled workflows enabled. Existing secrets are reused:
+`GROQ_API_KEY`, `DRIVE_TOKEN_JSON`, `DRIVE_FOLDER_ID`, `YOUTUBE_TOKEN_JSON`.
+The configured destination remains channel `UCztvMrNCT34DO3DtzLPgWaw`.
+
+The existing sixteen CPU image workers, exact seven-second narration timeline,
+10–15 minute validation, local narration, original music, captions and thumbnail
+pipeline are reused. Fresh Groq financial stories cover financial growth, money
+psychology, saving and investing habits, business decisions, moral parables and
+everyday money mistakes. Historical documentaries require verified source material;
+without it, generation uses clearly labelled fiction. Prior titles are included
+in planning and exact story hashes prevent duplicate uploads.
+
+Uploads start private. `daily_publish.py` reads back the exact video ID, channel,
+title, tags, description, successful processing and HD definition before making
+it public. Public status and metadata are read back again before any deletion.
+Failed, incomplete, ambiguous, or unverified uploads retain all Drive assets.
+
+Disposable media created by this daily workflow receive run-specific Drive
+appProperties. Cleanup persists an ID manifest, then rechecks each file's run,
+workflow-key hash, parent folder, private ownership, and explicit disposable name
+before permanent deletion. It never deletes folders, unrelated files, older
+untagged runs, story/state records, history, hashes, configuration or credentials.
+Preparation audio, scene images/clips/QA, final music, captions, thumbnail, video
+and plan are disposable. Deletion is permanent and recovers storage space.
+
+Cleanup retries transient failures and records each completed deletion. A 404 on
+an already journaled ID is safe. If publication or cleanup fails, rerun only the
+failed `publish-cleanup` job, or manually dispatch with `cleanup_run` set to its
+`daily-<GitHub run ID>`. That mode skips all generation/upload jobs, rechecks the
+existing video and resumes cleanup without calling `videos.insert` again.
+Never rerun all jobs to recover an ambiguous upload; reconcile its persisted
+state first. Daily uploads use the existing durable pre-insert state guard.
+
+Validation: `python -m unittest -v` includes deletion-safety, idempotency,
+missing-verification, wrong-channel and essential-data preservation tests.

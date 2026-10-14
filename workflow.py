@@ -113,7 +113,16 @@ def make_story(day, previous):
         if choice.get('finish_reason') == 'length':
             raise RuntimeError('Story response was truncated; refusing incomplete script')
         return json.loads(choice['message']['content'])
+    financial = os.getenv('CONTENT_TYPE') == 'financial-storytelling'
+    theme = ('Motivational financial storytelling: rotate poor-to-rich journeys, money psychology, '
+        'saving and investing habits, business successes and failures, financial moral parables, '
+        'and everyday money mistakes. Real financial history is allowed ONLY when verified source '
+        'material is supplied; otherwise choose fiction. Never invent historical facts or investment '
+        'returns. Show realistic tradeoffs and uncertainty, no guaranteed wealth or personalized advice.'
+        if financial else 'Motivational storytelling.')
     outline = ask(f'''Plan an original fictional English motivational story for {day}.
+    Content direction: {theme}
+    Avoid these previous titles and plots: {json.dumps(previous)}.
     A vivid crisis or impossible choice must open the FIRST sentence, with an unanswered question.
     No greeting or generic motivational preamble. Give the protagonist one concrete goal, believable setbacks, and earned resolution.
     No random magical trials, repeated mentor lessons, or repeated endings. Escalate choices, setbacks, surprising reversals,
@@ -351,6 +360,11 @@ class Store:
             return self.client.files().update(fileId=file_id, media_body=media, fields='id').execute()
         metadata = {'name': key.replace('/', '__'), 'parents': [self.folder],
                     'appProperties': {'workflow_key': hashlib.sha256(key.encode()).hexdigest()}}
+        if os.getenv('RUN_SCOPED_CLEANUP') == 'true' and key.startswith('runs/'):
+            parts = key.split('/')
+            from daily_publish import disposable
+            if len(parts) == 3 and disposable(parts[2]):
+                metadata['appProperties'].update(automation_run=parts[1], disposable='v1')
         return self.client.files().create(body=metadata, media_body=media, fields='id').execute()
 
     def save(self, key, value):
