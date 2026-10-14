@@ -5,3 +5,6 @@ __pycache__/
 token.json
 client_secrets.json
 node_modules/
+
+.venv/
+client_secret_*.json

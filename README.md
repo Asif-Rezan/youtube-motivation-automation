@@ -159,3 +159,31 @@ missing-verification, wrong-channel and essential-data preservation tests.
 
 Daily readiness checks validate publishing scope before model generation.
 Review the **Google OAuth check** Actions run after changing credentials.
+
+## Authorize public publishing and start one test
+
+On your own computer, download a **Desktop app** OAuth client JSON from the
+Google Cloud project where YouTube Data API v3 is enabled. Save it in this
+repository as `client_secrets.json` (gitignored). A Web application client will
+not work with the helper's loopback redirect. If the consent app is in Testing,
+add your Google account as a test user first.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt google-auth-oauthlib
+# macOS, if GitHub CLI is not installed: brew install gh
+gh auth login
+python authorize_youtube.py --run-test
+```
+
+The helper opens Google's consent page; select **Rezan Relaxation** and approve
+the requested upload and publishing scopes. It checks the channel, requires an
+offline refresh token, sends the token directly to the existing repository's
+`YOUTUBE_TOKEN_JSON` secret using GitHub CLI stdin, and dispatches one manual
+run of `daily-upload.yml`. It does not change the nightly cron, print tokens,
+write token files, or alter Drive authorization. Your GitHub account must have
+permission to update repository secrets and run Actions. Google consent must be
+completed by the account owner. If consent fails, no secret is changed. If the
+secret update succeeds but dispatch fails, use Actions > Daily financial
+storytelling publishing > Run workflow; leave `cleanup_run` blank for a new test.
