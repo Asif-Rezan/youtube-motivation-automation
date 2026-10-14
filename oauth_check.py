@@ -28,7 +28,7 @@ def report_error(name, error):
     failed = True
     status = getattr(getattr(error, 'resp', None), 'status', None)
     safe = str(error) if isinstance(error, RuntimeError) else type(error).__name__
-    if safe not in ('missing_secret', 'invalid_json', 'missing_oauth_fields', 'channel_mismatch', 'scope_check_failed', 'upload_scope_missing'):
+    if safe not in ('missing_secret', 'invalid_json', 'missing_oauth_fields', 'channel_mismatch', 'scope_check_failed', 'upload_scope_missing', 'publish_scope_missing'):
         safe = type(error).__name__
     for code in ('invalid_grant', 'invalid_client', 'access_denied'):
         if code in str(error):
@@ -55,10 +55,15 @@ try:
         if info.status_code != 200:
             raise RuntimeError('scope_check_failed')
         scopes = set(info.json().get('scope', '').split())
-    if 'https://www.googleapis.com/auth/youtube.upload' not in scopes:
+    if not scopes.intersection({'https://www.googleapis.com/auth/youtube.upload',
+            'https://www.googleapis.com/auth/youtube', 'https://www.googleapis.com/auth/youtube.force-ssl'}):
         raise RuntimeError('upload_scope_missing')
+    publish_allowed = bool(scopes.intersection({'https://www.googleapis.com/auth/youtube',
+        'https://www.googleapis.com/auth/youtube.force-ssl', 'https://www.googleapis.com/auth/youtubepartner'}))
+    if os.getenv('REQUIRE_PUBLIC_PUBLISH') == 'true' and not publish_allowed:
+        raise RuntimeError('publish_scope_missing')
     print(json.dumps({'check': 'YouTube OAuth and expected channel', 'passed': True,
-        'upload_scope': 'verified' if 'https://www.googleapis.com/auth/youtube.upload' in scopes else 'not_confirmed'}))
+        'upload_scope': 'verified', 'publish_scope': 'verified' if publish_allowed else 'missing'}))
 except Exception as error:
     report_error('YouTube OAuth', error)
 

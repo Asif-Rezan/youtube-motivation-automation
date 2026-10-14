@@ -1,4 +1,4 @@
-"""Cloud-run daily storytelling pipeline. No public publishing path exists."""
+"""Cloud rendering and private upload helpers; daily_publish verifies and publishes daily runs."""
 import argparse
 import datetime as dt
 import hashlib
@@ -113,7 +113,16 @@ def make_story(day, previous):
         if choice.get('finish_reason') == 'length':
             raise RuntimeError('Story response was truncated; refusing incomplete script')
         return json.loads(choice['message']['content'])
+    financial = os.getenv('CONTENT_TYPE') == 'financial-storytelling'
+    theme = ('Motivational financial storytelling: rotate poor-to-rich journeys, money psychology, '
+        'saving and investing habits, business successes and failures, financial moral parables, '
+        'and everyday money mistakes. Real financial history is allowed ONLY when verified source '
+        'material is supplied; otherwise choose fiction. Never invent historical facts or investment '
+        'returns. Show realistic tradeoffs and uncertainty, no guaranteed wealth or personalized advice.'
+        if financial else 'Motivational storytelling.')
     outline = ask(f'''Plan an original fictional English motivational story for {day}.
+    Content direction: {theme}
+    Avoid these previous titles and plots: {json.dumps(previous)}.
     A vivid crisis or impossible choice must open the FIRST sentence, with an unanswered question.
     No greeting or generic motivational preamble. Give the protagonist one concrete goal, believable setbacks, and earned resolution.
     No random magical trials, repeated mentor lessons, or repeated endings. Escalate choices, setbacks, surprising reversals,
@@ -136,6 +145,7 @@ def make_story(day, previous):
         keys = chapter_keys[begin:begin+5]
         group_schema = object_schema({'narrations': object_schema({k: text_schema for k in keys})})
         group = ask(f'''Write chapters {begin+1} through {begin+5} of this original fictional story.
+        Content direction: {theme}
         Title: {outline['title']}. Character: {outline['character_description']}.
         Assigned chapter events ONLY: {json.dumps([{'chapter': i+1, 'event': summaries[i]} for i in range(begin, begin+5)])}.
         Previous chapter ending: {prior[-700:]}.
@@ -351,6 +361,11 @@ class Store:
             return self.client.files().update(fileId=file_id, media_body=media, fields='id').execute()
         metadata = {'name': key.replace('/', '__'), 'parents': [self.folder],
                     'appProperties': {'workflow_key': hashlib.sha256(key.encode()).hexdigest()}}
+        if os.getenv('RUN_SCOPED_CLEANUP') == 'true' and key.startswith('runs/'):
+            parts = key.split('/')
+            from daily_publish import disposable
+            if len(parts) == 3 and disposable(parts[2]):
+                metadata['appProperties'].update(automation_run=parts[1], disposable='v1')
         return self.client.files().create(body=metadata, media_body=media, fields='id').execute()
 
     def save(self, key, value):
@@ -405,11 +420,12 @@ def upload_private(video, thumbnail, story, state, store, key, music_credit=''):
         raise RuntimeError('OAuth account is not the expected YouTube channel')
     # Persist before insert. An interrupted/ambiguous upload requires manual reconciliation.
     # Never silently retry videos.insert and risk duplicate videos.
+    state['upload_description'] = story['description'] + '\n\n' + music_credit
+    state['thumbnail_uploaded'] = False
     state['phase'] = 'upload_started'
     store.save(key, state)
     request = client.videos().insert(part='snippet,status', notifySubscribers=False,
-        body={'snippet': {'title': story['title'], 'description': story['description'] +
-             '\n\n' + music_credit, 'tags': story['tags'], 'categoryId': '22',
+        body={'snippet': {'title': story['title'], 'description': state['upload_description'], 'tags': story['tags'], 'categoryId': '22',
              'defaultLanguage': 'en'}, 'status': {'privacyStatus': 'private', 'selfDeclaredMadeForKids': False}},
         media_body=MediaFileUpload(str(video), chunksize=8*1024*1024, resumable=True))
     result = None
@@ -418,6 +434,8 @@ def upload_private(video, thumbnail, story, state, store, key, music_credit=''):
     state.update(phase='uploaded', video_id=result['id'])
     store.save(key, state)
     client.thumbnails().set(videoId=result['id'], media_body=MediaFileUpload(str(thumbnail))).execute()
+    state['thumbnail_uploaded'] = True
+    store.save(key, state)
     deadline = time.monotonic() + 1200
     while True:
         items = client.videos().list(part='status,processingDetails', id=result['id']).execute().get('items', [])
@@ -481,7 +499,7 @@ def run(daily=False):
     if daily and (not test_record.get('passed') or not test_record.get('remote_verification', {}).get('private_test_passed') or test_record.get('validation', {}).get('image_interval_seconds') != 7 or not test_record.get('validation', {}).get('storyboard_verified') or test_record.get('validation', {}).get('style') != 'ghibli-inspired'):
         raise RuntimeError('No fully verified private HD upload test is recorded')
     state = store.load(key, {})
-    if state.get('phase') in ('upload_started', 'uploaded', 'complete'):
+    if state.get('phase') in ('upload_started', 'uploaded', 'complete', 'published'):
         raise RuntimeError('Run already uploaded or needs upload reconciliation; inspect state before continuing')
     music_credit = load_music(store, root)
     history = store.load('history.json', [])
