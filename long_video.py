@@ -152,20 +152,75 @@ def picture_clip(image, seconds, target):
         '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-movflags', '+faststart', str(target))
 
 
+def refine_visual_plan(root=ROOT):
+    """Keep each physical action dominant; omit the heroine from object-only shots."""
+    import re
+    story = json.loads((root/'story.json').read_text())
+    plan = json.loads((root/'plan.json').read_text())
+    character = ' '.join(story['character_description'].split()[:14])
+    name = story.get('protagonist_name')
+    if not name:
+        candidates = re.findall(r'(?<=[ ,])([A-Z][a-z]{2,})(?=[, .])', story['scenes'][0]['narration'])
+        name = next((n for n in candidates if n not in ('The', 'This', 'With', 'Later', 'Below')), None)
+    if not name:
+        raise ValueError('Protagonist name is needed for scene-specific character inclusion')
+    for shot in plan['shots']:
+        action = shot['visual_action'].strip().rstrip('.')
+        if ';' in action and re.search(r'\b(truck|vehicle|beam|river|bridge)\b', action.rsplit(';', 1)[-1], re.I):
+            action = action.rsplit(';', 1)[-1].strip()
+        main = bool(re.search(r'\b'+re.escape(name)+r'\b', action, re.I))
+        group = bool(re.search(r'\b(workers|crew|team|locals|people|crowd|volunteers)\b', action, re.I))
+        group = group or bool(main and re.search(r'\b(boss|mayor|mother|father|brother|coworker)\b|\bMr\.', action, re.I))
+        human = bool(re.search(r'\b(man|woman|worker|coworker|engineer|mayor|boss|forecaster)\b|\bMr\.', action, re.I))
+        focus = 'group' if group else ('person' if main or human else 'object')
+        composition = 'wide scene showing multiple people together, ' if group else 'wide scene, '
+        shot['prompt'] = composition + action
+        if main:
+            shot['prompt'] += '. Main woman: ' + character
+        shot['focus'] = focus
+        shot['negative_prompt'] = 'portrait, headshot, close-up face, face filling frame'
+        if focus == 'object':
+            shot['negative_prompt'] += ', person, people, woman, man, human face'
+        elif focus == 'group':
+            shot['negative_prompt'] += ', solo, one person alone'
+        shot['semantic_target'] = action
+    plan['storyboard_verified'] = True
+    plan['visual_review'] = {'passed': False, 'phase': 'corrected-object-and-group-render-required'}
+    plan['scene_composition_version'] = 2
+    (root/'plan.json').write_text(json.dumps(plan, indent=2))
+    print(json.dumps({'scene_plan_refined': True, 'shots': len(plan['shots'])}), flush=True)
+    return plan
+
+
 def generate_shard(shard, root=ROOT, count=SHARDS):
+    from scene_check import check_scene
     plan = json.loads((root/'plan.json').read_text())
     if not plan.get('storyboard_verified') or not all(s.get('prompt') for s in plan['shots']):
         raise RuntimeError('Narration-aligned storyboard is required before image generation')
+    if plan.get('scene_composition_version') != 2:
+        raise RuntimeError('Scene-specific object and group composition is required')
     shots = [s for s in plan['shots'] if s['index']%count == shard]
     for shot in shots:
         index = shot['index']
         image, clip = root/f'shot-{index:03}.png', root/f'shot-{index:03}.mp4'
-        os.environ['IMAGE_SEED'] = str(shot['seed'])
-        if not image.exists():
-            w.make_image(shot['prompt'], image)
+        check = root/f'shot-{index:03}.qa.json'
+        os.environ['IMAGE_NEGATIVE_PROMPT'] = shot.get('negative_prompt', '')
+        for attempt in range(3):
+            os.environ['IMAGE_SEED'] = str(shot['seed']+attempt*10000)
+            if not image.exists():
+                w.make_image(shot['prompt'], image)
+            report = check_scene(image, shot)
+            if report['passed']:
+                check.write_text(json.dumps(report))
+                break
+            image.unlink()
+            print(json.dumps({'shot': index, 'visual_check_passed': False, 'attempt': attempt+1}), flush=True)
+        else:
+            raise RuntimeError(f'Shot {index} did not match its narrated scene after three CPU renders')
         if not clip.exists():
             picture_clip(image, shot['duration'], clip)
-        print(json.dumps({'shard': shard, 'shot': index+1, 'total': len(plan['shots']), 'rendered': True}), flush=True)
+        print(json.dumps({'shard': shard, 'shot': index+1, 'total': len(plan['shots']), 'rendered': True,
+            'visual_check_passed': report['passed']}), flush=True)
 
 
 def validate_engagement(story):
@@ -230,6 +285,7 @@ def finish(root=ROOT):
         '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-c:a', 'aac', '-movflags', '+faststart', str(root/'video.mp4'))
     metadata = w.check_video(root/'video.mp4')
     story = json.loads((root/'story.json').read_text())
+    os.environ['IMAGE_NEGATIVE_PROMPT'] = ''
     os.environ['IMAGE_SEED'] = '9931'
     w.make_image(story['thumbnail_prompt'], root/'thumbnail-source.png')
     image = ImageOps.fit(Image.open(root/'thumbnail-source.png').convert('RGB'), (1280, 720))
@@ -240,12 +296,16 @@ def finish(root=ROOT):
     image.save(root/'thumbnail.jpg', quality=92)
     if (root/'thumbnail.jpg').stat().st_size >= 2*1024*1024:
         raise RuntimeError('Thumbnail exceeds size limit')
+    scene_reports = [json.loads((root/f"shot-{s['index']:03}.qa.json").read_text()) for s in plan['shots']]
+    if not all(r['passed'] for r in scene_reports):
+        raise RuntimeError('Visual scene checks did not pass')
     report = {'render_passed': True, 'duration_seconds': float(metadata['format']['duration']),
         'width': 1920, 'height': 1080, 'images': len(clips), 'image_interval_seconds': INTERVAL,
         'style': 'ghibli-inspired', 'privacy': 'private', 'voice': 'Kokoro am_michael',
         'music': 'Magenta MusicRNN', 'image_model': os.getenv('CPU_IMAGE_MODEL', 'Lykon/dreamshaper-8'),
         'audio_validation': audio_report, 'timeline_verified': True, 'storyboard_verified': plan.get('storyboard_verified', False),
-        'alignment': plan.get('alignment')}
+        'alignment': plan.get('alignment'), 'scene_composition_version': plan.get('scene_composition_version'),
+        'semantic_checked_images': sum(r.get('required', False) for r in scene_reports)}
     (root/'validation.json').write_text(json.dumps(report))
     print(json.dumps(report), flush=True)
     return report
@@ -254,6 +314,7 @@ def finish(root=ROOT):
 def render_complete(story, root):
     prepare(story, root)
     storyboard(root)
+    refine_visual_plan(root)
     generate_shard(0, root, count=1)
     return finish(root)
 
@@ -312,7 +373,7 @@ def save_shard(shard):
     plan = json.loads((ROOT/'plan.json').read_text())
     for shot in plan['shots']:
         if shot['index']%SHARDS == shard:
-            for ext in ('png', 'mp4'):
+            for ext in ('png', 'mp4', 'qa.json'):
                 name = f"shot-{shot['index']:03}.{ext}"
                 store.upload(ROOT/name, f'runs/{run_id()}/{name}')
     print(json.dumps({'shard': shard, 'saved_privately': True}), flush=True)
@@ -327,6 +388,11 @@ def restore_clips():
         if not file_id:
             raise RuntimeError('Saved seven-second clip missing')
         store.download(file_id, ROOT/name)
+        qa_name = f"shot-{shot['index']:03}.qa.json"
+        qa_id = store.find(f'runs/{run_id()}/{qa_name}')
+        if not qa_id:
+            raise RuntimeError('Visual-check record missing')
+        store.download(qa_id, ROOT/qa_name)
 
 
 def upload():
@@ -358,7 +424,7 @@ def upload():
 if __name__ == '__main__':
     command = sys.argv[1]
     shard = int(sys.argv[2]) if len(sys.argv)>2 else 0
-    actions = {'init-input': init_input, 'stage-story': stage_story, 'prepare': prepare, 'storyboard': storyboard, 'save-preparation': save_preparation,
+    actions = {'init-input': init_input, 'stage-story': stage_story, 'prepare': prepare, 'restore-preparation': restore_preparation, 'refine-plan': refine_visual_plan, 'storyboard': storyboard, 'save-preparation': save_preparation,
         'restore-images': lambda: restore_preparation(True), 'generate-shard': lambda: generate_shard(shard),
         'save-shard': lambda: save_shard(shard), 'restore-clips': restore_clips,
         'finish': finish, 'upload': upload}

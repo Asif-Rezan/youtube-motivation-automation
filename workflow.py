@@ -100,7 +100,7 @@ def make_story(day, previous):
         'image_prompts': {'type': 'array', 'items': text_schema}})
     chapter_keys = [f'chapter_{i:02}' for i in range(1, 21)]
     outline_schema = object_schema({**{k: text_schema for k in
-        ('title', 'description', 'thumbnail_text', 'thumbnail_prompt', 'character_description')},
+        ('title', 'description', 'thumbnail_text', 'thumbnail_prompt', 'character_description', 'protagonist_name')},
         'tags': {'type': 'array', 'items': text_schema},
         'scenes': object_schema({k: scene_schema for k in chapter_keys})})
     def ask(prompt, limit, schema):
@@ -121,7 +121,7 @@ def make_story(day, previous):
     Last chapter ends with an earned resolution and a specific reflection. No viewer calls to action in the story plan.
     Create an original plot and title; avoid generic stock stories.
     Return JSON: title (max 100 characters), description (clearly label fictional), tags (list),
-    thumbnail_text (2-5 words), thumbnail_prompt, character_description (max 14 words, appearance and outfit),
+    thumbnail_text (2-5 words), thumbnail_prompt, protagonist_name (first name), character_description (max 14 words, appearance and outfit),
     scenes (object with chapter_01 through chapter_20). Each chapter: summary (max 25 words), image_prompt,
     image_prompts (four distinct visual beats, each max 8 words). Hand-painted Japanese animation style.
     Main character keeps the same appearance. Provide ONLY the plan, no full narration yet.''', 5200, outline_schema)
@@ -163,7 +163,7 @@ def make_story(day, previous):
 
 
 def make_image(prompt, path):
-    prompt = prompt + ', hand-painted Japanese animation, expressive 2D illustration, warm light'
+    prompt = 'hand-painted 2D Japanese animation, watercolor illustration, anime, ' + prompt
     if os.getenv('IMAGE_BACKEND', 'cpu') == 'cpu':
         from image_cpu import generate
         generate(prompt + ', no text, no watermark', path)

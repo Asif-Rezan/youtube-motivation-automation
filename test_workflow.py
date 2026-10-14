@@ -54,6 +54,26 @@ class Checks(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'every narration window'):
                 storyboard(root, ask=incomplete, pause=lambda _: None)
 
+    def test_scene_refinement_keeps_truck_and_group_instead_of_portrait(self):
+        from long_video import refine_visual_plan
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            story = {'protagonist_name': 'Maya', 'character_description': 'woman in safety vest',
+                     'scenes': [{'narration': 'A truck stalled.'}]}
+            plan = {'shots': [{'visual_action': 'Forecaster warns; delivery truck wheels sink into thick mud'},
+                              {'visual_action': 'Maya faces her boss Mr. Alvarez across a desk'}]}
+            (root/'story.json').write_text(json.dumps(story))
+            (root/'plan.json').write_text(json.dumps(plan))
+            result = refine_visual_plan(root)
+            truck, meeting = result['shots']
+            self.assertEqual(truck['focus'], 'object')
+            self.assertNotIn('Main woman', truck['prompt'])
+            self.assertIn('delivery truck', truck['prompt'])
+            self.assertIn('person', truck['negative_prompt'])
+            self.assertEqual(meeting['focus'], 'group')
+            self.assertIn('multiple people', meeting['prompt'])
+            self.assertIn('solo', meeting['negative_prompt'])
+
     def test_actual_seven_second_image_change(self):
         from long_video import picture_clip
         import subprocess
