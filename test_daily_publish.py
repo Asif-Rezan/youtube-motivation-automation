@@ -59,7 +59,7 @@ class CleanupTests(unittest.TestCase):
 
     def test_metadata_and_hd_gate(self):
         state = {'video_id': 'v', 'story': {'title': 'Title', 'tags': ['money'], 'description': 'Fiction'}}
-        video = {'id': 'v', 'snippet': {'channelId': 'c', 'title': 'Title', 'tags': ['money'], 'description': 'Fiction\nCredit'},
+        video = {'id': 'v', 'snippet': {'channelId': 'c', 'title': 'Title', 'tags': ['money'], 'description': 'Fiction'},
                  'status': {'uploadStatus': 'processed'}, 'processingDetails': {'processingStatus': 'succeeded'},
                  'contentDetails': {'definition': 'sd'}}
         self.assertFalse(validate_remote(video, state, 'c'))
@@ -67,3 +67,66 @@ class CleanupTests(unittest.TestCase):
         self.assertTrue(validate_remote(video, state, 'c'))
         with self.assertRaises(RuntimeError):
             validate_remote(video, state, 'wrong-channel')
+
+class RecoveryTests(unittest.TestCase):
+    def test_published_run_cannot_be_overwritten_or_uploaded_again(self):
+        import long_video
+        from unittest.mock import patch
+        store = MagicMock()
+        store.load.return_value = {'phase': 'published', 'video_id': 'existing'}
+        with patch('long_video.w.Store', return_value=store):
+            with self.assertRaisesRegex(RuntimeError, 'reconciliation'):
+                long_video.save_preparation()
+        store.upload.assert_not_called()
+        store.save.assert_not_called()
+
+    def test_cleanup_transient_failure_retries_same_file_without_upload(self):
+        from unittest.mock import patch
+        fixture = CleanupTests()
+        fixture.setUp()
+        execute = fixture.store.client.files().delete().execute
+        fixture.store.client.files().delete.reset_mock()
+        execute.side_effect = [RuntimeError('temporary'), {}]
+        with patch('daily_publish.time.sleep'):
+            cleanup(fixture.store, fixture.run, fixture.state)
+        self.assertEqual(execute.call_count, 2)
+        for call in fixture.store.client.files().delete.call_args_list:
+            self.assertEqual(call.kwargs, {'fileId': 'file'})
+        fixture.store.upload.assert_not_called()
+
+    def test_cleanup_manifest_is_saved_before_delete_and_all_pages_are_read(self):
+        fixture = CleanupTests()
+        fixture.setUp()
+        fixture.store.load.return_value = None
+        fixture.store.client.files().list().execute.side_effect = [
+            {'files': [fixture.entry], 'nextPageToken': 'page2'}, {'files': []}]
+        saved = []
+        fixture.store.save.side_effect = lambda key, value: saved.append(key)
+        def delete():
+            self.assertTrue(saved)
+            return {}
+        fixture.store.client.files().delete().execute.side_effect = delete
+        cleanup(fixture.store, fixture.run, fixture.state)
+        self.assertEqual(fixture.store.client.files().list().execute.call_count, 2)
+
+    def test_exact_description_required(self):
+        state = {'video_id': 'v', 'upload_description': 'Fiction\n\nMusic credit',
+                 'story': {'title': 'T', 'description': 'Fiction', 'tags': []}}
+        video = {'id': 'v', 'snippet': {'title': 'T', 'description': 'Fiction with unexpected text',
+                 'tags': [], 'channelId': 'c'}, 'status': {'uploadStatus': 'processed'}}
+        with self.assertRaisesRegex(RuntimeError, 'metadata'):
+            validate_remote(video, state, 'c')
+
+    def test_disposable_drive_files_tagged_without_tagging_credentials(self):
+        import workflow
+        from unittest.mock import patch
+        store = workflow.Store.__new__(workflow.Store)
+        store.client, store.folder = MagicMock(), 'folder'
+        store.find, store.check_private, store.check_quota = MagicMock(return_value=None), MagicMock(), MagicMock()
+        with patch.dict('os.environ', {'RUN_SCOPED_CLEANUP': 'true'}):
+            store.put('runs/daily-123/video.mp4', 'media', 10)
+            body = store.client.files().create.call_args.kwargs['body']
+            self.assertEqual(body['appProperties']['automation_run'], 'daily-123')
+            store.put('runs/daily-123/state.json', 'media', 10)
+            body = store.client.files().create.call_args.kwargs['body']
+            self.assertNotIn('disposable', body['appProperties'])

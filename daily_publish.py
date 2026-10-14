@@ -1,7 +1,6 @@
 """Verify and publish an existing upload; permanently clean only tagged run media."""
 import hashlib
 import json
-import os
 import re
 import time
 
@@ -19,9 +18,10 @@ def validate_remote(video, state, channel):
     story = state['story']
     if (snippet['channelId'] != channel or snippet['title'] != story['title']
         or set(snippet.get('tags', [])) != set(story['tags'])
-        or not snippet['description'].startswith(story['description'])):
+        or snippet['description'] != state.get('upload_description', story['description'])):
         raise RuntimeError('Channel or metadata mismatch')
-    if status.get('uploadStatus') in ('failed', 'rejected', 'deleted'):
+    if (status.get('uploadStatus') in ('failed', 'rejected', 'deleted')
+        or video.get('processingDetails', {}).get('processingStatus') in ('failed', 'terminated')):
         raise RuntimeError('YouTube upload failed')
     return (status.get('uploadStatus') == 'processed'
         and video.get('processingDetails', {}).get('processingStatus') == 'succeeded'
@@ -29,6 +29,8 @@ def validate_remote(video, state, channel):
 
 
 def cleanup(store, run, state):
+    if not re.fullmatch(r'daily-\d+', run):
+        raise ValueError('Invalid daily run ID')
     proof = state.get('verification', {})
     if (state.get('phase') != 'published' or proof.get('video_id') != state.get('video_id')
         or not all(proof.get(k) is True for k in ('hd', 'metadata', 'processed', 'public'))):
@@ -96,6 +98,8 @@ def main():
     state = store.load(key, {})
     if state.get('phase') not in ('uploaded', 'complete', 'published') or not state.get('video_id'):
         raise RuntimeError('No successful upload to verify; no cleanup allowed')
+    if state.get('thumbnail_uploaded') is not True:
+        raise RuntimeError('Thumbnail upload unconfirmed; preserve all media')
     client = build('youtube', 'v3', credentials=Credentials.from_authorized_user_info(
         json.loads(required('YOUTUBE_TOKEN_JSON'))), cache_discovery=False)
     deadline = time.monotonic() + 1800

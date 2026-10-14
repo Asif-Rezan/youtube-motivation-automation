@@ -176,7 +176,7 @@ def refine_visual_plan(root=ROOT):
         composition = 'wide scene showing multiple people together, ' if group else 'wide scene, '
         shot['prompt'] = composition + action
         if main:
-            shot['prompt'] += '. Main woman: ' + character
+            shot['prompt'] += '. Main character: ' + character
         shot['focus'] = focus
         shot['negative_prompt'] = 'portrait, headshot, close-up face, face filling frame'
         if focus == 'object':
@@ -292,7 +292,10 @@ def finish(root=ROOT):
     draw = ImageDraw.Draw(image)
     font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 75)
     draw.rectangle((0, 510, 1280, 720), fill=(17, 37, 37))
-    draw.text((55, 555), story['thumbnail_text'].upper(), font=font, fill=(255, 244, 212))
+    text = story['thumbnail_text'].upper()
+    while draw.textbbox((0, 0), text, font=font)[2] > 1170 and font.size > 24:
+        font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', font.size-2)
+    draw.text((55, 555), text, font=font, fill=(255, 244, 212))
     image.save(root/'thumbnail.jpg', quality=92)
     if (root/'thumbnail.jpg').stat().st_size >= 2*1024*1024:
         raise RuntimeError('Thumbnail exceeds size limit')
@@ -332,6 +335,10 @@ def stage_story():
     store = w.Store()
     print(json.dumps({'check': 'Private Drive store', 'passed': True}), flush=True)
     if os.getenv('GENERATE_FRESH_STORY') == 'true':
+        if os.getenv('STORY_FILE'):
+            raise RuntimeError('Fresh daily stories cannot use STORY_FILE')
+        if store.load(f'runs/{run_id()}/state.json', {}).get('phase') in ('upload_started', 'uploaded', 'complete', 'published'):
+            raise RuntimeError('Run already uploaded; use cleanup-only recovery')
         history = store.load('history.json', [])
         story = w.make_story(run_id(), [h.get('title') for h in history[-20:]])
         validate_engagement(story)
@@ -351,7 +358,7 @@ def stage_story():
 def save_preparation():
     store = w.Store()
     key = f'runs/{run_id()}/state.json'
-    if store.load(key, {}).get('phase') in ('upload_started', 'uploaded', 'complete'):
+    if store.load(key, {}).get('phase') in ('upload_started', 'uploaded', 'complete', 'published'):
         raise RuntimeError('Existing upload requires reconciliation; refusing duplicate')
     for name in ASSETS:
         store.upload(ROOT/name, f'runs/{run_id()}/{name}')
@@ -401,7 +408,7 @@ def upload():
         raise RuntimeError('New-format render has not passed validation')
     w.check_video(ROOT/'video.mp4')
     store, key = w.Store(), f'runs/{run_id()}/state.json'
-    if store.load(key, {}).get('phase') in ('upload_started', 'uploaded', 'complete'):
+    if store.load(key, {}).get('phase') in ('upload_started', 'uploaded', 'complete', 'published'):
         raise RuntimeError('Existing upload requires reconciliation; refusing duplicate insertion')
     story = json.loads((ROOT/'story.json').read_text())
     digest = hashlib.sha256(' '.join(s['narration'] for s in story['scenes']).encode()).hexdigest()
