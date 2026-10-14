@@ -337,7 +337,7 @@ def stage_story():
     if os.getenv('GENERATE_FRESH_STORY') == 'true':
         if os.getenv('STORY_FILE'):
             raise RuntimeError('Fresh daily stories cannot use STORY_FILE')
-        if store.load(f'runs/{run_id()}/state.json', {}).get('phase') in ('upload_started', 'uploaded', 'complete', 'published'):
+        if store.load(f'runs/{run_id()}/state.json', {}).get('phase') in ('upload_started', 'uploaded', 'complete', 'published', 'verified_private'):
             raise RuntimeError('Run already uploaded; use cleanup-only recovery')
         history = store.load('history.json', [])
         story = w.make_story(run_id(), [h.get('title') for h in history[-20:]])
@@ -358,7 +358,7 @@ def stage_story():
 def save_preparation():
     store = w.Store()
     key = f'runs/{run_id()}/state.json'
-    if store.load(key, {}).get('phase') in ('upload_started', 'uploaded', 'complete', 'published'):
+    if store.load(key, {}).get('phase') in ('upload_started', 'uploaded', 'complete', 'published', 'verified_private'):
         raise RuntimeError('Existing upload requires reconciliation; refusing duplicate')
     for name in ASSETS:
         store.upload(ROOT/name, f'runs/{run_id()}/{name}')
@@ -408,7 +408,7 @@ def upload():
         raise RuntimeError('New-format render has not passed validation')
     w.check_video(ROOT/'video.mp4')
     store, key = w.Store(), f'runs/{run_id()}/state.json'
-    if store.load(key, {}).get('phase') in ('upload_started', 'uploaded', 'complete', 'published'):
+    if store.load(key, {}).get('phase') in ('upload_started', 'uploaded', 'complete', 'published', 'verified_private'):
         raise RuntimeError('Existing upload requires reconciliation; refusing duplicate insertion')
     story = json.loads((ROOT/'story.json').read_text())
     digest = hashlib.sha256(' '.join(s['narration'] for s in story['scenes']).encode()).hexdigest()

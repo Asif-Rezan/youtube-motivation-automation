@@ -10,8 +10,8 @@
   Lykon/dreamshaper-8 safetensors weights on cloud CPUs.
 - Kokoro English narration, Faster-Whisper aligned burned-in captions, zoom/fade
   transitions, original MusicRNN background music and illustrated thumbnails.
-- Daily videos upload privately to Rezan Relaxation, pass HD/metadata verification, then publish publicly.
-- Daily generation starts at 01:00 Asia/Dhaka; temporary run media is cleaned after verified publishing.
+- Daily videos upload privately to Rezan Relaxation, remain private after HD/metadata verification.
+- Daily generation starts at 01:00 Asia/Dhaka; temporary run media is cleaned after verified private upload.
 
 The previous ten-second private test passed in Actions run 38450919780.
 The current seven-second update derives each visual from actual measured word
@@ -74,8 +74,8 @@ Set GitHub Actions secrets directly; do not commit real credentials:
 - DRIVE_TOKEN_JSON: authorized Google OAuth JSON. The owner-only workflow
   folder is automatically discovered; DRIVE_FOLDER_ID is optional.
 - YOUTUBE_TOKEN_JSON: authorized Google OAuth JSON with upload/read access
-  for Rezan Relaxation. Daily public publishing also requires `youtube` or
-  `youtube.force-ssl` OAuth scope; `youtube.upload` alone cannot change visibility.
+  for Rezan Relaxation. Private daily uploads reuse the existing upload/read OAuth permissions.
+  No public-publishing permission is required.
   The expected channel ID is UCztvMrNCT34DO3DtzLPgWaw.
 - GROQ_API_KEY: required for fresh unattended daily story generation. It is also
   required for narration-aligned scene prompts. Fresh tests generate an original
@@ -84,7 +84,7 @@ Set GitHub Actions secrets directly; do not commit real credentials:
 IMAGE_BACKEND=cpu, TTS_BACKEND=kokoro, CAPTION_BACKEND=cpu and
 MUSIC_BACKEND=magenta are free-model defaults. See .env.example.
 
-The daily parallel workflow has its own verified-publication path. Legacy
+The daily parallel workflow has its own private-verification path. Legacy
 `workflow.py daily` retains its private-test gate. A fixed test story cannot be
 used for fresh daily generation. OAuth credentials must remain valid for
 unattended operation; resolve OAuth Testing refresh-token expiry before relying
@@ -133,9 +133,10 @@ everyday money mistakes. Historical documentaries require verified source materi
 without it, generation uses clearly labelled fiction. Prior titles are included
 in planning and exact story hashes prevent duplicate uploads.
 
-Uploads start private. `daily_publish.py` reads back the exact video ID, channel,
-title, tags, description, successful processing and HD definition and confirmed thumbnail upload before making
-it public. The complete description, including music attribution, must match exactly. Public status and metadata are read back again before any deletion.
+Uploads remain **private**. `daily_publish.py` reads back the exact video ID,
+channel, title, tags, complete description, successful processing and HD
+definition, requires confirmed thumbnail upload, and verifies private visibility
+before deletion. It never calls `videos.update` or changes visibility.
 Failed, incomplete, ambiguous, or unverified uploads retain all Drive assets.
 
 Disposable media created by this daily workflow receive run-specific Drive
@@ -147,7 +148,7 @@ Preparation audio, scene images/clips/QA, final music, captions, thumbnail, vide
 and plan are disposable. Deletion is permanent and recovers storage space.
 
 Cleanup retries transient failures and records each completed deletion. A 404 on
-an already journaled ID is safe. If publication or cleanup fails, rerun only the
+an already journaled ID is safe. If private verification or cleanup fails, rerun only the
 failed `publish-cleanup` job, or manually dispatch with `cleanup_run` set to its
 `daily-<GitHub run ID>`. That mode skips all generation/upload jobs, rechecks the
 existing video and resumes cleanup without calling `videos.insert` again.
@@ -157,33 +158,13 @@ state first. Daily uploads use the existing durable pre-insert state guard.
 Validation: `python -m unittest -v` includes deletion-safety, idempotency,
 missing-verification, wrong-channel and essential-data preservation tests.
 
-Daily readiness checks validate publishing scope before model generation.
+Daily readiness checks validate existing upload/read access before model generation.
 Review the **Google OAuth check** Actions run after changing credentials.
 
-## Authorize public publishing and start one test
+## One-time private tests
 
-On your own computer, download a **Desktop app** OAuth client JSON from the
-Google Cloud project where YouTube Data API v3 is enabled. Save it in this
-repository as `client_secrets.json` (gitignored). A Web application client will
-not work with the helper's loopback redirect. If the consent app is in Testing,
-add your Google account as a test user first.
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt google-auth-oauthlib
-# macOS, if GitHub CLI is not installed: brew install gh
-gh auth login
-python authorize_youtube.py --run-test
-```
-
-The helper opens Google's consent page; select **Rezan Relaxation** and approve
-the requested upload and publishing scopes. It checks the channel, requires an
-offline refresh token, sends the token directly to the existing repository's
-`YOUTUBE_TOKEN_JSON` secret using GitHub CLI stdin, and dispatches one manual
-run of `daily-upload.yml`. It does not change the nightly cron, print tokens,
-write token files, or alter Drive authorization. Your GitHub account must have
-permission to update repository secrets and run Actions. Google consent must be
-completed by the account owner. If consent fails, no secret is changed. If the
-secret update succeeds but dispatch fails, use Actions > Daily financial
-storytelling publishing > Run workflow; leave `cleanup_run` blank for a new test.
+Use Actions > Daily financial storytelling publishing > Run workflow, leaving
+`cleanup_run` blank. Updating `.github/workflows/private-video-trigger.txt` on
+main also starts a single fresh private test. Neither method changes the nightly
+01:00 Asia/Dhaka cron. The existing OAuth token supports private upload; the
+optional `authorize_youtube.py` helper is unnecessary for private-only operation.

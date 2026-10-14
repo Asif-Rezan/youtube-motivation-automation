@@ -499,7 +499,7 @@ def run(daily=False):
     if daily and (not test_record.get('passed') or not test_record.get('remote_verification', {}).get('private_test_passed') or test_record.get('validation', {}).get('image_interval_seconds') != 7 or not test_record.get('validation', {}).get('storyboard_verified') or test_record.get('validation', {}).get('style') != 'ghibli-inspired'):
         raise RuntimeError('No fully verified private HD upload test is recorded')
     state = store.load(key, {})
-    if state.get('phase') in ('upload_started', 'uploaded', 'complete', 'published'):
+    if state.get('phase') in ('upload_started', 'uploaded', 'complete', 'published', 'verified_private'):
         raise RuntimeError('Run already uploaded or needs upload reconciliation; inspect state before continuing')
     music_credit = load_music(store, root)
     history = store.load('history.json', [])

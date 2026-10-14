@@ -8,8 +8,8 @@ class CleanupTests(unittest.TestCase):
     def setUp(self):
         self.store = MagicMock()
         self.run = 'daily-123'
-        self.state = {'phase': 'published', 'video_id': 'video', 'verification': {
-            'video_id': 'video', 'hd': True, 'processed': True, 'metadata': True, 'public': True}}
+        self.state = {'phase': 'verified_private', 'video_id': 'video', 'verification': {
+            'video_id': 'video', 'hd': True, 'processed': True, 'metadata': True, 'private': True}}
         self.entry = {'id': 'file', 'name': 'runs__daily-123__video.mp4', 'parents': ['folder'],
             'mimeType': 'video/mp4', 'appProperties': {'automation_run': self.run,
                 'disposable': 'v1', 'workflow_key': hashlib.sha256(b'runs/daily-123/video.mp4').hexdigest()}}
@@ -24,7 +24,7 @@ class CleanupTests(unittest.TestCase):
         self.store.client.files().delete.assert_not_called()
 
     def test_missing_hd_or_metadata_never_deletes(self):
-        for flag in ('hd', 'metadata', 'processed', 'public'):
+        for flag in ('hd', 'metadata', 'processed', 'private'):
             state = dict(self.state, verification=dict(self.state['verification'], **{flag: False}))
             with self.assertRaises(RuntimeError):
                 cleanup(self.store, self.run, state)
@@ -69,11 +69,11 @@ class CleanupTests(unittest.TestCase):
             validate_remote(video, state, 'wrong-channel')
 
 class RecoveryTests(unittest.TestCase):
-    def test_published_run_cannot_be_overwritten_or_uploaded_again(self):
+    def test_verified_private_run_cannot_be_overwritten_or_uploaded_again(self):
         import long_video
         from unittest.mock import patch
         store = MagicMock()
-        store.load.return_value = {'phase': 'published', 'video_id': 'existing'}
+        store.load.return_value = {'phase': 'verified_private', 'video_id': 'existing'}
         with patch('long_video.w.Store', return_value=store):
             with self.assertRaisesRegex(RuntimeError, 'reconciliation'):
                 long_video.save_preparation()
@@ -130,3 +130,39 @@ class RecoveryTests(unittest.TestCase):
             store.put('runs/daily-123/state.json', 'media', 10)
             body = store.client.files().create.call_args.kwargs['body']
             self.assertNotIn('disposable', body['appProperties'])
+
+class PrivateVisibilityTests(unittest.TestCase):
+    def run_private_verification(self, privacy):
+        import daily_publish
+        from unittest.mock import patch
+        state = {'phase': 'complete', 'video_id': 'v', 'thumbnail_uploaded': True,
+            'hash': 'hash', 'story': {'title': 'T', 'description': 'Fiction', 'tags': []}}
+        video = {'id': 'v', 'snippet': {'channelId': 'c', 'title': 'T', 'description': 'Fiction', 'tags': []},
+            'status': {'privacyStatus': privacy, 'uploadStatus': 'processed'},
+            'processingDetails': {'processingStatus': 'succeeded'}, 'contentDetails': {'definition': 'hd'}}
+        store, client = MagicMock(), MagicMock()
+        store.load.side_effect = [state, []]
+        client.videos().list().execute.return_value = {'items': [video]}
+        env = {'SAVED_RUN_ID': 'daily-123', 'YOUTUBE_TOKEN_JSON': '{}', 'EXPECTED_CHANNEL_ID': 'c'}
+        with patch.dict('os.environ', env), patch('workflow.Store', return_value=store), \
+             patch.dict('sys.modules', {
+                 'google.oauth2.credentials': MagicMock(),
+                 'googleapiclient.discovery': MagicMock(build=MagicMock(return_value=client))}), \
+             patch('daily_publish.cleanup') as clean:
+            if privacy == 'private':
+                daily_publish.main()
+                self.assertEqual(state['phase'], 'verified_private')
+                clean.assert_called_once_with(store, 'daily-123', state)
+            else:
+                with self.assertRaisesRegex(RuntimeError, 'remain private'):
+                    daily_publish.main()
+                clean.assert_not_called()
+            client.videos().update.assert_not_called()
+            client.videos().insert.assert_not_called()
+
+    def test_verified_private_upload_never_changes_visibility_or_reuploads(self):
+        self.run_private_verification('private')
+
+    def test_public_or_unlisted_video_preserves_media(self):
+        for privacy in ('public', 'unlisted'):
+            self.run_private_verification(privacy)

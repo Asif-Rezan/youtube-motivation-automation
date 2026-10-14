@@ -1,4 +1,4 @@
-"""Verify and publish an existing upload; permanently clean only tagged run media."""
+"""Verify an existing private upload; permanently clean only tagged run media."""
 import hashlib
 import json
 import re
@@ -32,9 +32,9 @@ def cleanup(store, run, state):
     if not re.fullmatch(r'daily-\d+', run):
         raise ValueError('Invalid daily run ID')
     proof = state.get('verification', {})
-    if (state.get('phase') != 'published' or proof.get('video_id') != state.get('video_id')
-        or not all(proof.get(k) is True for k in ('hd', 'metadata', 'processed', 'public'))):
-        raise RuntimeError('Verified published upload required before deletion')
+    if (state.get('phase') != 'verified_private' or proof.get('video_id') != state.get('video_id')
+        or not all(proof.get(k) is True for k in ('hd', 'metadata', 'processed', 'private'))):
+        raise RuntimeError('Verified private upload required before deletion')
     key = f'runs/{run}/cleanup.json'
     journal = store.load(key, None)
     if journal is None:
@@ -96,7 +96,7 @@ def main():
     store = Store()
     key = f'runs/{run}/state.json'
     state = store.load(key, {})
-    if state.get('phase') not in ('uploaded', 'complete', 'published') or not state.get('video_id'):
+    if state.get('phase') not in ('uploaded', 'complete', 'verified_private') or not state.get('video_id'):
         raise RuntimeError('No successful upload to verify; no cleanup allowed')
     if state.get('thumbnail_uploaded') is not True:
         raise RuntimeError('Thumbnail upload unconfirmed; preserve all media')
@@ -114,23 +114,17 @@ def main():
         if time.monotonic() >= deadline:
             raise RuntimeError('HD processing pending; preserve all media')
         time.sleep(20)
-    if video['status']['privacyStatus'] != 'public':
-        status = {k: video['status'][k] for k in ('selfDeclaredMadeForKids', 'license', 'embeddable', 'publicStatsViewable') if k in video['status']}
-        status['privacyStatus'] = 'public'
-        client.videos().update(part='status', body={'id': state['video_id'], 'status': status}).execute()
-    video = client.videos().list(part='snippet,status,processingDetails,contentDetails',
-        id=state['video_id']).execute()['items'][0]
-    if not validate_remote(video, state, required('EXPECTED_CHANNEL_ID')) or video['status']['privacyStatus'] != 'public':
-        raise RuntimeError('Public publishing verification failed; preserve media')
-    state.update(phase='published', verification={'video_id': state['video_id'],
-        'hd': True, 'processed': True, 'metadata': True, 'public': True})
+    if video['status']['privacyStatus'] != 'private':
+        raise RuntimeError('Video must remain private; preserve all media')
+    state.update(phase='verified_private', verification={'video_id': state['video_id'],
+        'hd': True, 'processed': True, 'metadata': True, 'private': True})
     store.save(key, state)
     history = store.load('history.json', [])
     if not any(h.get('run') == run for h in history):
         history.append({'run': run, 'video_id': state['video_id'], 'title': state['story']['title'], 'hash': state['hash']})
     store.save('history.json', history)
     cleanup(store, run, state)
-    print(json.dumps({'run': run, 'video_id': state['video_id'], 'published': True, 'cleanup_complete': True}))
+    print(json.dumps({'run': run, 'video_id': state['video_id'], 'privacy': 'private', 'verified': True, 'cleanup_complete': True}))
 
 
 if __name__ == '__main__':
