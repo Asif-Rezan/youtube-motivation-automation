@@ -369,10 +369,41 @@ class Store:
         return self.client.files().create(body=metadata, media_body=media, fields='id').execute()
 
     def save(self, key, value):
+        """Retry checkpoint writes against one fixed Drive ID, including ambiguous creates."""
         import io
         from googleapiclient.http import MediaIoBaseUpload
         payload = json.dumps(value).encode()
-        self.put(key, MediaIoBaseUpload(io.BytesIO(payload), mimetype='application/json', resumable=True), len(payload))
+        self.check_private(self.folder)
+        self.check_quota(len(payload))
+        file_id = self.find(key)
+        creating = file_id is None
+        if creating:
+            file_id = self.client.files().generateIds(count=1, space='drive').execute()['ids'][0]
+        metadata = {'id': file_id, 'name': key.replace('/', '__'), 'parents': [self.folder],
+            'appProperties': {'workflow_key': hashlib.sha256(key.encode()).hexdigest()}}
+        for attempt in range(5):
+            try:
+                # Small JSON checkpoints do not need resumable upload sessions.
+                media = MediaIoBaseUpload(io.BytesIO(payload), mimetype='application/json', resumable=False)
+                if creating:
+                    self.client.files().create(body=metadata, media_body=media, fields='id').execute()
+                else:
+                    self.client.files().update(fileId=file_id, media_body=media, fields='id').execute()
+                return
+            except Exception as error:
+                status = getattr(getattr(error, 'resp', None), 'status', None)
+                if creating and status == 409:
+                    # The previous request may have succeeded before its response timed out.
+                    self.check_private(file_id)
+                    if json.loads(self.client.files().get_media(fileId=file_id).execute()) == value:
+                        return
+                    raise RuntimeError('Checkpoint creation conflict; refusing to overwrite') from None
+                transient = isinstance(error, (TimeoutError, ConnectionError)) or status in (408, 429, 500, 502, 503, 504)
+                if not transient or attempt == 4:
+                    raise
+                print(json.dumps({'check': 'Drive checkpoint save', 'retry': attempt+1,
+                    'error_type': type(error).__name__}), flush=True)
+                time.sleep(min(2 ** (attempt+1), 16))
 
     def upload(self, path, key):
         from googleapiclient.http import MediaFileUpload

@@ -168,3 +168,19 @@ Use Actions > Daily financial storytelling publishing > Run workflow, leaving
 main also starts a single fresh private test. Neither method changes the nightly
 01:00 Asia/Dhaka cron. The existing OAuth token supports private upload; the
 optional `authorize_youtube.py` helper is unnecessary for private-only operation.
+
+### Recovering Drive checkpoint timeouts
+
+Small JSON checkpoint saves use non-resumable uploads with bounded backoff for
+network timeouts, connection failures, rate limits and temporary server errors.
+Each write retries against a fixed file ID. New checkpoints preallocate their
+ID so an ambiguous successful create cannot create duplicates on retry. A create
+conflict is accepted only when the saved JSON matches the intended checkpoint.
+Cleanup journals checkpoint every ten deletions and once at completion, reducing
+Drive requests. If interrupted between checkpoints, already-deleted manifest IDs
+return 404 and are safely recorded on the next attempt.
+
+Use **Resume verified private video cleanup** to recover a completed run without
+any video generation or `videos.insert` call. Enter its original `daily-<run ID>`.
+The cleanup worker rechecks private visibility, successful HD processing and
+exact metadata before resuming. The daily 01:00 Asia/Dhaka schedule is unchanged.

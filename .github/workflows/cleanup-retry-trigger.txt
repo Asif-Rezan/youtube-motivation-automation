@@ -1,0 +1,1 @@
+2026-10-14: resume verified private cleanup for daily-38542296278 with retry-safe checkpoint writes.
