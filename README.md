@@ -10,7 +10,7 @@
   Lykon/dreamshaper-8 safetensors weights on cloud CPUs.
 - Kokoro English narration, Faster-Whisper aligned burned-in captions, zoom/fade
   transitions, original MusicRNN background music and illustrated thumbnails.
-- Private uploads to the user-selected REZAN IT channel. Public publishing remains disabled.
+- Private uploads to the user-selected Rezan Relaxation channel. Public publishing remains disabled.
 
 The previous ten-second private test passed in Actions run 38450919780.
 The current seven-second update derives each visual from actual measured word
@@ -73,7 +73,7 @@ Set GitHub Actions secrets directly; do not commit real credentials:
 - DRIVE_TOKEN_JSON: authorized Google OAuth JSON. The owner-only workflow
   folder is automatically discovered; DRIVE_FOLDER_ID is optional.
 - YOUTUBE_TOKEN_JSON: authorized Google OAuth JSON with upload/read access
-  for REZAN IT. The expected channel ID is UCwNhdtzL9XZMIAMXm81UCbw.
+  for Rezan Relaxation. The expected channel ID is UCztvMrNCT34DO3DtzLPgWaw.
 - GROQ_API_KEY: required for fresh unattended daily story generation. It is also
   required for narration-aligned scene prompts. Fresh tests generate an original
   story and store all unpublished content privately.

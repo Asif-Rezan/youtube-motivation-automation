@@ -46,7 +46,7 @@ jobs:
           DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
           YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
-          EXPECTED_CHANNEL_ID: UCwNhdtzL9XZMIAMXm81UCbw
+          EXPECTED_CHANNEL_ID: UCztvMrNCT34DO3DtzLPgWaw
           IMAGE_MODEL: ${{ vars.IMAGE_MODEL }}
           TTS_MODEL: ${{ vars.TTS_MODEL }}
           TTS_VOICE: ${{ vars.TTS_VOICE }}
