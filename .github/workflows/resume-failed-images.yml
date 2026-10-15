@@ -1,4 +1,4 @@
-name: Resume failed private video image shards
+name: Resume saved private video image shards
 on:
   workflow_dispatch:
     inputs:
@@ -7,7 +7,7 @@ on:
         required: true
         type: string
       shards_json:
-        description: 'JSON array of failed image shard numbers, for example [12]'
+        description: 'JSON array of image shard numbers to regenerate, for example [12]'
         required: true
         type: string
 permissions:

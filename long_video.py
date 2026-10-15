@@ -52,7 +52,7 @@ def shot_plan(story, lengths, word_lists):
             'chapter': chapter, 'narration': ' '.join(word['word'] for word in anchor),
             'seed': 1700+index})
     return {'duration_seconds': total, 'image_interval_seconds': INTERVAL,
-        'style': 'ghibli-inspired', 'alignment': 'measured-word-timestamps', 'shots': shots}
+        'style': 'cinematic-detailed', 'alignment': 'measured-word-timestamps', 'shots': shots}
 
 
 def storyboard(root=ROOT, ask=None, pause=None):
@@ -329,9 +329,8 @@ def refine_visual_plan(root=ROOT):
         shot['prompt'] = composition + action
         if main:
             shot['prompt'] += '. Main character: ' + character
-        shot['prompt'] += ('. Polished hand-painted 2D anime storytelling illustration, cinematic framing, '
-                           'layered environment, natural body pose, expressive lighting, rich balanced colors. '
-                           'Keep the narrated action and objects prominent; preserve the described setting and clothing.')
+        shot['prompt'] += ('. Highly detailed cinematic image, vivid colors, rich textures, '
+                           'lifelike lighting, clear composition. Keep the narrated action prominent.')
         shot['focus'] = focus
         shot['negative_prompt'] = 'portrait, headshot, close-up face, face filling frame'
         if focus == 'object':
@@ -340,6 +339,7 @@ def refine_visual_plan(root=ROOT):
             shot['negative_prompt'] += ', solo, one person alone'
         shot['semantic_target'] = action
     plan['storyboard_verified'] = True
+    plan['style'] = 'cinematic-detailed'
     plan['visual_review'] = {'passed': False, 'phase': 'corrected-object-and-group-render-required'}
     plan['scene_composition_version'] = 2
     (root/'plan.json').write_text(json.dumps(plan, indent=2))
@@ -478,7 +478,7 @@ def finish(root=ROOT):
         raise RuntimeError(f'Image model mismatch across rendered shots: {image_models}')
     report = {'render_passed': True, 'duration_seconds': float(metadata['format']['duration']),
         'width': 1920, 'height': 1080, 'images': len(clips), 'image_interval_seconds': INTERVAL,
-        'style': 'ghibli-inspired', 'privacy': 'private', 'voice': 'Kokoro am_michael',
+        'style': 'cinematic-detailed', 'privacy': 'private', 'voice': 'Kokoro am_michael',
         'music': 'Magenta MusicRNN', 'image_model': next(iter(image_models)),
         'audio_validation': audio_report, 'timeline_verified': True, 'storyboard_verified': plan.get('storyboard_verified', False),
         'alignment': plan.get('alignment'), 'scene_composition_version': plan.get('scene_composition_version'),

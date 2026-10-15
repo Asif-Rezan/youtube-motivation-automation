@@ -14,8 +14,8 @@ SSD_REVISION = REVISION = '60987f37e94cd59c36b1cba832b9f97b57395a10'
 DREAMSHAPER_MODEL = 'Lykon/dreamshaper-8'
 DREAMSHAPER_REVISION = 'a7e52b98680b1ba8ff7bce97c7f9f2e2e5337917'
 SAFETY_MODEL = 'CompVis/stable-diffusion-safety-checker'
-NEGATIVE = ('photograph, photorealistic, live action, 3D render, CGI, blurry, '
-            'extra arms, extra legs, deformed hands, duplicate person, watermark, lettering')
+NEGATIVE = ('blurry, low detail, distorted anatomy, extra arms, extra legs, '
+            'deformed hands, duplicate person, watermark, lettering')
 _pipeline = None
 _pipeline_key = None
 _safety_checker = None

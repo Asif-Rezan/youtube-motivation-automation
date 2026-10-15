@@ -31,7 +31,7 @@ jobs:
           CPU_IMAGE_WIDTH: '1024'
           CPU_IMAGE_HEIGHT: '576'
         run: |
-          python image_cpu.py --prompt 'ghibli style, hand-painted 2D animation, a young woman in a teal jacket beside a peaceful village school garden, watercolor hills, soft natural light' --output output/cpu-check.png
+          python image_cpu.py --prompt 'A young woman in a teal jacket reads a letter beside a village school garden, highly detailed cinematic image, vivid colors, rich textures, lifelike lighting' --output output/cpu-check.png
           python - <<'PY'
           from PIL import Image
           image = Image.open('output/cpu-check.png')

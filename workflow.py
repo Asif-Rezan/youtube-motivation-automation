@@ -136,7 +136,7 @@ def make_story(day, previous):
     Return JSON: title (max 100 characters), description (clearly label fictional), tags (list),
     thumbnail_text (2-5 words), thumbnail_prompt, protagonist_name (first name), character_description (max 24 words: age appearance, skin tone, face shape, hair color and style, consistent outfit),
     scenes (object with chapter_01 through chapter_20). Each chapter: summary (max 25 words), image_prompt,
-    image_prompts (four distinct visual beats, each max 8 words). Hand-painted Japanese animation style.
+    image_prompts (four distinct visual beats, each max 8 words). Vivid, detailed cinematic visual style.
     Main character keeps the same appearance. Provide ONLY the plan, no full narration yet.''', 5200, outline_schema)
     outline['scenes'] = [outline['scenes'][k] for k in chapter_keys]
     if len(outline.get('scenes', [])) != 20:
@@ -176,7 +176,8 @@ def make_story(day, previous):
 
 
 def make_image(prompt, path):
-    prompt = prompt + ', hand-painted 2D Japanese animation, polished watercolor illustration'
+    if 'highly detailed cinematic image' not in prompt.lower():
+        prompt += ', highly detailed cinematic image, vivid colors, rich textures, lifelike lighting, clear composition'
     if os.getenv('IMAGE_BACKEND', 'cpu') == 'cpu':
         from image_cpu import generate
         generate(prompt + ', no text, no watermark', path)
@@ -530,7 +531,7 @@ def run(daily=False):
     root.mkdir(parents=True, exist_ok=True)
     store, key = Store(), f'runs/{run_id}/state.json'
     test_record = store.load('last-private-test.json', {}) if daily else {}
-    if daily and (not test_record.get('passed') or not test_record.get('remote_verification', {}).get('private_test_passed') or test_record.get('validation', {}).get('image_interval_seconds') != 7 or not test_record.get('validation', {}).get('storyboard_verified') or test_record.get('validation', {}).get('style') != 'ghibli-inspired'):
+    if daily and (not test_record.get('passed') or not test_record.get('remote_verification', {}).get('private_test_passed') or test_record.get('validation', {}).get('image_interval_seconds') != 7 or not test_record.get('validation', {}).get('storyboard_verified') or test_record.get('validation', {}).get('style') not in ('ghibli-inspired', 'cinematic-detailed')):
         raise RuntimeError('No fully verified private HD upload test is recorded')
     state = store.load(key, {})
     if state.get('phase') in ('upload_started', 'uploaded', 'complete', 'published', 'verified_private'):

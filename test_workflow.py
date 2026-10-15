@@ -72,6 +72,8 @@ class Checks(unittest.TestCase):
             self.assertEqual(truck['focus'], 'object')
             self.assertNotIn('Main woman', truck['prompt'])
             self.assertIn('delivery truck', truck['prompt'])
+            self.assertIn('Highly detailed cinematic image', truck['prompt'])
+            self.assertEqual(result['style'], 'cinematic-detailed')
             self.assertIn('person', truck['negative_prompt'])
             self.assertEqual(meeting['focus'], 'group')
             self.assertIn('multiple people', meeting['prompt'])

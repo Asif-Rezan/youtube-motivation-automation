@@ -6,7 +6,7 @@
 - 1920×1080 output at 30 fps.
 - A newly generated image at 0, 7, 14, 21 seconds and every seven seconds thereafter.
   The final image lasts only for the remaining duration. Chapter boundaries do not reset this timeline.
-- Narration-matched hand-painted 2D illustrations at 1024×576, using pinned public
+- Narration-matched vivid cinematic images at 1024×576, using pinned public
   segmind/SSD-1B safetensors weights on cloud CPUs.
 - Kokoro English narration, Faster-Whisper aligned burned-in captions, zoom/fade
   transitions, original MusicRNN background music and illustrated thumbnails.

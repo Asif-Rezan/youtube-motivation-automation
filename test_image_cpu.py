@@ -10,11 +10,13 @@ from unittest.mock import patch
 from PIL import Image
 import image_cpu
 import long_video
+import workflow
 from scene_check import check_scene
 
 
 class ImageCPUChecks(unittest.TestCase):
     def test_models_and_resolution_configuration(self):
+        self.assertNotIn('photorealistic', image_cpu.NEGATIVE)
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(image_cpu.image_config().model, image_cpu.MODEL)
             self.assertEqual((image_cpu.image_config().width, image_cpu.image_config().height), (768, 432))
@@ -30,6 +32,13 @@ class ImageCPUChecks(unittest.TestCase):
         with patch.dict(os.environ, {'CPU_IMAGE_WIDTH': '1001'}):
             with self.assertRaisesRegex(ValueError, 'multiples of eight'):
                 image_cpu.image_config()
+
+    def test_story_image_prompt_keeps_one_cinematic_style(self):
+        with patch.object(image_cpu, 'generate') as generate:
+            workflow.make_image('Mayra reads a letter. Highly detailed cinematic image', Path('sample.png'))
+        prompt = generate.call_args.args[0]
+        self.assertEqual(prompt.lower().count('highly detailed cinematic image'), 1)
+        self.assertIn('Mayra reads a letter', prompt)
 
     def test_ssd_uses_sdxl_and_dreamshaper_uses_sd15(self):
         called = []
