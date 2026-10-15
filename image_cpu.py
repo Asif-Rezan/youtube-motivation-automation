@@ -9,6 +9,7 @@ import time
 MODEL = 'Lykon/dreamshaper-8'
 REVISION = 'a7e52b98680b1ba8ff7bce97c7f9f2e2e5337917'
 SSD_MODEL = 'segmind/SSD-1B'
+SSD_REVISION = '60987f37e94cd59c36b1cba832b9f97b57395a10'
 NEGATIVE = ('photograph, photorealistic, live action, 3D render, CGI, blurry, '
             'extra arms, extra legs, deformed hands, duplicate person, watermark, lettering')
 _pipeline = None
@@ -29,7 +30,7 @@ def image_config():
     model = os.getenv('CPU_IMAGE_MODEL') or MODEL
     if model not in (MODEL, SSD_MODEL):
         raise ValueError(f'Unsupported CPU image model: {model}')
-    revision = os.getenv('CPU_MODEL_REVISION') or (REVISION if model == MODEL else 'main')
+    revision = os.getenv('CPU_MODEL_REVISION') or (REVISION if model == MODEL else SSD_REVISION)
     config = ImageConfig(model, revision, int(os.getenv('CPU_IMAGE_WIDTH', '768')),
                          int(os.getenv('CPU_IMAGE_HEIGHT', '432')),
                          int(os.getenv('CPU_IMAGE_STEPS', '28' if model == MODEL else '16')),
@@ -71,6 +72,8 @@ def generate(prompt, path):
     if _pipeline is None or _pipeline_key != key:
         _pipeline = load_pipeline(config)
         _pipeline_key = key
+    if getattr(_pipeline, 'safety_checker', None) is None and os.getenv('CPU_IMAGE_BENCHMARK') != 'true':
+        raise RuntimeError(f'{config.model} has no content safety checker; refusing production inference')
     import torch
     seed = int(os.getenv('IMAGE_SEED', '42'))
     negative = ', '.join(filter(None, (NEGATIVE, os.getenv('IMAGE_NEGATIVE_PROMPT', '').strip())))

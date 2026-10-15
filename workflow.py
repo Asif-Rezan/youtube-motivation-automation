@@ -134,7 +134,7 @@ def make_story(day, previous):
     Last chapter ends with an earned resolution and a specific reflection. No viewer calls to action in the story plan.
     Create an original plot and title; avoid generic stock stories.
     Return JSON: title (max 100 characters), description (clearly label fictional), tags (list),
-    thumbnail_text (2-5 words), thumbnail_prompt, protagonist_name (first name), character_description (max 14 words, appearance and outfit),
+    thumbnail_text (2-5 words), thumbnail_prompt, protagonist_name (first name), character_description (max 24 words: age appearance, skin tone, face shape, hair color and style, consistent outfit),
     scenes (object with chapter_01 through chapter_20). Each chapter: summary (max 25 words), image_prompt,
     image_prompts (four distinct visual beats, each max 8 words). Hand-painted Japanese animation style.
     Main character keeps the same appearance. Provide ONLY the plan, no full narration yet.''', 5200, outline_schema)

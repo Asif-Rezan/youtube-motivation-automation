@@ -19,6 +19,7 @@ jobs:
       CPU_IMAGE_HEIGHT: '432'
       CPU_IMAGE_STEPS: '28'
       CPU_IMAGE_GUIDANCE_SCALE: '7.5'
+      CPU_IMAGE_BENCHMARK: 'true'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:

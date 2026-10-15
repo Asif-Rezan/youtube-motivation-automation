@@ -1,0 +1,23 @@
+# Local CPU illustration benchmark
+
+The production daily workflow uses the pinned DreamShaper 8 model at 1024×576, 28 steps and guidance 7.5, selected after a representative GitHub Actions CPU comparison. SSD-1B is an isolated benchmark candidate and does not silently replace the production model.
+
+Run **Manual local CPU image benchmark** from GitHub Actions. It uses no YouTube, Drive, or Groq credentials and never publishes a video. The two jobs use the same bridge and letter scenes and seeds. They save `benchmark.json` and sample PNG files as run artifacts. The JSON records model, resolution, steps, guidance, generation time, peak process memory, available disk, and model weight size. Review the images for accurate objects, character appearance, composition, and anatomy before changing production settings. The script also tests DreamShaper at 1024×576 and SSD-1B at both 16/7.0 and 20/9.0 steps/guidance.
+
+The public `ubuntu-latest` runner has 4 CPU cores, 16 GB RAM and 14 GB SSD according to [GitHub's runner documentation](https://docs.github.com/en/actions/how-tos/write-workflows/choose-where-workflows-run/choose-the-runner-for-a-job). Each of the 16 production image jobs is a separate runner. The current daily job allows 360 minutes per image shard, including dependency installation, model loading, illustration generation, scene checks, and clip rendering. Benchmarking four illustrations is a feasibility check, not proof that a full 10–15 minute run will fit.
+
+Model licenses: [SSD-1B](https://huggingface.co/segmind/SSD-1B) is Apache 2.0. [DreamShaper 8](https://huggingface.co/Lykon/dreamshaper-8) is CreativeML OpenRAIL-M, which permits commercial use subject to its use restrictions. This project downloads weights for local inference only.
+
+A successful benchmark should leave substantial RAM and disk headroom, with projected time for the busiest shard under 360 minutes. The benchmark cannot establish perfect character identity or detect every malformed hand; sample review remains necessary.
+
+## SSD-1B runner result, 15 October 2026
+
+[Benchmark run #1](https://github.com/Asif-Rezan/youtube-motivation-automation/actions/runs/38684500543) generated two scenes at both tested settings on a four-core CPU runner. At 1024×576, 16 steps and guidance 7.0 took 305–310 seconds per image after model load; 20 steps and guidance 9.0 took 368–373 seconds. First-image load added about 77 seconds. Peak process memory was 11.36 GB. Float32 component weights total 8.93 GB. The runner reported 89.06 GB free before model download and 80.13 GB afterward; available disk varies by runner image and must not be assumed from this one run.
+
+Visual review found that the bridge image duplicated the protagonist where workers were requested and looked photographic, while the letter scene was cartoon styled. The same character did not stay visually consistent. Increasing to 20 steps and guidance 9.0 did not fix those issues. The model pipeline reported **no built-in safety checker**. The production path therefore refuses this model until a compatible local safety check is provided, and DreamShaper remains the production default. SSD-1B is supported for isolated benchmarking only.
+
+## DreamShaper resolution result, 15 October 2026
+
+The same run generated both scenes at 768×432 and 1024×576 with 28 steps and guidance 7.5. At 768×432, generation took 443–444 seconds per image, with peak process memory 7.12 GB. At 1024×576, generation took 933–936 seconds, with peak process memory 8.96 GB. Float32 component weights total 5.48 GB. The runner reported 89.79 GB free before model download and 84.30 GB after. DreamShaper's built-in safety checker was present at both resolutions.
+
+The 1024×576 images had more environmental detail, but the raw benchmark prompts still produced imperfect story actions: the bridge became a large industrial structure, and the letter scene showed writing rather than reading. The production storyboard now places the narrated action, objects, character description and setting before visual style, and its existing semantic check can regenerate mismatched group and object scenes up to three times. A complete daily video has not been run as part of this benchmark. The larger resolution costs about 2.1 times as much CPU time per image; eight images at the observed slowest rate project to about 125 minutes, leaving margin under the 360-minute shard limit. The daily and private long-video workflows therefore use 1024×576 with DreamShaper, while keeping width and height configurable.

@@ -6,7 +6,7 @@
 - 1920×1080 output at 30 fps.
 - A newly generated image at 0, 7, 14, 21 seconds and every seven seconds thereafter.
   The final image lasts only for the remaining duration. Chapter boundaries do not reset this timeline.
-- Ghibli-inspired hand-painted 2D illustrations, using pinned public
+- Narration-matched hand-painted 2D illustrations at 1024×576, using pinned public
   Lykon/dreamshaper-8 safetensors weights on cloud CPUs.
 - Kokoro English narration, Faster-Whisper aligned burned-in captions, zoom/fade
   transitions, original MusicRNN background music and illustrated thumbnails.
@@ -34,8 +34,10 @@ remain manual; the new daily workflow generates a fresh story on each run.
 Standard GitHub Ubuntu runners perform the work even when the user's computer
 is off. The dedicated illustration model is downloaded as public weights; no
 paid inference provider, GPU runner, vidIQ service or paid storage is used.
-Illustrations are generated at 768×432 then scaled into the 1080p video; they
-are not native 1080p renders. Sixteen image workers share the work. Subjective
+Illustrations are generated at 1024×576 then scaled into the 1080p video; they
+are not native 1080p renders. Sixteen image workers share the work. The
+[CPU image benchmark](docs/image-cpu-benchmark.md) records why DreamShaper remains
+the production model and why SSD-1B is limited to isolated tests. Subjective
 style quality and character continuity still require review before public release.
 
 Owner-only Google Drive stores the story, prepared audio, captions, images,

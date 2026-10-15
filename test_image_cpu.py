@@ -132,6 +132,17 @@ class ImageCPUChecks(unittest.TestCase):
             self.assertEqual(calls, [shot['prompt']])
             self.assertEqual(json.loads((root/'shot-000.qa.json').read_text())['image_generation']['model'], image_cpu.MODEL)
 
+    def test_model_without_safety_checker_cannot_run_in_production(self):
+        pipe = types.SimpleNamespace(safety_checker=None)
+        with tempfile.TemporaryDirectory() as temp, \
+             patch.dict(os.environ, {'CPU_IMAGE_MODEL': image_cpu.SSD_MODEL}, clear=True), \
+             patch.object(image_cpu, 'load_pipeline', return_value=pipe):
+            image_cpu._pipeline = None
+            with self.assertRaisesRegex(RuntimeError, 'no content safety checker'):
+                image_cpu.generate('A safe fictional scene', Path(temp)/'scene.png')
+        image_cpu._pipeline = None
+        image_cpu._pipeline_key = None
+
 
 if __name__ == '__main__':
     unittest.main()

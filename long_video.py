@@ -65,7 +65,7 @@ def storyboard(root=ROOT, ask=None, pause=None):
     character = story.get('character_description', '').strip()
     if not character:
         raise ValueError('Visual synchronization needs a character description')
-    character = ' '.join(character.split()[:14])
+    character = ' '.join(character.split()[:24])
     shots = plan['shots']
     for begin in range(0, len(shots), 8):
         if begin:
@@ -87,6 +87,7 @@ and location. Identify the active character, physical action, important objects,
 when the narration supplies them. Describe one drawable composition with a detailed, accurate setting.
 Use natural poses and facial expressions. Include other people only when narrated.
 Do not invent scenery, props, weather, clothing, or characters to add visual interest.
+Name the active character instead of using a pronoun when chapter context identifies them.
 Do not put style, camera lists, narration text, typography or character design into the prompt;
 the renderer adds character design and illustration style. Do not replace specific objects with generic ones.
 Chapter context: {json.dumps(context)}
@@ -299,7 +300,7 @@ def refine_visual_plan(root=ROOT):
     import re
     story = json.loads((root/'story.json').read_text())
     plan = json.loads((root/'plan.json').read_text())
-    character = ' '.join(story['character_description'].split()[:14])
+    character = ' '.join(story['character_description'].split()[:24])
     name = story.get('protagonist_name')
     if not name:
         candidates = re.findall(r'(?<=[ ,])([A-Z][a-z]{2,})(?=[, .])', story['scenes'][0]['narration'])
