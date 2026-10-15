@@ -58,7 +58,7 @@ class ImageCPUChecks(unittest.TestCase):
             StableDiffusionXLPipeline=StableDiffusionXLPipeline, DPMSolverMultistepScheduler=Scheduler)
         fake_torch = types.SimpleNamespace(float32='float32', set_num_threads=lambda n: None)
         with patch.dict(sys.modules, {'torch': fake_torch, 'diffusers': fake_diffusers}):
-            for model in (image_cpu.MODEL, image_cpu.SSD_MODEL):
+            for model in (image_cpu.DREAMSHAPER_MODEL, image_cpu.SSD_MODEL):
                 config = image_cpu.ImageConfig(model, 'main', 1024, 576, 16, 7)
                 image_cpu.load_pipeline(config)
         self.assertEqual([item[0] for item in called], ['StableDiffusionPipeline', 'StableDiffusionXLPipeline'])
@@ -80,6 +80,7 @@ class ImageCPUChecks(unittest.TestCase):
                                      'CPU_IMAGE_WIDTH': '1024', 'CPU_IMAGE_HEIGHT': '576',
                                      'IMAGE_SEED': '1700'}, clear=True), \
              patch.object(image_cpu, 'load_pipeline', return_value=pipe), \
+             patch.object(image_cpu, 'check_ssd_safety') as safety_check, \
              patch.dict(sys.modules, {'torch': fake_torch}):
             image_cpu._pipeline = None
             path = Path(temp)/'sample.png'
@@ -87,6 +88,7 @@ class ImageCPUChecks(unittest.TestCase):
             self.assertTrue(path.exists())
             self.assertEqual(report['model'], image_cpu.SSD_MODEL)
             self.assertEqual(report['seed'], 1700)
+            safety_check.assert_called_once()
             self.assertEqual(pipe.kwargs['generator'], 1700)
             self.assertIn('deformed hands', pipe.kwargs['negative_prompt'])
             self.assertEqual(json.loads(image_cpu.metadata_path(path).read_text())['model'], image_cpu.SSD_MODEL)
@@ -132,14 +134,24 @@ class ImageCPUChecks(unittest.TestCase):
             self.assertEqual(calls, [shot['prompt']])
             self.assertEqual(json.loads((root/'shot-000.qa.json').read_text())['image_generation']['model'], image_cpu.MODEL)
 
-    def test_model_without_safety_checker_cannot_run_in_production(self):
-        pipe = types.SimpleNamespace(safety_checker=None)
+    def test_ssd_requires_local_safety_check_before_saving(self):
+        class Pipe:
+            safety_checker = None
+            def __call__(self, **kwargs):
+                return types.SimpleNamespace(images=[Image.new('RGB', (1024, 576), 'blue')])
+        fake_torch = types.SimpleNamespace(Generator=lambda device: types.SimpleNamespace(
+            manual_seed=lambda seed: seed))
         with tempfile.TemporaryDirectory() as temp, \
              patch.dict(os.environ, {'CPU_IMAGE_MODEL': image_cpu.SSD_MODEL}, clear=True), \
-             patch.object(image_cpu, 'load_pipeline', return_value=pipe):
+             patch.object(image_cpu, 'load_pipeline', return_value=Pipe()), \
+             patch.object(image_cpu, 'check_ssd_safety', side_effect=RuntimeError('blocked')) as check, \
+             patch.dict(sys.modules, {'torch': fake_torch}):
             image_cpu._pipeline = None
-            with self.assertRaisesRegex(RuntimeError, 'no content safety checker'):
-                image_cpu.generate('A safe fictional scene', Path(temp)/'scene.png')
+            path = Path(temp)/'scene.png'
+            with self.assertRaisesRegex(RuntimeError, 'blocked'):
+                image_cpu.generate('A safe fictional scene', path)
+            check.assert_called_once()
+            self.assertFalse(path.exists())
         image_cpu._pipeline = None
         image_cpu._pipeline_key = None
 

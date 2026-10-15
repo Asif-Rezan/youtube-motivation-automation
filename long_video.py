@@ -465,7 +465,7 @@ def finish(root=ROOT):
     if not all(r['passed'] for r in scene_reports):
         raise RuntimeError('Visual scene checks did not pass')
     image_models = {r.get('image_generation', {}).get('model') for r in scene_reports}
-    if os.getenv('IMAGE_BACKEND', 'cpu') == 'cpu' and image_models != {os.getenv('CPU_IMAGE_MODEL', 'Lykon/dreamshaper-8')}:
+    if os.getenv('IMAGE_BACKEND', 'cpu') == 'cpu' and image_models != {os.getenv('CPU_IMAGE_MODEL', 'segmind/SSD-1B')}:
         raise RuntimeError(f'Image model mismatch across rendered shots: {image_models}')
     report = {'render_passed': True, 'duration_seconds': float(metadata['format']['duration']),
         'width': 1920, 'height': 1080, 'images': len(clips), 'image_interval_seconds': INTERVAL,

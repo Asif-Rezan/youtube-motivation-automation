@@ -18,15 +18,16 @@ env:
   CPU_TTS_VOICE: am_michael
   CPU_IMAGE_WIDTH: '1024'
   CPU_IMAGE_HEIGHT: '576'
-  CPU_IMAGE_STEPS: '28'
-  CPU_IMAGE_GUIDANCE_SCALE: '7.5'
+  CPU_IMAGE_STEPS: '16'
+  CPU_IMAGE_GUIDANCE_SCALE: '7.0'
   HF_HUB_DISABLE_XET: '1'
   OMP_NUM_THREADS: '4'
   MKL_NUM_THREADS: '4'
   DAILY_ENABLED: 'false'
   GENERATE_FRESH_STORY: 'true'
   STORY_MODEL: openai/gpt-oss-120b
-  CPU_IMAGE_MODEL: Lykon/dreamshaper-8
+  # Previous image model: Lykon/dreamshaper-8 (28 steps, guidance 7.5).
+  CPU_IMAGE_MODEL: segmind/SSD-1B
 jobs:
   prepare:
     runs-on: ubuntu-latest
