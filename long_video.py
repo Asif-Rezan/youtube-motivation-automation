@@ -314,7 +314,16 @@ def refine_visual_plan(root=ROOT):
         main = bool(re.search(r'\b'+re.escape(name)+r'\b', action, re.I))
         group = bool(re.search(r'\b(workers|crew|team|locals|people|crowd|volunteers)\b', action, re.I))
         group = group or bool(main and re.search(r'\b(boss|mayor|mother|father|brother|coworker)\b|\bMr\.', action, re.I))
-        human = bool(re.search(r'\b(man|woman|worker|coworker|engineer|mayor|boss|forecaster)\b|\bMr\.', action, re.I))
+        human = bool(re.search(
+            r'\b(man|woman|worker|coworker|engineer|mayor|boss|forecaster|roommate|manager|'
+            r'client|friend|neighbor|colleague|mentor|partner|mother|father|brother|sister|'
+            r'son|daughter)\b|\bMr\.', action, re.I))
+        # Storyboard names can differ from the outline's protagonist spelling.
+        # A named person performing an action must never get a "no people" prompt.
+        human = human or bool(re.search(
+            r'\b[A-Z][a-z]{2,}\s+(?:at|on|in|showing|handing|holding|typing|'
+            r'listening|staring|raising|smiling|drafting|presenting|pointing|'
+            r'walking|speaking|standing|sitting|looking|reading|writing)\b', action))
         focus = 'group' if group else ('person' if main or human else 'object')
         composition = 'wide scene showing multiple people together, ' if group else 'wide scene, '
         shot['prompt'] = composition + action

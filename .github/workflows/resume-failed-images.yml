@@ -1,0 +1,152 @@
+name: Resume failed private video image shards
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: 'Saved daily run ID, for example daily-38692298687'
+        required: true
+        type: string
+      shards_json:
+        description: 'JSON array of failed image shard numbers, for example [12]'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: youtube-daily-financial
+  cancel-in-progress: false
+env:
+  SAVED_RUN_ID: ${{ inputs.source_run_id }}
+  RUN_SCOPED_CLEANUP: 'true'
+  CONTENT_TYPE: financial-storytelling
+  OUTPUT_DIR: output/ghibli-long-test
+  TTS_BACKEND: kokoro
+  CAPTION_BACKEND: cpu
+  MUSIC_BACKEND: magenta
+  IMAGE_BACKEND: cpu
+  CPU_TTS_VOICE: am_michael
+  CPU_IMAGE_MODEL: segmind/SSD-1B
+  CPU_IMAGE_WIDTH: '1024'
+  CPU_IMAGE_HEIGHT: '576'
+  CPU_IMAGE_STEPS: '16'
+  CPU_IMAGE_GUIDANCE_SCALE: '7.0'
+  HF_HUB_DISABLE_XET: '1'
+  OMP_NUM_THREADS: '4'
+  MKL_NUM_THREADS: '4'
+  DAILY_ENABLED: 'true'
+  GENERATE_FRESH_STORY: 'false'
+  STORY_MODEL: openai/gpt-oss-120b
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - name: Restore saved story, narration and visual plan
+        env:
+          DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+        run: python -u long_video.py restore-preparation
+      - name: Correct person and object scene classification
+        run: python -u long_video.py refine-plan
+      - name: Save corrected visual plan privately
+        env:
+          DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+        run: python -u long_video.py save-preparation
+  images:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      max-parallel: 16
+      matrix:
+        shard: ${{ fromJSON(inputs.shards_json) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install CPU illustration dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          pip install -r requirements.txt
+          pip install 'torch==2.7.1' --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-cpu.txt
+      - name: Restore saved visual plan
+        env:
+          DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+        run: python -u long_video.py restore-images
+      - name: Regenerate only selected failed shard
+        run: python -u long_video.py generate-shard ${{ matrix.shard }}
+      - name: Save repaired clips privately
+        env:
+          DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+        run: python -u long_video.py save-shard ${{ matrix.shard }}
+  finish:
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install music, thumbnail and rendering dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          pip install -r requirements.txt
+          pip install 'torch==2.7.1' --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-cpu.txt
+          npm install --ignore-scripts --no-audit --no-fund @magenta/music@1.23.1
+      - name: Restore original narration and all saved clips
+        env:
+          DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+        run: python -u long_video.py restore-clips
+      - name: Render final video and thumbnail
+        run: python -u long_video.py finish
+      - name: Upload privately to YouTube
+        env:
+          DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+          EXPECTED_CHANNEL_ID: UCztvMrNCT34DO3DtzLPgWaw
+        run: python -u long_video.py upload
+  publish-cleanup:
+    needs: finish
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - name: Verify private HD upload, then clean this run only
+        env:
+          DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+          EXPECTED_CHANNEL_ID: UCztvMrNCT34DO3DtzLPgWaw
+        run: python -u daily_publish.py

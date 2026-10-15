@@ -61,11 +61,14 @@ class Checks(unittest.TestCase):
             story = {'protagonist_name': 'Maya', 'character_description': 'woman in safety vest',
                      'scenes': [{'narration': 'A truck stalled.'}]}
             plan = {'shots': [{'visual_action': 'Forecaster warns; delivery truck wheels sink into thick mud'},
-                              {'visual_action': 'Maya faces her boss Mr. Alvarez across a desk'}]}
+                              {'visual_action': 'Maya faces her boss Mr. Alvarez across a desk'},
+                              {'visual_action': 'Roommate on speaker, hesitates then nods'},
+                              {'visual_action': 'Mayra handing laptop to client'},
+                              {'visual_action': 'Leo showing brochure and pointing to chart'}]}
             (root/'story.json').write_text(json.dumps(story))
             (root/'plan.json').write_text(json.dumps(plan))
             result = refine_visual_plan(root)
-            truck, meeting = result['shots']
+            truck, meeting = result['shots'][:2]
             self.assertEqual(truck['focus'], 'object')
             self.assertNotIn('Main woman', truck['prompt'])
             self.assertIn('delivery truck', truck['prompt'])
@@ -73,6 +76,9 @@ class Checks(unittest.TestCase):
             self.assertEqual(meeting['focus'], 'group')
             self.assertIn('multiple people', meeting['prompt'])
             self.assertIn('solo', meeting['negative_prompt'])
+            for person in result['shots'][2:]:
+                self.assertEqual(person['focus'], 'person')
+                self.assertNotIn(', person, people', person['negative_prompt'])
 
     def test_actual_seven_second_image_change(self):
         from long_video import picture_clip
