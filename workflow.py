@@ -52,7 +52,7 @@ def timestamp(seconds):
     return f'{h:02}:{m:02}:{s:02},{ms:03}'
 
 
-def validate_story(data):
+def validate_story(data, word_range=(1200, 2500)):
     if not isinstance(data, dict) or not 4 <= len(data.get('scenes', [])) <= 32:
         raise ValueError('Story must contain 4–32 narration chapters')
     if not isinstance(data.get('title'), str) or not 1 <= len(data['title']) <= 100:
@@ -68,8 +68,8 @@ def validate_story(data):
             if not isinstance(scene.get(field), str) or not scene[field].strip():
                 raise ValueError(f'Missing scene {field}')
         words += len(scene['narration'].split())
-    if not 1200 <= words <= 2500:
-        raise ValueError(f'Expected 1200–2500 narrated words; received {words}')
+    if not word_range[0] <= words <= word_range[1]:
+        raise ValueError(f'Expected {word_range[0]}–{word_range[1]} narrated words; received {words}')
     if not isinstance(data.get('thumbnail_text'), str) or len(data['thumbnail_text']) > 45:
         raise ValueError('Invalid thumbnail text')
     if not isinstance(data.get('thumbnail_prompt'), str):

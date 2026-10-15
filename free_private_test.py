@@ -19,7 +19,8 @@ def render():
     from PIL import Image, ImageOps
     from music_cpu import generate
     ROOT.mkdir(parents=True, exist_ok=True)
-    story = w.validate_story(json.loads(Path('private-test-story.json').read_text()))
+    story = w.validate_story(json.loads(Path('private-test-story.json').read_text()),
+                             word_range=(500, 1000))
     (ROOT/'story.json').write_text(json.dumps(story, indent=2))
     generate(ROOT/'music.audio')
     lengths, clips, word_lists = [], [], []

@@ -181,6 +181,12 @@ class Checks(unittest.TestCase):
         with self.assertRaises(ValueError):
             w.validate_story(story)
 
+    def test_short_private_fixture_has_separate_word_range(self):
+        story = json.loads(Path('private-test-story.json').read_text())
+        with self.assertRaisesRegex(ValueError, '1200–2500'):
+            w.validate_story(story)
+        self.assertEqual(w.validate_story(story, word_range=(500, 1000)), story)
+
     def test_aligned_captions(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp)/'captions.srt'
