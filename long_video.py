@@ -52,7 +52,7 @@ def shot_plan(story, lengths, word_lists):
             'chapter': chapter, 'narration': ' '.join(word['word'] for word in anchor),
             'seed': 1700+index})
     return {'duration_seconds': total, 'image_interval_seconds': INTERVAL,
-        'style': 'cinematic-detailed', 'alignment': 'measured-word-timestamps', 'shots': shots}
+        'style': w.VISUAL_STYLE_ID, 'alignment': 'measured-word-timestamps', 'shots': shots}
 
 
 def storyboard(root=ROOT, ask=None, pause=None):
@@ -329,8 +329,7 @@ def refine_visual_plan(root=ROOT):
         shot['prompt'] = composition + action
         if main:
             shot['prompt'] += '. Main character: ' + character
-        shot['prompt'] += ('. Highly detailed cinematic image, vivid colors, rich textures, '
-                           'lifelike lighting, clear composition. Keep the narrated action prominent.')
+        shot['prompt'] += '. Keep the narrated action prominent. ' + w.VISUAL_STYLE
         shot['focus'] = focus
         shot['negative_prompt'] = 'portrait, headshot, close-up face, face filling frame'
         if focus == 'object':
@@ -339,7 +338,7 @@ def refine_visual_plan(root=ROOT):
             shot['negative_prompt'] += ', solo, one person alone'
         shot['semantic_target'] = action
     plan['storyboard_verified'] = True
-    plan['style'] = 'cinematic-detailed'
+    plan['style'] = w.VISUAL_STYLE_ID
     plan['visual_review'] = {'passed': False, 'phase': 'corrected-object-and-group-render-required'}
     plan['scene_composition_version'] = 2
     (root/'plan.json').write_text(json.dumps(plan, indent=2))
@@ -353,6 +352,8 @@ def generate_shard(shard, root=ROOT, count=SHARDS):
     plan = json.loads((root/'plan.json').read_text())
     if not plan.get('storyboard_verified') or not all(s.get('prompt') for s in plan['shots']):
         raise RuntimeError('Narration-aligned storyboard is required before image generation')
+    if plan.get('style') != w.VISUAL_STYLE_ID:
+        raise RuntimeError('Scene plan must use the current illustrated style')
     if plan.get('scene_composition_version') != 2:
         raise RuntimeError('Scene-specific object and group composition is required')
     shots = [s for s in plan['shots'] if s['index']%count == shard]
@@ -436,7 +437,7 @@ def mix_audio(voice, music, target, seconds):
 
 
 def finish(root=ROOT):
-    from PIL import Image, ImageDraw, ImageFont, ImageOps
+    from PIL import Image, ImageOps
     from music_cpu import generate
     plan = json.loads((root/'plan.json').read_text())
     clips = [root/f"shot-{s['index']:03}.mp4" for s in plan['shots']]
@@ -458,15 +459,12 @@ def finish(root=ROOT):
     story = json.loads((root/'story.json').read_text())
     os.environ['IMAGE_NEGATIVE_PROMPT'] = ''
     os.environ['IMAGE_SEED'] = '9931'
-    w.make_image(story['thumbnail_prompt'], root/'thumbnail-source.png')
+    thumbnail_prompt = (story['thumbnail_prompt'] + '. Main character: ' +
+        story['character_description'] + '. Make a single story-specific illustrated thumbnail '
+        'with the protagonist prominent and a clear contrasting background or supporting characters. '
+        'No title text, labels, numbers, arrows, or interface elements.')
+    w.make_image(thumbnail_prompt, root/'thumbnail-source.png')
     image = ImageOps.fit(Image.open(root/'thumbnail-source.png').convert('RGB'), (1280, 720))
-    draw = ImageDraw.Draw(image)
-    font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 75)
-    draw.rectangle((0, 510, 1280, 720), fill=(17, 37, 37))
-    text = story['thumbnail_text'].upper()
-    while draw.textbbox((0, 0), text, font=font)[2] > 1170 and font.size > 24:
-        font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', font.size-2)
-    draw.text((55, 555), text, font=font, fill=(255, 244, 212))
     image.save(root/'thumbnail.jpg', quality=92)
     if (root/'thumbnail.jpg').stat().st_size >= 2*1024*1024:
         raise RuntimeError('Thumbnail exceeds size limit')
@@ -478,7 +476,7 @@ def finish(root=ROOT):
         raise RuntimeError(f'Image model mismatch across rendered shots: {image_models}')
     report = {'render_passed': True, 'duration_seconds': float(metadata['format']['duration']),
         'width': 1920, 'height': 1080, 'images': len(clips), 'image_interval_seconds': INTERVAL,
-        'style': 'cinematic-detailed', 'privacy': 'private', 'voice': 'Kokoro am_michael',
+        'style': w.VISUAL_STYLE_ID, 'privacy': 'private', 'voice': 'Kokoro am_michael',
         'music': 'Magenta MusicRNN', 'image_model': next(iter(image_models)),
         'audio_validation': audio_report, 'timeline_verified': True, 'storyboard_verified': plan.get('storyboard_verified', False),
         'alignment': plan.get('alignment'), 'scene_composition_version': plan.get('scene_composition_version'),

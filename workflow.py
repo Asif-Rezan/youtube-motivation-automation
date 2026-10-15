@@ -16,6 +16,12 @@ FINAL_CTA = (" Which choice would you have made in the protagonist's place? "
     'Leave a comment with your answer, like this video if it inspired you, '
     'and subscribe for more stories of courage and growth.')
 
+VISUAL_STYLE = ('original 2D editorial cartoon illustration, clean dark ink outlines, '
+    'flat muted pastel colors with soft cel shading, expressive simple faces, '
+    'detailed everyday environments, clear visual storytelling, wide 16:9 composition, '
+    'consistent character design, no photorealism, no 3D render, no anime')
+VISUAL_STYLE_ID = 'editorial-cartoon'
+
 
 def required(name):
     value = os.getenv(name, '')
@@ -134,9 +140,13 @@ def make_story(day, previous):
     Last chapter ends with an earned resolution and a specific reflection. No viewer calls to action in the story plan.
     Create an original plot and title; avoid generic stock stories.
     Return JSON: title (max 100 characters), description (clearly label fictional), tags (list),
-    thumbnail_text (2-5 words), thumbnail_prompt, protagonist_name (first name), character_description (max 24 words: age appearance, skin tone, face shape, hair color and style, consistent outfit),
+    thumbnail_text (2-5 words, metadata only), thumbnail_prompt (one specific scene from the story,
+    showing the protagonist and the financial or emotional contrast; no written words),
+    protagonist_name (first name), character_description (max 24 words: age appearance,
+    skin tone, face shape, hair color and style, consistent outfit),
     scenes (object with chapter_01 through chapter_20). Each chapter: summary (max 25 words), image_prompt,
-    image_prompts (four distinct visual beats, each max 8 words). Vivid, detailed cinematic visual style.
+    image_prompts (four distinct visual beats, each max 8 words). Use clear scenes that work as
+    original 2D editorial cartoon illustrations with dark outlines and muted pastel colors.
     Main character keeps the same appearance. Provide ONLY the plan, no full narration yet.''', 5200, outline_schema)
     outline['scenes'] = [outline['scenes'][k] for k in chapter_keys]
     if len(outline.get('scenes', [])) != 20:
@@ -176,17 +186,17 @@ def make_story(day, previous):
 
 
 def make_image(prompt, path):
-    if 'highly detailed cinematic image' not in prompt.lower():
-        prompt += ', highly detailed cinematic image, vivid colors, rich textures, lifelike lighting, clear composition'
+    if VISUAL_STYLE not in prompt:
+        prompt += '. ' + VISUAL_STYLE
     if os.getenv('IMAGE_BACKEND', 'cpu') == 'cpu':
         from image_cpu import generate
-        generate(prompt + ', no text, no watermark', path)
+        generate(prompt + ', no text, no letters, no watermark', path)
         return
     if os.getenv('IMAGE_BACKEND') != 'hf':
         raise ValueError('IMAGE_BACKEND must be cpu or hf')
     from huggingface_hub import InferenceClient
     image = InferenceClient(api_key=required('HF_TOKEN')).text_to_image(
-        prompt=prompt + ', cinematic lighting, landscape composition, no text or watermarks',
+        prompt=prompt + ', no text, no letters, no watermarks',
         model=required('IMAGE_MODEL'), width=1344, height=768)
     image.save(path)
 
@@ -531,7 +541,7 @@ def run(daily=False):
     root.mkdir(parents=True, exist_ok=True)
     store, key = Store(), f'runs/{run_id}/state.json'
     test_record = store.load('last-private-test.json', {}) if daily else {}
-    if daily and (not test_record.get('passed') or not test_record.get('remote_verification', {}).get('private_test_passed') or test_record.get('validation', {}).get('image_interval_seconds') != 7 or not test_record.get('validation', {}).get('storyboard_verified') or test_record.get('validation', {}).get('style') not in ('ghibli-inspired', 'cinematic-detailed')):
+    if daily and (not test_record.get('passed') or not test_record.get('remote_verification', {}).get('private_test_passed') or test_record.get('validation', {}).get('image_interval_seconds') != 7 or not test_record.get('validation', {}).get('storyboard_verified') or test_record.get('validation', {}).get('style') not in ('ghibli-inspired', 'cinematic-detailed', VISUAL_STYLE_ID)):
         raise RuntimeError('No fully verified private HD upload test is recorded')
     state = store.load(key, {})
     if state.get('phase') in ('upload_started', 'uploaded', 'complete', 'published', 'verified_private'):

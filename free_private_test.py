@@ -16,7 +16,7 @@ def saved_run_id():
 
 
 def render():
-    from PIL import Image, ImageDraw, ImageFont, ImageOps
+    from PIL import Image, ImageOps
     from music_cpu import generate
     ROOT.mkdir(parents=True, exist_ok=True)
     story = w.validate_story(json.loads(Path('private-test-story.json').read_text()))
@@ -48,12 +48,10 @@ def render():
         '-crf', '21', '-c:a', 'aac', '-movflags', '+faststart', str(ROOT/'video.mp4'))
     meta = w.check_video(ROOT/'video.mp4')
     source = ROOT/'thumbnail-source.png'
-    w.make_image(story['thumbnail_prompt'], source)
+    w.make_image(story['thumbnail_prompt'] + '. Main character: ' +
+        story.get('character_description', '') + '. Single clear illustrated scene, '
+        'no title text, labels, numbers, arrows, or interface elements.', source)
     image = ImageOps.fit(Image.open(source).convert('RGB'), (1280, 720))
-    draw = ImageDraw.Draw(image)
-    font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 80)
-    draw.rectangle((0, 500, 1280, 720), fill=(15, 18, 24))
-    draw.text((55, 540), story['thumbnail_text'].upper(), font=font, fill='white')
     image.save(ROOT/'thumbnail.jpg', quality=90)
     if (ROOT/'thumbnail.jpg').stat().st_size >= 2*1024*1024:
         raise RuntimeError('Thumbnail exceeds YouTube size limit')

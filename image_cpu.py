@@ -15,7 +15,8 @@ DREAMSHAPER_MODEL = 'Lykon/dreamshaper-8'
 DREAMSHAPER_REVISION = 'a7e52b98680b1ba8ff7bce97c7f9f2e2e5337917'
 SAFETY_MODEL = 'CompVis/stable-diffusion-safety-checker'
 NEGATIVE = ('blurry, low detail, distorted anatomy, extra arms, extra legs, '
-            'deformed hands, duplicate person, watermark, lettering')
+            'deformed hands, duplicate person, watermark, lettering, photograph, '
+            'photorealistic, realistic skin, 3d render, glossy plastic, anime')
 _pipeline = None
 _pipeline_key = None
 _safety_checker = None

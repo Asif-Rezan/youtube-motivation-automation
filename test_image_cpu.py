@@ -16,7 +16,7 @@ from scene_check import check_scene
 
 class ImageCPUChecks(unittest.TestCase):
     def test_models_and_resolution_configuration(self):
-        self.assertNotIn('photorealistic', image_cpu.NEGATIVE)
+        self.assertIn('photorealistic', image_cpu.NEGATIVE)
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(image_cpu.image_config().model, image_cpu.MODEL)
             self.assertEqual((image_cpu.image_config().width, image_cpu.image_config().height), (768, 432))
@@ -33,11 +33,12 @@ class ImageCPUChecks(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'multiples of eight'):
                 image_cpu.image_config()
 
-    def test_story_image_prompt_keeps_one_cinematic_style(self):
+    def test_story_image_prompt_adds_cartoon_style(self):
         with patch.object(image_cpu, 'generate') as generate:
-            workflow.make_image('Mayra reads a letter. Highly detailed cinematic image', Path('sample.png'))
+            workflow.make_image('Mayra reads a letter', Path('sample.png'))
         prompt = generate.call_args.args[0]
-        self.assertEqual(prompt.lower().count('highly detailed cinematic image'), 1)
+        self.assertEqual(prompt.count(workflow.VISUAL_STYLE), 1)
+        self.assertIn('no photorealism', prompt)
         self.assertIn('Mayra reads a letter', prompt)
 
     def test_ssd_uses_sdxl_and_dreamshaper_uses_sd15(self):
@@ -122,7 +123,8 @@ class ImageCPUChecks(unittest.TestCase):
             shot = {'index': 0, 'seed': 1700, 'prompt': 'Maya repairs a bridge',
                     'negative_prompt': '', 'duration': 7}
             (root/'plan.json').write_text(json.dumps({'storyboard_verified': True,
-                'scene_composition_version': 2, 'shots': [shot]}))
+                'scene_composition_version': 2, 'style': workflow.VISUAL_STYLE_ID,
+                'shots': [shot]}))
             image = root/'shot-000.png'
             image.write_bytes(b'stale')
             image_cpu.metadata_path(image).write_text(json.dumps({'model': image_cpu.SSD_MODEL}))
