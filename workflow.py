@@ -12,6 +12,10 @@ import textwrap
 import time
 from zoneinfo import ZoneInfo
 
+FINAL_CTA = (" Which choice would you have made in the protagonist's place? "
+    'Leave a comment with your answer, like this video if it inspired you, '
+    'and subscribe for more stories of courage and growth.')
+
 
 def required(name):
     value = os.getenv(name, '')
@@ -56,8 +60,8 @@ def validate_story(data):
             if not isinstance(scene.get(field), str) or not scene[field].strip():
                 raise ValueError(f'Missing scene {field}')
         words += len(scene['narration'].split())
-    if not 1500 <= words <= 2500:
-        raise ValueError(f'Expected 1500–2500 narrated words; received {words}')
+    if not 1200 <= words <= 2500:
+        raise ValueError(f'Expected 1200–2500 narrated words; received {words}')
     if not isinstance(data.get('thumbnail_text'), str) or len(data['thumbnail_text']) > 45:
         raise ValueError('Invalid thumbnail text')
     if not isinstance(data.get('thumbnail_prompt'), str):
@@ -150,7 +154,8 @@ def make_story(day, previous):
         Assigned chapter events ONLY: {json.dumps([{'chapter': i+1, 'event': summaries[i]} for i in range(begin, begin+5)])}.
         Previous chapter ending: {prior[-700:]}.
         Return JSON with narrations: an object with the exact chapter keys {keys}, each value a narration string.
-        Each string MUST contain 95-105 English spoken words; total for this request 475-525 words.
+        Each string MUST contain 80-88 English spoken words; total for this request 400-440 words.
+        Aim for about 1650-1800 spoken words across all twenty chapters including the final CTA.
         Natural narration with concrete actions and dialogue, not generic advice.
         Begin chapter 1 with the crisis immediately, no welcome or setup preamble.
         Escalate stakes, introduce reversals and emotional payoffs every few chapters.
@@ -164,9 +169,7 @@ def make_story(day, previous):
         for scene, narration in zip(outline['scenes'][begin:begin+5], parts):
             scene['narration'] = narration
         prior = parts[-1]
-    outline['scenes'][-1]['narration'] += (' Which choice would you have made in the protagonist\'s place? '
-        'Leave a comment with your answer, like this video if it inspired you, '
-        'and subscribe for more stories of courage and growth.')
+    outline['scenes'][-1]['narration'] += FINAL_CTA
     from long_video import validate_engagement
     validate_engagement(outline)
     return validate_story(outline)
