@@ -9,6 +9,13 @@ from zoneinfo import ZoneInfo
 import workflow as w
 
 ROOT = Path('output/free-private-test')
+# This short component test is separate from the 10–15 minute daily pipeline.
+MIN_DURATION = 180
+MAX_DURATION = 600
+
+
+def check_test_video(path):
+    return w.check_video(path, min_duration=MIN_DURATION, max_duration=MAX_DURATION)
 
 
 def saved_run_id():
@@ -34,7 +41,7 @@ def render():
         lengths.append(w.render_scene(image, audio, clip))
         clips.append(clip)
         print(json.dumps({'scene': i+1, 'phase': 'rendered', 'seconds': lengths[-1], 'caption_words': len(words)}), flush=True)
-    if not 180 <= sum(lengths) <= 600:
+    if not MIN_DURATION <= sum(lengths) <= MAX_DURATION:
         raise RuntimeError('Narration duration outside 3–10 minutes')
     w.aligned_subtitles(word_lists, lengths, ROOT/'captions.srt')
     (ROOT/'clips.txt').write_text(''.join(f"file '{p.name}'\n" for p in clips))
@@ -47,7 +54,7 @@ def render():
         '-vf', f"subtitles={ROOT/'captions.srt'}:force_style='FontName=DejaVu Sans,FontSize=22,Outline=2,MarginV=35'",
         '-map', '0:v', '-map', '[a]', '-t', str(sum(lengths)), '-c:v', 'libx264', '-preset', 'fast',
         '-crf', '21', '-c:a', 'aac', '-movflags', '+faststart', str(ROOT/'video.mp4'))
-    meta = w.check_video(ROOT/'video.mp4')
+    meta = check_test_video(ROOT/'video.mp4')
     source = ROOT/'thumbnail-source.png'
     w.make_image(story['thumbnail_prompt'] + '. Main character: ' +
         story.get('character_description', '') + '. Single clear cinematic story scene, '
@@ -67,7 +74,7 @@ def upload():
     report = json.loads((ROOT/'validation.json').read_text())
     if not report.get('render_passed'):
         raise RuntimeError('No validated rendered video')
-    w.check_video(ROOT/'video.mp4')
+    check_test_video(ROOT/'video.mp4')
     store = w.Store()
     run_id = saved_run_id()
     key = f'runs/{run_id}/state.json'
@@ -106,7 +113,7 @@ def restore():
         if not file_id:
             raise RuntimeError('Saved render asset is missing')
         store.download(file_id, ROOT/name)
-    w.check_video(ROOT/'video.mp4')
+    check_test_video(ROOT/'video.mp4')
     print(json.dumps({'restored_render': True, 'run': run_id}), flush=True)
 
 

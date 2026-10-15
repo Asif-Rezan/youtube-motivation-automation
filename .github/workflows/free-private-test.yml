@@ -2,7 +2,10 @@ name: Complete free-model private video test
 on:
   push:
     branches: [main]
-    paths: ['.github/workflows/free-private-test.yml']
+    paths:
+      - '.github/workflows/free-private-test.yml'
+      - 'free_private_test.py'
+      - 'test_free_private_test.py'
   workflow_dispatch:
 permissions:
   contents: read
