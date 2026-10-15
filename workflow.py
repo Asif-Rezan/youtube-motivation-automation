@@ -176,7 +176,7 @@ def make_story(day, previous):
 
 
 def make_image(prompt, path):
-    prompt = 'hand-painted 2D Japanese animation, watercolor illustration, anime, ' + prompt
+    prompt = prompt + ', hand-painted 2D Japanese animation, polished watercolor illustration'
     if os.getenv('IMAGE_BACKEND', 'cpu') == 'cpu':
         from image_cpu import generate
         generate(prompt + ', no text, no watermark', path)

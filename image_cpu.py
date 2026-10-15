@@ -1,53 +1,95 @@
-"""Download public model weights and generate images on a cloud CPU runner.
-
-This does not call Hugging Face Inference Providers and consumes no inference
-API credits. The default model revision is pinned for reproducibility.
-"""
+"""Local, deterministic CPU illustration generation using public model weights."""
 import argparse
+from dataclasses import asdict, dataclass
+import json
 import os
 from pathlib import Path
 import time
 
 MODEL = 'Lykon/dreamshaper-8'
 REVISION = 'a7e52b98680b1ba8ff7bce97c7f9f2e2e5337917'
+SSD_MODEL = 'segmind/SSD-1B'
+NEGATIVE = ('photograph, photorealistic, live action, 3D render, CGI, blurry, '
+            'extra arms, extra legs, deformed hands, duplicate person, watermark, lettering')
 _pipeline = None
+_pipeline_key = None
+
+
+@dataclass(frozen=True)
+class ImageConfig:
+    model: str
+    revision: str
+    width: int
+    height: int
+    steps: int
+    guidance_scale: float
+
+
+def image_config():
+    model = os.getenv('CPU_IMAGE_MODEL') or MODEL
+    if model not in (MODEL, SSD_MODEL):
+        raise ValueError(f'Unsupported CPU image model: {model}')
+    revision = os.getenv('CPU_MODEL_REVISION') or (REVISION if model == MODEL else 'main')
+    config = ImageConfig(model, revision, int(os.getenv('CPU_IMAGE_WIDTH', '768')),
+                         int(os.getenv('CPU_IMAGE_HEIGHT', '432')),
+                         int(os.getenv('CPU_IMAGE_STEPS', '28' if model == MODEL else '16')),
+                         float(os.getenv('CPU_IMAGE_GUIDANCE_SCALE', '7.5' if model == MODEL else '7.0')))
+    if config.width % 8 or config.height % 8 or not 256 <= config.width <= 1024 or not 256 <= config.height <= 1024:
+        raise ValueError('CPU image dimensions must be multiples of eight in 256–1024')
+    if not 1 <= config.steps <= 50 or not 1 <= config.guidance_scale <= 15:
+        raise ValueError('CPU steps must be 1–50 and guidance scale 1–15')
+    return config
+
+
+def load_pipeline(config):
+    """Use the matching SD 1.5 or SDXL pipeline; never fall back silently."""
+    import torch
+    from diffusers import DPMSolverMultistepScheduler, StableDiffusionPipeline, StableDiffusionXLPipeline
+    torch.set_num_threads(min(os.cpu_count() or 2, 4))
+    pipeline_type = StableDiffusionXLPipeline if config.model == SSD_MODEL else StableDiffusionPipeline
+    print(json.dumps({'image_model_loading': config.model, 'revision': config.revision,
+                      'pipeline': pipeline_type.__name__}), flush=True)
+    pipe = pipeline_type.from_pretrained(config.model, revision=config.revision,
+                                         torch_dtype=torch.float32, use_safetensors=True,
+                                         trust_remote_code=False)
+    pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+        pipe.scheduler.config, algorithm_type='dpmsolver++', use_karras_sigmas=True)
+    pipe.to('cpu')
+    pipe.enable_attention_slicing()
+    pipe.enable_vae_slicing()
+    return pipe
+
+
+def metadata_path(path):
+    return Path(path).with_suffix('.image.json')
 
 
 def generate(prompt, path):
-    global _pipeline
+    global _pipeline, _pipeline_key
+    config = image_config()
+    key = (config.model, config.revision)
+    if _pipeline is None or _pipeline_key != key:
+        _pipeline = load_pipeline(config)
+        _pipeline_key = key
     import torch
-    from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
-    torch.set_num_threads(min(os.cpu_count() or 2, 4))
-    model = os.getenv('CPU_IMAGE_MODEL') or MODEL
-    revision = os.getenv('CPU_MODEL_REVISION') or (REVISION if model == MODEL else 'main')
-    if _pipeline is None:
-        print('Loading public image-model weights on CPU', flush=True)
-        # Pinned public model repository. Torch >=2.6 is required for safer
-        # weights-only loading of the legacy tensor files used by this model.
-        _pipeline = DiffusionPipeline.from_pretrained(model, revision=revision,
-            torch_dtype=torch.float32, use_safetensors=True, trust_remote_code=False)
-        _pipeline.scheduler = DPMSolverMultistepScheduler.from_config(
-            _pipeline.scheduler.config, algorithm_type='dpmsolver++', use_karras_sigmas=True)
-        _pipeline.to('cpu')
-        _pipeline.enable_attention_slicing()
-        _pipeline.enable_vae_slicing()
-    width = int(os.getenv('CPU_IMAGE_WIDTH', '768'))
-    height = int(os.getenv('CPU_IMAGE_HEIGHT', '432'))
-    steps = int(os.getenv('CPU_IMAGE_STEPS', '28'))
-    if width % 8 or height % 8 or not 256 <= width <= 1024 or not 256 <= height <= 1024:
-        raise ValueError('CPU image dimensions must be multiples of eight in 256–1024')
-    if not 1 <= steps <= 50:
-        raise ValueError('CPU generation requires 1–50 steps')
+    seed = int(os.getenv('IMAGE_SEED', '42'))
+    negative = ', '.join(filter(None, (NEGATIVE, os.getenv('IMAGE_NEGATIVE_PROMPT', '').strip())))
     start = time.monotonic()
-    result = _pipeline(prompt=prompt, negative_prompt='photograph, photorealistic, live action, 3D render, CGI, extra arms, extra legs, deformed hands, duplicate person, watermark, lettering, ' + os.getenv('IMAGE_NEGATIVE_PROMPT', ''), width=width, height=height,
-        num_inference_steps=steps, guidance_scale=7.5,
-        generator=torch.Generator(device='cpu').manual_seed(int(os.getenv('IMAGE_SEED', '42'))))
-    if any(result.nsfw_content_detected or []):
-        raise RuntimeError('Image was blocked by model safety check; no substitute is generated')
+    result = _pipeline(prompt=prompt, negative_prompt=negative,
+                       width=config.width, height=config.height,
+                       num_inference_steps=config.steps, guidance_scale=config.guidance_scale,
+                       generator=torch.Generator(device='cpu').manual_seed(seed))
+    if any(getattr(result, 'nsfw_content_detected', None) or []):
+        raise RuntimeError('Image blocked by model safety check')
     image = result.images[0]
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     image.save(path)
-    print(f'CPU image generated: {image.width}x{image.height}; {time.monotonic()-start:.1f}s', flush=True)
+    report = {**asdict(config), 'seed': seed, 'seconds': round(time.monotonic()-start, 2),
+              'safety_check_available': getattr(_pipeline, 'safety_checker', None) is not None}
+    metadata_path(path).write_text(json.dumps(report))
+    print(json.dumps({'cpu_image_generated': str(path), **report}), flush=True)
+    return report
 
 
 if __name__ == '__main__':

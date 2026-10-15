@@ -6,11 +6,20 @@ _processor = None
 def check_scene(image, shot):
     global _model, _processor
     import torch
-    from PIL import Image
+    from PIL import Image, ImageFilter, ImageStat
     from transformers import CLIPModel, CLIPProcessor
+    with Image.open(image) as picture:
+        gray = picture.convert('L')
+        edges = gray.filter(ImageFilter.FIND_EDGES)
+        interior = edges.crop((4, 4, max(5, gray.width-4), max(5, gray.height-4)))
+        detail = ImageStat.Stat(interior).stddev[0]
+    if detail < 2.5:
+        return {'passed': False, 'required': True, 'method': 'image-detail-check',
+                'detail_score': round(detail, 3)}
     required = shot.get('focus') in ('object', 'group')
     if not required:
-        return {'passed': True, 'required': False, 'method': 'narration-plan-and-sample-review'}
+        return {'passed': True, 'required': False, 'method': 'detail-and-narration-plan',
+                'detail_score': round(detail, 3)}
     if _model is None:
         _model = CLIPModel.from_pretrained('openai/clip-vit-base-patch32', trust_remote_code=False).eval()
         _processor = CLIPProcessor.from_pretrained('openai/clip-vit-base-patch32', trust_remote_code=False)
@@ -24,4 +33,5 @@ def check_scene(image, shot):
         scores = _model(**inputs).logits_per_image[0].tolist()
     passed = scores[0] > max(scores[1:])
     return {'passed': passed, 'required': True, 'method': 'CLIP-scene-versus-portrait',
+            'detail_score': round(detail, 3),
             'scene_score': scores[0], 'alternative_score': max(scores[1:])}

@@ -83,7 +83,10 @@ For abstract reflection or dialogue, show the current character in the current p
 No metaphorical mountains, gardens or random scenery unless literally present in that event.
 Keep recurring characters and clothes consistent. Main character design: {character}.
 Each prompt MUST be 12-22 English words: subject and concrete action FIRST, then relevant objects
-and location. Describe one simple drawable composition. Include other people only when narrated.
+and location. Identify the active character, physical action, important objects, and visible emotion
+when the narration supplies them. Describe one drawable composition with a detailed, accurate setting.
+Use natural poses and facial expressions. Include other people only when narrated.
+Do not invent scenery, props, weather, clothing, or characters to add visual interest.
 Do not put style, camera lists, narration text, typography or character design into the prompt;
 the renderer adds character design and illustration style. Do not replace specific objects with generic ones.
 Chapter context: {json.dumps(context)}
@@ -316,6 +319,9 @@ def refine_visual_plan(root=ROOT):
         shot['prompt'] = composition + action
         if main:
             shot['prompt'] += '. Main character: ' + character
+        shot['prompt'] += ('. Polished hand-painted 2D anime storytelling illustration, cinematic framing, '
+                           'layered environment, natural body pose, expressive lighting, rich balanced colors. '
+                           'Keep the narrated action and objects prominent; preserve the described setting and clothing.')
         shot['focus'] = focus
         shot['negative_prompt'] = 'portrait, headshot, close-up face, face filling frame'
         if focus == 'object':
@@ -333,6 +339,7 @@ def refine_visual_plan(root=ROOT):
 
 def generate_shard(shard, root=ROOT, count=SHARDS):
     from scene_check import check_scene
+    from image_cpu import image_config, metadata_path
     plan = json.loads((root/'plan.json').read_text())
     if not plan.get('storyboard_verified') or not all(s.get('prompt') for s in plan['shots']):
         raise RuntimeError('Narration-aligned storyboard is required before image generation')
@@ -343,6 +350,18 @@ def generate_shard(shard, root=ROOT, count=SHARDS):
         index = shot['index']
         image, clip = root/f'shot-{index:03}.png', root/f'shot-{index:03}.mp4'
         check = root/f'shot-{index:03}.qa.json'
+        image_meta = metadata_path(image)
+        expected = image_config() if os.getenv('IMAGE_BACKEND', 'cpu') == 'cpu' else None
+        if image.exists() and expected:
+            try:
+                cached = json.loads(image_meta.read_text())
+            except (FileNotFoundError, json.JSONDecodeError):
+                cached = {}
+            if any(cached.get(field) != getattr(expected, field) for field in
+                   ('model', 'revision', 'width', 'height', 'steps', 'guidance_scale')):
+                image.unlink()
+                image_meta.unlink(missing_ok=True)
+                clip.unlink(missing_ok=True)
         os.environ['IMAGE_NEGATIVE_PROMPT'] = shot.get('negative_prompt', '')
         for attempt in range(3):
             os.environ['IMAGE_SEED'] = str(shot['seed']+attempt*10000)
@@ -350,9 +369,12 @@ def generate_shard(shard, root=ROOT, count=SHARDS):
                 w.make_image(shot['prompt'], image)
             report = check_scene(image, shot)
             if report['passed']:
+                if expected:
+                    report['image_generation'] = json.loads(image_meta.read_text())
                 check.write_text(json.dumps(report))
                 break
             image.unlink()
+            image_meta.unlink(missing_ok=True)
             print(json.dumps({'shot': index, 'visual_check_passed': False, 'attempt': attempt+1}), flush=True)
         else:
             raise RuntimeError(f'Shot {index} did not match its narrated scene after three CPU renders')
@@ -441,10 +463,13 @@ def finish(root=ROOT):
     scene_reports = [json.loads((root/f"shot-{s['index']:03}.qa.json").read_text()) for s in plan['shots']]
     if not all(r['passed'] for r in scene_reports):
         raise RuntimeError('Visual scene checks did not pass')
+    image_models = {r.get('image_generation', {}).get('model') for r in scene_reports}
+    if os.getenv('IMAGE_BACKEND', 'cpu') == 'cpu' and image_models != {os.getenv('CPU_IMAGE_MODEL', 'Lykon/dreamshaper-8')}:
+        raise RuntimeError(f'Image model mismatch across rendered shots: {image_models}')
     report = {'render_passed': True, 'duration_seconds': float(metadata['format']['duration']),
         'width': 1920, 'height': 1080, 'images': len(clips), 'image_interval_seconds': INTERVAL,
         'style': 'ghibli-inspired', 'privacy': 'private', 'voice': 'Kokoro am_michael',
-        'music': 'Magenta MusicRNN', 'image_model': os.getenv('CPU_IMAGE_MODEL', 'Lykon/dreamshaper-8'),
+        'music': 'Magenta MusicRNN', 'image_model': next(iter(image_models)),
         'audio_validation': audio_report, 'timeline_verified': True, 'storyboard_verified': plan.get('storyboard_verified', False),
         'alignment': plan.get('alignment'), 'scene_composition_version': plan.get('scene_composition_version'),
         'semantic_checked_images': sum(r.get('required', False) for r in scene_reports)}
