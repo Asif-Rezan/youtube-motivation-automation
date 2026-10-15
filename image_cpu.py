@@ -38,9 +38,9 @@ def image_config():
     if model not in (DREAMSHAPER_MODEL, SSD_MODEL):
         raise ValueError(f'Unsupported CPU image model: {model}')
     revision = os.getenv('CPU_MODEL_REVISION') or (DREAMSHAPER_REVISION if model == DREAMSHAPER_MODEL else SSD_REVISION)
-    config = ImageConfig(model, revision, int(os.getenv('CPU_IMAGE_WIDTH', '768' if model == DREAMSHAPER_MODEL else '1344')),
-                         int(os.getenv('CPU_IMAGE_HEIGHT', '432' if model == DREAMSHAPER_MODEL else '768')),
-                         int(os.getenv('CPU_IMAGE_STEPS', '28' if model == DREAMSHAPER_MODEL else '32')),
+    config = ImageConfig(model, revision, int(os.getenv('CPU_IMAGE_WIDTH', '768' if model == DREAMSHAPER_MODEL else '1024')),
+                         int(os.getenv('CPU_IMAGE_HEIGHT', '432' if model == DREAMSHAPER_MODEL else '576')),
+                         int(os.getenv('CPU_IMAGE_STEPS', '28' if model == DREAMSHAPER_MODEL else '16')),
                          float(os.getenv('CPU_IMAGE_GUIDANCE_SCALE', '7.5' if model == DREAMSHAPER_MODEL else '9.0')))
     if config.width % 8 or config.height % 8 or not 256 <= config.width <= 1536 or not 256 <= config.height <= 1536:
         raise ValueError('CPU image dimensions must be multiples of eight in 256–1536')

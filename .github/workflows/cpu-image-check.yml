@@ -27,16 +27,16 @@ jobs:
           pip install -r requirements.txt -r requirements-cpu.txt
       - name: Generate an image without API credentials
         env:
-          CPU_IMAGE_STEPS: '32'
-          CPU_IMAGE_WIDTH: '1344'
-          CPU_IMAGE_HEIGHT: '768'
+          CPU_IMAGE_STEPS: '16'
+          CPU_IMAGE_WIDTH: '1024'
+          CPU_IMAGE_HEIGHT: '576'
           CPU_IMAGE_GUIDANCE_SCALE: '9.0'
         run: |
           python image_cpu.py --prompt 'A young woman in a teal jacket reads a letter beside a village school garden, highly detailed cinematic image, vivid colors, rich textures, lifelike lighting' --output output/cpu-check.png
           python - <<'PY'
           from PIL import Image
           image = Image.open('output/cpu-check.png')
-          assert image.size == (1344, 768)
+          assert image.size == (1024, 576)
           assert image.convert('L').getextrema()[1] > 0
           print('Actual CPU-generated image passed size and nonblank checks')
           PY

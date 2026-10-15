@@ -36,9 +36,9 @@ jobs:
       - name: Generate complete original video without upload credentials
         env:
           IMAGE_BACKEND: cpu
-          CPU_IMAGE_WIDTH: '1344'
-          CPU_IMAGE_HEIGHT: '768'
-          CPU_IMAGE_STEPS: '32'
+          CPU_IMAGE_WIDTH: '1024'
+          CPU_IMAGE_HEIGHT: '576'
+          CPU_IMAGE_STEPS: '16'
           CPU_IMAGE_GUIDANCE_SCALE: '9.0'
           TTS_BACKEND: kokoro
           CPU_TTS_VOICE: am_michael

@@ -22,8 +22,8 @@ class ImageCPUChecks(unittest.TestCase):
         self.assertNotIn('cel shading', image_cpu.NEGATIVE)
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(image_cpu.image_config().model, image_cpu.MODEL)
-            self.assertEqual((image_cpu.image_config().width, image_cpu.image_config().height), (1344, 768))
-            self.assertEqual((image_cpu.image_config().steps, image_cpu.image_config().guidance_scale), (32, 9.0))
+            self.assertEqual((image_cpu.image_config().width, image_cpu.image_config().height), (1024, 576))
+            self.assertEqual((image_cpu.image_config().steps, image_cpu.image_config().guidance_scale), (16, 9.0))
         with patch.dict(os.environ, {'CPU_IMAGE_MODEL': image_cpu.SSD_MODEL,
                                      'CPU_IMAGE_WIDTH': '1024', 'CPU_IMAGE_HEIGHT': '576',
                                      'CPU_IMAGE_STEPS': '16', 'CPU_IMAGE_GUIDANCE_SCALE': '7.0'}):

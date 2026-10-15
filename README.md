@@ -7,8 +7,8 @@
 - A newly generated image at 0, 5, 10, 15 seconds and every five seconds thereafter.
   The final image lasts only for the remaining duration. Chapter boundaries do not reset this timeline.
 - Narration-matched cinematic 2D editorial story images with clean outlines,
-  restrained cel shading, muted natural colors and recognizable everyday settings at 1344×768, using pinned public
-  segmind/SSD-1B safetensors weights on cloud CPUs.
+  restrained cel shading, muted natural colors and recognizable everyday settings at 1024×576, using pinned public
+  segmind/SSD-1B safetensors weights on cloud CPUs with 16 generation steps.
 - Kokoro English narration, Faster-Whisper aligned burned-in captions, zoom/fade
   transitions, original MusicRNN background music and full-frame cinematic
   thumbnails without the previous large text band.
@@ -36,7 +36,7 @@ remain manual; the new daily workflow generates a fresh story on each run.
 Standard GitHub Ubuntu runners perform the work even when the user's computer
 is off. The dedicated image model is downloaded as public weights; no
 paid inference provider, GPU runner, vidIQ service or paid storage is used.
-Images are generated at 1344×768 then scaled into the 1080p video; they
+Images are generated at 1024×576 then scaled into the 1080p video; they
 are not native 1080p renders. Sixteen image workers share the work. The
 [CPU image benchmark](docs/image-cpu-benchmark.md) compares SSD-1B with the previous
 DreamShaper model. Subjective
