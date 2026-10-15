@@ -7,7 +7,7 @@
 - A newly generated image at 0, 7, 14, 21 seconds and every seven seconds thereafter.
   The final image lasts only for the remaining duration. Chapter boundaries do not reset this timeline.
 - Narration-matched hand-painted 2D illustrations at 1024×576, using pinned public
-  Lykon/dreamshaper-8 safetensors weights on cloud CPUs.
+  segmind/SSD-1B safetensors weights on cloud CPUs.
 - Kokoro English narration, Faster-Whisper aligned burned-in captions, zoom/fade
   transitions, original MusicRNN background music and illustrated thumbnails.
 - Daily videos upload privately to Rezan Relaxation, remain private after HD/metadata verification.
@@ -36,8 +36,8 @@ is off. The dedicated illustration model is downloaded as public weights; no
 paid inference provider, GPU runner, vidIQ service or paid storage is used.
 Illustrations are generated at 1024×576 then scaled into the 1080p video; they
 are not native 1080p renders. Sixteen image workers share the work. The
-[CPU image benchmark](docs/image-cpu-benchmark.md) records why DreamShaper remains
-the production model and why SSD-1B is limited to isolated tests. Subjective
+[CPU image benchmark](docs/image-cpu-benchmark.md) compares SSD-1B with the previous
+DreamShaper model. Subjective
 style quality and character continuity still require review before public release.
 
 Owner-only Google Drive stores the story, prepared audio, captions, images,
