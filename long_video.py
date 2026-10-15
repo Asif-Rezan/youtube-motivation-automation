@@ -13,6 +13,10 @@ ROOT = Path(os.getenv('OUTPUT_DIR', 'output/ghibli-long-test'))
 INTERVAL = 7
 SHARDS = 16
 ASSETS = ('story.json', 'plan.json', 'narration.wav', 'captions.srt')
+MIN_DURATION, MAX_DURATION = 600, 900
+PREFERRED_MIN, PREFERRED_MAX = 720, 840
+MAX_CORRECTIONS = 3
+MAX_NATURAL_TEMPO = 1.04
 
 
 def run_id():
@@ -110,18 +114,88 @@ Exact shot windows: {json.dumps([{'key': f"shot_{shot['index']:03}", 'spoken': s
     return plan
 
 
-def prepare(story=None, root=ROOT):
-    root.mkdir(parents=True, exist_ok=True)
-    story = story or json.loads(Path(os.getenv('STORY_FILE', str(root/'story.json'))).read_text())
-    w.validate_story(story)
-    (root/'story.json').write_text(json.dumps(story, indent=2))
+def duration_action(total):
+    """Use measured speech; reserve tempo changes for barely excessive audio."""
+    if MIN_DURATION <= total <= MAX_DURATION:
+        return 'accept'
+    if MAX_DURATION < total <= 895 * MAX_NATURAL_TEMPO:
+        return 'tempo'
+    return 'rewrite'
+
+
+def narration_digest(text):
+    return hashlib.sha256(text.encode('utf-8')).hexdigest()
+
+
+def rewrite_for_duration(story, total, lengths, ask=None):
+    """Rewrite only the chapters needed to move measured speech toward the safe band."""
+    ask = ask or w.request_groq
+    target = (PREFERRED_MIN + PREFERRED_MAX) / 2
+    ratio = target / total
+    # Spread a large adjustment across chapters so no one chapter loses its story beat.
+    candidates = list(range(len(lengths)))
+    candidates.sort(key=lambda i: lengths[i], reverse=total > MAX_DURATION)
+    needed = abs(total - target)
+    selected = []
+    for index in candidates:
+        selected.append(index)
+        if sum(lengths[i] for i in selected) * .28 >= needed:
+            break
+    selected.sort()
+    updates = {}
+    for begin in range(0, len(selected), 5):
+        group = selected[begin:begin+5]
+        keys = [f'chapter_{i+1:02}' for i in group]
+        schema = {'type': 'object', 'properties': {key: {'type': 'string'} for key in keys},
+                  'required': keys, 'additionalProperties': False}
+        context = [{'chapter': i+1, 'previous': story['scenes'][i-1]['narration'][-250:] if i else '',
+                    'current': story['scenes'][i]['narration'],
+                    'next': story['scenes'][i+1]['narration'][:250] if i+1 < len(lengths) else ''}
+                   for i in group]
+        prompt = (f'Rewrite only these chapters of an existing fictional story to make spoken narration '
+                  f'{"shorter" if ratio < 1 else "longer"}. Preserve each chapter event, character continuity, '
+                  f'natural dialogue, opening hook, and ending. Keep the final like, comment, and subscribe CTA '
+                  f'unchanged at the end of chapter 20 if present. Add meaningful action or dialogue when expanding; '
+                  f'never pad or repeat. Original measured duration is {total:.1f}s; target is about {target:.0f}s. '
+                  f'Aim for approximately {ratio:.2f} times the current word count in each returned chapter. '
+                  f'Return only JSON with exactly these keys: {keys}. Context: {json.dumps(context)}')
+        result = ask('chat/completions', {'model': os.getenv('STORY_MODEL', 'openai/gpt-oss-120b'),
+            'messages': [{'role': 'user', 'content': prompt}],
+            'response_format': {'type': 'json_schema', 'json_schema': {'name': 'duration_rewrite',
+                'strict': True, 'schema': schema}}, 'reasoning_effort': 'low',
+            'temperature': .35, 'max_completion_tokens': 3000})
+        choice = result['choices'][0]
+        if choice.get('finish_reason') == 'length':
+            raise RuntimeError('Duration rewrite response was truncated')
+        values = json.loads(choice['message']['content'])
+        if set(values) != set(keys) or not all(isinstance(v, str) and v.strip() for v in values.values()):
+            raise ValueError('Duration rewrite returned incomplete chapters')
+        updates.update({i: values[f'chapter_{i+1:02}'].strip() for i in group})
+    revised = json.loads(json.dumps(story))
+    for index, text in updates.items():
+        if index == len(lengths)-1 and story['scenes'][-1]['narration'].endswith(w.FINAL_CTA):
+            # The CTA is application-owned text, not material for the model to revise.
+            text = text.split('Which choice would you have made', 1)[0].rstrip() + w.FINAL_CTA
+        revised['scenes'][index]['narration'] = text
+    validate_engagement(revised)
+    w.validate_story(revised)
+    return revised, selected
+
+
+def measure_chapters(story, root):
     lengths, word_lists, audios = [], [], []
     for index, scene in enumerate(story['scenes']):
         audio = root/f'narration-{index:02}.wav'
+        words_path = root/f'words-{index:02}.json'
+        digest_path = root/f'narration-{index:02}.sha256'
+        digest = narration_digest(scene['narration'])
+        if not digest_path.exists() or digest_path.read_text() != digest or not audio.exists():
+            audio.unlink(missing_ok=True)
+            words_path.unlink(missing_ok=True)
         if not audio.exists():
             w.make_narration(scene['narration'], audio)
+            digest_path.write_text(digest)
         length = w.duration(audio)
-        words_path = root/f'words-{index:02}.json'
         if not words_path.exists():
             words_path.write_text(json.dumps(w.transcribe(audio)))
         words = json.loads(words_path.read_text())
@@ -130,9 +204,71 @@ def prepare(story=None, root=ROOT):
         word_lists.append(words)
         audios.append(audio)
         print(json.dumps({'chapter': index+1, 'seconds': length, 'audio_passed': True}), flush=True)
-    total = sum(lengths)
-    if not 600 <= total <= 900:
-        raise RuntimeError(f'Narration is {total:.1f}s, outside 600–900s; do not generate images')
+    return lengths, word_lists, audios
+
+
+def adjust_tempo(root, audios, lengths, word_lists, total):
+    # Reach a small safety margin; never exceed a four-percent speed change.
+    target = min(895, total / 1.005)
+    factor = total / target
+    if factor > MAX_NATURAL_TEMPO:
+        raise ValueError('Required tempo adjustment exceeds natural-speech limit')
+    changed_lengths, changed_words = [], []
+    for index, (audio, old_length, words) in enumerate(zip(audios, lengths, word_lists)):
+        adjusted = audio.with_name(audio.stem + '-adjusted.wav')
+        w.shell('ffmpeg', '-y', '-i', str(audio), '-filter:a', f'atempo={factor:.8f}',
+                '-c:a', 'pcm_s16le', str(adjusted))
+        new_length = w.duration(adjusted)
+        scale = new_length / old_length
+        scaled = [{**word, 'start': float(word['start'])*scale,
+                   'end': min(float(word['end'])*scale, new_length)} for word in words]
+        w.aligned_subtitles([scaled], [new_length], root/'chapter-check.srt')
+        adjusted.replace(audio)
+        (root/f'words-{index:02}.json').write_text(json.dumps(scaled))
+        changed_lengths.append(new_length)
+        changed_words.append(scaled)
+    return changed_lengths, changed_words, factor
+
+
+def prepare(story=None, root=ROOT):
+    root.mkdir(parents=True, exist_ok=True)
+    story = story or json.loads(Path(os.getenv('STORY_FILE', str(root/'story.json'))).read_text())
+    w.validate_story(story)
+    print(json.dumps({'story_words': sum(len(s['narration'].split()) for s in story['scenes'])}), flush=True)
+    (root/'story.json').write_text(json.dumps(story, indent=2))
+    original = None
+    for attempt in range(MAX_CORRECTIONS + 1):
+        lengths, word_lists, audios = measure_chapters(story, root)
+        total = sum(lengths)
+        if original is None:
+            original = total
+            print(json.dumps({'original_narration_seconds': round(original, 3)}), flush=True)
+        action = duration_action(total)
+        if action == 'accept':
+            break
+        if attempt == MAX_CORRECTIONS:
+            raise RuntimeError(f'Narration duration recovery failed after {MAX_CORRECTIONS} attempts: '
+                               f'original={original:.1f}s, final={total:.1f}s, required=600–900s')
+        print(json.dumps({'duration_correction_attempt': attempt+1, 'seconds': round(total, 3),
+                          'action': action}), flush=True)
+        if action == 'tempo':
+            lengths, word_lists, factor = adjust_tempo(root, audios, lengths, word_lists, total)
+            print(json.dumps({'tempo_factor': round(factor, 5),
+                              'adjusted_seconds': round(sum(lengths), 3)}), flush=True)
+            # Re-measure the cached corrected audio on the next pass.
+        else:
+            try:
+                revised, changed = rewrite_for_duration(story, total, lengths)
+            except (RuntimeError, ValueError, KeyError, json.JSONDecodeError) as error:
+                print(json.dumps({'duration_rewrite_failed': True, 'attempt': attempt+1,
+                                  'error_type': type(error).__name__, 'reason': str(error)}), flush=True)
+                continue
+            story = revised
+            (root/'story.json').write_text(json.dumps(story, indent=2))
+            print(json.dumps({'rewritten_chapters': [i+1 for i in changed],
+                              'story_words': sum(len(s['narration'].split()) for s in story['scenes'])}), flush=True)
+    print(json.dumps({'final_narration_seconds': round(total, 3),
+                      'preferred_range': PREFERRED_MIN <= total <= PREFERRED_MAX}), flush=True)
     w.aligned_subtitles(word_lists, lengths, root/'captions.srt')
     (root/'audio-list.txt').write_text(''.join(f"file '{p.name}'\n" for p in audios))
     w.shell('ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', str(root/'audio-list.txt'),
