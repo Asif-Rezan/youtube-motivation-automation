@@ -13,7 +13,7 @@
   transitions, original MusicRNN background music and full-frame cinematic
   thumbnails without the previous large text band.
 - Daily videos upload privately to Rezan Relaxation, remain private after HD/metadata verification.
-- Generation starts twice daily at 01:00 and 13:00 Asia/Dhaka; temporary run media is cleaned after verified private upload.
+- Generation starts once daily at 01:00 Asia/Dhaka; temporary run media is cleaned after verified private upload.
 
 The previous ten-second private test passed in Actions run 38450919780.
 The current five-second update derives each visual from actual measured word
@@ -92,8 +92,8 @@ The daily parallel workflow has its own private-verification path. Legacy
 `workflow.py daily` retains its private-test gate. A fixed test story cannot be
 used for fresh daily generation. OAuth credentials must remain valid for
 unattended operation; resolve OAuth Testing refresh-token expiry before relying
-on long-term scheduling. The 01:00 and 13:00 Asia/Dhaka starts correspond to 19:00 UTC
-on the previous calendar day and 07:00 UTC on the same day; GitHub can delay scheduled starts.
+on long-term scheduling. The 01:00 Asia/Dhaka start corresponds to 19:00 UTC
+on the previous calendar day; GitHub can delay scheduled starts.
 
 The standard workflow.py test/daily commands use the same long-video renderer.
 The parallel test workflow is the recommended new-format integration test.
@@ -122,8 +122,8 @@ an actual image change across a five-second boundary. These checks run locally a
 
 ## Daily financial storytelling publishing
 
-`.github/workflows/daily-upload.yml` starts at **01:00 and 13:00 Asia/Dhaka** daily
-(`0 19 * * *` and `0 7 * * *` UTC), and supports manual dispatch.
+`.github/workflows/daily-upload.yml` starts at **01:00 Asia/Dhaka** daily
+(`0 19 * * *` UTC), and supports manual dispatch.
 GitHub may delay scheduled starts. The workflow must be on the default branch,
 with Actions and scheduled workflows enabled. Existing secrets are reused:
 `GROQ_API_KEY`, `DRIVE_TOKEN_JSON`, `DRIVE_FOLDER_ID`, `YOUTUBE_TOKEN_JSON`.
@@ -176,7 +176,7 @@ Review the **Google OAuth check** Actions run after changing credentials.
 
 Use Actions > Daily financial storytelling publishing > Run workflow, leaving
 `cleanup_run` blank. Updating `.github/workflows/private-video-trigger.txt` on
-main also starts a single fresh private test. Neither method changes the twice-daily 01:00 and 13:00 Asia/Dhaka schedule. The existing OAuth token supports private upload; the
+main also starts a single fresh private test. Neither method changes the daily 01:00 Asia/Dhaka schedule. The existing OAuth token supports private upload; the
 optional `authorize_youtube.py` helper is unnecessary for private-only operation.
 
 ### Recovering Drive checkpoint timeouts
@@ -193,4 +193,4 @@ return 404 and are safely recorded on the next attempt.
 Use **Resume verified private video cleanup** to recover a completed run without
 any video generation or `videos.insert` call. Enter its original `daily-<run ID>`.
 The cleanup worker rechecks private visibility, successful HD processing and
-exact metadata before resuming. The twice-daily 01:00 and 13:00 Asia/Dhaka schedule is unchanged.
+exact metadata before resuming. The daily 01:00 Asia/Dhaka schedule is unchanged.
