@@ -49,7 +49,7 @@ def render():
     meta = w.check_video(ROOT/'video.mp4')
     source = ROOT/'thumbnail-source.png'
     w.make_image(story['thumbnail_prompt'] + '. Main character: ' +
-        story.get('character_description', '') + '. Single clear illustrated scene, '
+        story.get('character_description', '') + '. Single clear cinematic story scene, '
         'no title text, labels, numbers, arrows, or interface elements.', source)
     image = ImageOps.fit(Image.open(source).convert('RGB'), (1280, 720))
     image.save(ROOT/'thumbnail.jpg', quality=90)

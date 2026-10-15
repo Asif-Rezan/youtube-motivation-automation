@@ -2,6 +2,7 @@
 import argparse
 import datetime as dt
 import hashlib
+from difflib import SequenceMatcher
 import json
 import os
 from pathlib import Path
@@ -16,11 +17,12 @@ FINAL_CTA = (" Which choice would you have made in the protagonist's place? "
     'Leave a comment with your answer, like this video if it inspired you, '
     'and subscribe for more stories of courage and growth.')
 
-VISUAL_STYLE = ('original 2D editorial cartoon illustration, clean dark ink outlines, '
-    'flat muted pastel colors with soft cel shading, expressive simple faces, '
-    'detailed everyday environments, clear visual storytelling, wide 16:9 composition, '
-    'consistent character design, no photorealism, no 3D render, no anime')
-VISUAL_STYLE_ID = 'editorial-cartoon'
+VISUAL_STYLE = ('cinematic 2D editorial story illustration, clean dark outlines, '
+    'controlled cel shading, muted natural colors, expressive simplified faces, '
+    'recognizable everyday environments with specific story objects, '
+    'lighting appropriate to the scene, wide landscape composition, '
+    'consistent character appearance and clothing')
+VISUAL_STYLE_ID = 'cinematic-editorial-2d'
 
 
 def required(name):
@@ -75,6 +77,17 @@ def validate_story(data):
     return data
 
 
+def check_recent_originality(story, history):
+    """Reject obviously interchangeable recent concepts before rendering or upload."""
+    title = ' '.join(story['title'].lower().split())
+    for item in history[-30:]:
+        old_title = ' '.join(item.get('title', '').lower().split())
+        if old_title and SequenceMatcher(None, title, old_title).ratio() >= 0.82:
+            raise ValueError('Story title is too similar to a recent upload')
+    if story.get('format') and story['format'] in [h.get('format') for h in history[-2:]]:
+        raise ValueError('Story format repeats one of the last two uploads')
+
+
 def request_groq(endpoint, payload, binary=False):
     import requests
     # Generation calls are not automatically repeated: repeats can consume credits.
@@ -124,6 +137,23 @@ def make_story(day, previous):
             raise RuntimeError('Story response was truncated; refusing incomplete script')
         return json.loads(choice['message']['content'])
     financial = os.getenv('CONTENT_TYPE') == 'financial-storytelling'
+    formats = (
+        ('decision_drama', 'A character must choose between two costly financial options; show the consequences of the choice.'),
+        ('business_postmortem', 'Reconstruct a fictional small business failure, then show the specific decisions that enabled recovery.'),
+        ('money_psychology', 'Follow one harmful money belief through concrete incidents until the character tests and changes it.'),
+        ('family_tradeoff', 'Tell a multigenerational family story around a financial disagreement and its human consequences.'),
+        ('everyday_mistake', 'Trace one ordinary money mistake through escalating real-world consequences and a practical correction.'),
+        ('two_paths', 'Contrast two fictional people facing the same money problem whose choices produce different outcomes.'),
+    ) if financial else (
+        ('decision_drama', 'Build the story around one difficult choice and its consequences.'),
+        ('relationship_conflict', 'Build the story around a relationship conflict and an earned reconciliation.'),
+        ('setback_recovery', 'Reconstruct a specific failure and the concrete steps of recovery.'),
+        ('two_paths', 'Contrast two characters facing the same challenge with different choices.'),
+    )
+    recent_formats = [h.get('format') for h in previous[-3:]]
+    selected_format, format_direction = next(
+        ((name, direction) for name, direction in formats if name not in recent_formats),
+        formats[0])
     theme = ('Motivational financial storytelling: rotate poor-to-rich journeys, money psychology, '
         'saving and investing habits, business successes and failures, financial moral parables, '
         'and everyday money mistakes. Real financial history is allowed ONLY when verified source '
@@ -132,7 +162,9 @@ def make_story(day, previous):
         if financial else 'Motivational storytelling.')
     outline = ask(f'''Plan an original fictional English motivational story for {day}.
     Content direction: {theme}
-    Avoid these previous titles and plots: {json.dumps(previous)}.
+    This video's format is {selected_format}: {format_direction}
+    Make its central problem, setting, character relationships, turning points, and resolution materially distinct.
+    Avoid these previous titles and plots: {json.dumps(previous[-30:])}.
     A vivid crisis or impossible choice must open the FIRST sentence, with an unanswered question.
     No greeting or generic motivational preamble. Give the protagonist one concrete goal, believable setbacks, and earned resolution.
     No random magical trials, repeated mentor lessons, or repeated endings. Escalate choices, setbacks, surprising reversals,
@@ -146,9 +178,11 @@ def make_story(day, previous):
     skin tone, face shape, hair color and style, consistent outfit),
     scenes (object with chapter_01 through chapter_20). Each chapter: summary (max 25 words), image_prompt,
     image_prompts (four distinct visual beats, each max 8 words). Use clear scenes that work as
-    original 2D editorial cartoon illustrations with dark outlines and muted pastel colors.
-    Main character keeps the same appearance. Provide ONLY the plan, no full narration yet.''', 5200, outline_schema)
+    cinematic 2D editorial illustrations grounded in each chapter's actual events, setting, and time of day.
+    Show the specific narrated action or objects; include unusual or fantastical elements only when the story describes them.
+    Main character keeps the same appearance and clothing. Provide ONLY the plan, no full narration yet.''', 5200, outline_schema)
     outline['scenes'] = [outline['scenes'][k] for k in chapter_keys]
+    outline['format'] = selected_format
     if len(outline.get('scenes', [])) != 20:
         raise ValueError('Outline requires exactly twenty chapters')
     summaries = [scene['summary'] for scene in outline['scenes']]
@@ -541,7 +575,7 @@ def run(daily=False):
     root.mkdir(parents=True, exist_ok=True)
     store, key = Store(), f'runs/{run_id}/state.json'
     test_record = store.load('last-private-test.json', {}) if daily else {}
-    if daily and (not test_record.get('passed') or not test_record.get('remote_verification', {}).get('private_test_passed') or test_record.get('validation', {}).get('image_interval_seconds') != 7 or not test_record.get('validation', {}).get('storyboard_verified') or test_record.get('validation', {}).get('style') not in ('ghibli-inspired', 'cinematic-detailed', VISUAL_STYLE_ID)):
+    if daily and (not test_record.get('passed') or not test_record.get('remote_verification', {}).get('private_test_passed') or test_record.get('validation', {}).get('image_interval_seconds') != 5 or not test_record.get('validation', {}).get('storyboard_verified') or test_record.get('validation', {}).get('style') != VISUAL_STYLE_ID):
         raise RuntimeError('No fully verified private HD upload test is recorded')
     state = store.load(key, {})
     if state.get('phase') in ('upload_started', 'uploaded', 'complete', 'published', 'verified_private'):
@@ -549,6 +583,7 @@ def run(daily=False):
     music_credit = load_music(store, root)
     history = store.load('history.json', [])
     story = state.get('story') or make_story(day, history[-30:])
+    check_recent_originality(story, history)
     digest = hashlib.sha256(' '.join(s['narration'] for s in story['scenes']).encode()).hexdigest()
     if digest in [h.get('hash') for h in history]:
         raise RuntimeError('Exact duplicate story rejected')
@@ -566,7 +601,7 @@ def run(daily=False):
     if os.getenv('UPLOAD_ENABLED') == 'true':
         upload_private(video, thumb, story, state, store, key, music_credit)
     if state['phase'] == 'complete':
-        history.append({'title': story['title'], 'hash': digest, 'run': run_id})
+        history.append({'title': story['title'], 'format': story.get('format'), 'hash': digest, 'run': run_id})
         store.save('history.json', history)
         if not daily:
             store.save('last-private-test.json', {'passed': True, 'run': run_id, 'video_id': state['video_id'], 'validation': state['validation']})

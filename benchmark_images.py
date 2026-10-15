@@ -8,6 +8,7 @@ import shutil
 import time
 
 from image_cpu import generate, image_config
+from workflow import VISUAL_STYLE
 
 SCENES = [
     ('bridge', 'Maya in a blue coat braces a broken wooden bridge beam while two workers pull a rope, anxious determined expression, storm-damaged river crossing'),
@@ -25,7 +26,7 @@ def benchmark(root):
     report_path = root/'benchmark.json'
     settings = [(config.width, config.height, config.steps, config.guidance_scale)]
     if config.model == 'segmind/SSD-1B':
-        settings.append((config.width, config.height, 20, 9.0))
+        settings.append((config.width, config.height, 24, 9.0))
     else:
         settings.append((1024, 576, config.steps, config.guidance_scale))
     try:
@@ -47,7 +48,7 @@ def benchmark(root):
             path = root/f'{name}-{width}x{height}-{steps}-{guidance}.png'
             started = time.monotonic()
             try:
-                result = generate(prompt, path)
+                result = generate(prompt + '. ' + VISUAL_STYLE, path)
                 sample = {'scene': name, 'file': path.name, **result,
                           'elapsed_with_load_seconds': round(time.monotonic()-started, 2),
                           'peak_process_rss_gb': round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1e6, 2),

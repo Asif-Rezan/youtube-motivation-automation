@@ -1,4 +1,4 @@
-"""10–15 minute videos with a distinct illustrated image every seven seconds."""
+"""10–15 minute videos with a distinct story image every five seconds."""
 import datetime as dt
 import hashlib
 import json
@@ -10,8 +10,8 @@ from zoneinfo import ZoneInfo
 import workflow as w
 
 ROOT = Path(os.getenv('OUTPUT_DIR', 'output/ghibli-long-test'))
-INTERVAL = 7
-SHARDS = 16
+INTERVAL = 5
+SHARDS = 20
 ASSETS = ('story.json', 'plan.json', 'narration.wav', 'captions.srt')
 MIN_DURATION, MAX_DURATION = 600, 900
 PREFERRED_MIN, PREFERRED_MAX = 720, 840
@@ -24,7 +24,7 @@ def run_id():
 
 
 def shot_plan(story, lengths, word_lists):
-    """Anchor every visual to words actually spoken in its global seven-second window."""
+    """Anchor every visual to words actually spoken in its global five-second window."""
     if len(lengths) != len(word_lists) or len(lengths) != len(story['scenes']):
         raise ValueError('Chapter audio, transcript and story must agree')
     total = sum(lengths)
@@ -76,7 +76,7 @@ def storyboard(root=ROOT, ask=None, pause=None):
                   'required': list(properties), 'additionalProperties': False}
         context = {str(shot['chapter']): story['scenes'][shot['chapter']]['narration'] for shot in batch}
         prompt = f"""Storyboard this fictional narrated story. Return one image prompt per exact shot key.
-Each shot is a measured seven-second narration window. Depict ONLY the concrete action, location,
+Each shot is a measured five-second narration window. Depict ONLY the concrete action, location,
 objects and emotion being spoken in that window. Chapter text resolves pronouns and continuity only;
 NEVER illustrate a later or earlier chapter event in place of the current window.
 For abstract reflection or dialogue, show the current character in the current physical scene.
@@ -89,7 +89,7 @@ Use natural poses and facial expressions. Include other people only when narrate
 Do not invent scenery, props, weather, clothing, or characters to add visual interest.
 Name the active character instead of using a pronoun when chapter context identifies them.
 Do not put style, camera lists, narration text, typography or character design into the prompt;
-the renderer adds character design and illustration style. Do not replace specific objects with generic ones.
+the renderer adds character design and cinematic rendering detail. Do not replace specific objects with generic ones.
 Chapter context: {json.dumps(context)}
 Exact shot windows: {json.dumps([{'key': f"shot_{shot['index']:03}", 'spoken': shot['narration']} for shot in batch])}
 """
@@ -350,10 +350,14 @@ def generate_shard(shard, root=ROOT, count=SHARDS):
     from scene_check import check_scene
     from image_cpu import image_config, metadata_path
     plan = json.loads((root/'plan.json').read_text())
+    if plan.get('image_interval_seconds') != INTERVAL:
+        raise RuntimeError('Saved visual plan uses a different image interval; prepare a new run')
+    if not 0 <= shard < count:
+        raise ValueError(f'Image shard must be between 0 and {count-1}')
     if not plan.get('storyboard_verified') or not all(s.get('prompt') for s in plan['shots']):
         raise RuntimeError('Narration-aligned storyboard is required before image generation')
     if plan.get('style') != w.VISUAL_STYLE_ID:
-        raise RuntimeError('Scene plan must use the current illustrated style')
+        raise RuntimeError('Scene plan must use the current cinematic story style')
     if plan.get('scene_composition_version') != 2:
         raise RuntimeError('Scene-specific object and group composition is required')
     shots = [s for s in plan['shots'] if s['index']%count == shard]
@@ -442,10 +446,10 @@ def finish(root=ROOT):
     plan = json.loads((root/'plan.json').read_text())
     clips = [root/f"shot-{s['index']:03}.mp4" for s in plan['shots']]
     if not all(p.exists() for p in clips):
-        raise RuntimeError('Not every seven-second image clip exists')
+        raise RuntimeError('Not every five-second image clip exists')
     for shot, clip in zip(plan['shots'], clips):
         if abs(w.duration(clip)-shot['duration']) > .04:
-            raise RuntimeError('Shot timing differs from the global seven-second plan')
+            raise RuntimeError('Shot timing differs from the global five-second plan')
     (root/'clips.txt').write_text(''.join(f"file '{p.name}'\n" for p in clips))
     w.shell('ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', str(root/'clips.txt'), '-c', 'copy', str(root/'joined.mp4'))
     if not (root/'music.audio').exists():
@@ -460,7 +464,7 @@ def finish(root=ROOT):
     os.environ['IMAGE_NEGATIVE_PROMPT'] = ''
     os.environ['IMAGE_SEED'] = '9931'
     thumbnail_prompt = (story['thumbnail_prompt'] + '. Main character: ' +
-        story['character_description'] + '. Make a single story-specific illustrated thumbnail '
+        story['character_description'] + '. Make a single story-specific cinematic thumbnail '
         'with the protagonist prominent and a clear contrasting background or supporting characters. '
         'No title text, labels, numbers, arrows, or interface elements.')
     w.make_image(thumbnail_prompt, root/'thumbnail-source.png')
@@ -512,7 +516,7 @@ def stage_story():
         if store.load(f'runs/{run_id()}/state.json', {}).get('phase') in ('upload_started', 'uploaded', 'complete', 'published', 'verified_private'):
             raise RuntimeError('Run already uploaded; use cleanup-only recovery')
         history = store.load('history.json', [])
-        story = w.make_story(run_id(), [h.get('title') for h in history[-20:]])
+        story = w.make_story(run_id(), history[-20:])
         validate_engagement(story)
         (ROOT/'story.json').write_text(json.dumps(story, indent=2))
         print(json.dumps({'fresh_story_ready': True, 'title': story['title'],
@@ -550,6 +554,10 @@ def restore_preparation(images_only=False):
 def save_shard(shard):
     store = w.Store()
     plan = json.loads((ROOT/'plan.json').read_text())
+    if plan.get('image_interval_seconds') != INTERVAL:
+        raise RuntimeError('Saved visual plan uses a different image interval; prepare a new run')
+    if not 0 <= shard < SHARDS:
+        raise ValueError(f'Image shard must be between 0 and {SHARDS-1}')
     for shot in plan['shots']:
         if shot['index']%SHARDS == shard:
             for ext in ('png', 'mp4', 'qa.json'):
@@ -565,7 +573,7 @@ def restore_clips():
         name = f"shot-{shot['index']:03}.mp4"
         file_id = store.find(f'runs/{run_id()}/{name}')
         if not file_id:
-            raise RuntimeError('Saved seven-second clip missing')
+            raise RuntimeError('Saved five-second clip missing')
         store.download(file_id, ROOT/name)
         qa_name = f"shot-{shot['index']:03}.qa.json"
         qa_id = store.find(f'runs/{run_id()}/{qa_name}')
@@ -593,7 +601,7 @@ def upload():
     store.save(key, state)
     w.upload_private(ROOT/'video.mp4', ROOT/'thumbnail.jpg', story, state, store, key,
         'Background music: original Magenta MusicRNN melody with synthesized ambient piano.')
-    history.append({'title': story['title'], 'hash': digest, 'run': run_id(), 'video_id': state['video_id']})
+    history.append({'title': story['title'], 'format': story.get('format'), 'hash': digest, 'run': run_id(), 'video_id': state['video_id']})
     store.save('history.json', history)
     store.save('last-private-test.json', {'passed': True, 'run': run_id(),
         'video_id': state['video_id'], 'validation': report, 'processing_status': state['processing_status']})

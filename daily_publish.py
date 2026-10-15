@@ -124,7 +124,7 @@ def main():
     store.save(key, state)
     history = store.load('history.json', [])
     if not any(h.get('run') == run for h in history):
-        history.append({'run': run, 'video_id': state['video_id'], 'title': state['story']['title'], 'hash': state['hash']})
+        history.append({'run': run, 'video_id': state['video_id'], 'title': state['story']['title'], 'format': state['story'].get('format'), 'hash': state['hash']})
     store.save('history.json', history)
     cleanup(store, run, state)
     print(json.dumps({'run': run, 'video_id': state['video_id'], 'privacy': 'private', 'verified': True, 'cleanup_complete': True}))

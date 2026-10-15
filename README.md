@@ -4,19 +4,19 @@
 
 - Original English motivational financial stories targeting 10–15 minutes (600–900 seconds).
 - 1920×1080 output at 30 fps.
-- A newly generated image at 0, 7, 14, 21 seconds and every seven seconds thereafter.
+- A newly generated image at 0, 5, 10, 15 seconds and every five seconds thereafter.
   The final image lasts only for the remaining duration. Chapter boundaries do not reset this timeline.
-- Narration-matched 2D editorial cartoon images with dark ink outlines, muted
-  pastel colors and soft cel shading at 1024×576, using pinned public
+- Narration-matched cinematic 2D editorial story images with clean outlines,
+  restrained cel shading, muted natural colors and recognizable everyday settings at 1344×768, using pinned public
   segmind/SSD-1B safetensors weights on cloud CPUs.
 - Kokoro English narration, Faster-Whisper aligned burned-in captions, zoom/fade
-  transitions, original MusicRNN background music and full-frame illustrated
+  transitions, original MusicRNN background music and full-frame cinematic
   thumbnails without the previous large text band.
 - Daily videos upload privately to Rezan Relaxation, remain private after HD/metadata verification.
-- Daily generation starts at 01:00 Asia/Dhaka; temporary run media is cleaned after verified private upload.
+- Generation starts twice daily at 01:00 and 13:00 Asia/Dhaka; temporary run media is cleaned after verified private upload.
 
 The previous ten-second private test passed in Actions run 38450919780.
-The current seven-second update derives each visual from actual measured word
+The current five-second update derives each visual from actual measured word
 timestamps after speech generation, including windows crossing chapter boundaries.
 Groq produces concise scene prompts using the exact words spoken in that window
 and chapter context for pronouns and continuity. Image generation refuses a plan
@@ -34,9 +34,9 @@ remain manual; the new daily workflow generates a fresh story on each run.
 ## Free cloud infrastructure
 
 Standard GitHub Ubuntu runners perform the work even when the user's computer
-is off. The dedicated illustration model is downloaded as public weights; no
+is off. The dedicated image model is downloaded as public weights; no
 paid inference provider, GPU runner, vidIQ service or paid storage is used.
-Illustrations are generated at 1024×576 then scaled into the 1080p video; they
+Images are generated at 1344×768 then scaled into the 1080p video; they
 are not native 1080p renders. Sixteen image workers share the work. The
 [CPU image benchmark](docs/image-cpu-benchmark.md) compares SSD-1B with the previous
 DreamShaper model. Subjective
@@ -59,8 +59,8 @@ access. The workflow reads the input privately and never prints story text.
 Use **Ghibli long private video test** in Actions.
 Preparation generates narration and measures the real duration before generating
 images. Runs outside 600–900 seconds stop before image generation or upload.
-The global shot plan is computed from measured narration; sixteen CPU workers
-generate distinct illustrations and exact-duration silent clips. Each worker
+The global shot plan is computed from measured narration; twenty CPU workers
+generate distinct story images and exact-duration silent clips. Each worker
 stores outputs privately in Drive. Final assembly combines continuous narration,
 music, transitions and captions, validates every clip's duration and decodes the
 complete 1080p MP4 with strict FFmpeg error handling.
@@ -92,8 +92,8 @@ The daily parallel workflow has its own private-verification path. Legacy
 `workflow.py daily` retains its private-test gate. A fixed test story cannot be
 used for fresh daily generation. OAuth credentials must remain valid for
 unattended operation; resolve OAuth Testing refresh-token expiry before relying
-on long-term scheduling. The 01:00 Asia/Dhaka start corresponds to 19:00 UTC
-on the previous calendar day; GitHub can delay scheduled starts.
+on long-term scheduling. The 01:00 and 13:00 Asia/Dhaka starts correspond to 19:00 UTC
+on the previous calendar day and 07:00 UTC on the same day; GitHub can delay scheduled starts.
 
 The standard workflow.py test/daily commands use the same long-video renderer.
 The parallel test workflow is the recommended new-format integration test.
@@ -110,7 +110,7 @@ Exact story hashes and history guard repeated scripts.
 
 Component checks cover private storage/quota rules, speech chunking,
 caption bounds, story validation, real 1080p rendering, the global shot plan and
-an actual image change across a seven-second boundary. These checks run locally and in GitHub Actions. They do not replace the full private-video upload test.
+an actual image change across a five-second boundary. These checks run locally and in GitHub Actions. They do not replace the full private-video upload test.
 
 ## Model documentation
 
@@ -122,20 +122,27 @@ an actual image change across a seven-second boundary. These checks run locally 
 
 ## Daily financial storytelling publishing
 
-`.github/workflows/daily-upload.yml` starts at **01:00 Asia/Dhaka** daily
-(`0 19 * * *` UTC, previous calendar day), and supports manual dispatch.
+`.github/workflows/daily-upload.yml` starts at **01:00 and 13:00 Asia/Dhaka** daily
+(`0 19 * * *` and `0 7 * * *` UTC), and supports manual dispatch.
 GitHub may delay scheduled starts. The workflow must be on the default branch,
 with Actions and scheduled workflows enabled. Existing secrets are reused:
 `GROQ_API_KEY`, `DRIVE_TOKEN_JSON`, `DRIVE_FOLDER_ID`, `YOUTUBE_TOKEN_JSON`.
 The configured destination remains channel `UCztvMrNCT34DO3DtzLPgWaw`.
 
-The existing sixteen CPU image workers, exact seven-second narration timeline,
+The existing twenty CPU image workers, exact five-second narration timeline,
 10–15 minute validation, local narration, original music, captions and thumbnail
 pipeline are reused. Fresh Groq financial stories cover financial growth, money
 psychology, saving and investing habits, business decisions, moral parables and
 everyday money mistakes. Historical documentaries require verified source material;
 without it, generation uses clearly labelled fiction. Prior titles are included
-in planning and exact story hashes prevent duplicate uploads.
+in planning and exact story hashes prevent duplicate uploads. The planner rotates
+financial story formats (decision drama, business postmortem, money psychology,
+family tradeoff, everyday mistake, and two-path comparison), records each format
+in upload history, and rejects a format used in either of the last two uploads or
+a near-duplicate recent title. Each script must have its own central problem,
+setting, relationships, turning points, and resolution. Review the finished private
+video before public release: automated variety checks cannot guarantee YouTube
+monetization eligibility.
 
 Uploads remain **private**. `daily_publish.py` reads back the exact video ID,
 channel, title, tags, complete description, successful processing and HD
@@ -169,8 +176,7 @@ Review the **Google OAuth check** Actions run after changing credentials.
 
 Use Actions > Daily financial storytelling publishing > Run workflow, leaving
 `cleanup_run` blank. Updating `.github/workflows/private-video-trigger.txt` on
-main also starts a single fresh private test. Neither method changes the nightly
-01:00 Asia/Dhaka cron. The existing OAuth token supports private upload; the
+main also starts a single fresh private test. Neither method changes the twice-daily 01:00 and 13:00 Asia/Dhaka schedule. The existing OAuth token supports private upload; the
 optional `authorize_youtube.py` helper is unnecessary for private-only operation.
 
 ### Recovering Drive checkpoint timeouts
@@ -187,4 +193,4 @@ return 404 and are safely recorded on the next attempt.
 Use **Resume verified private video cleanup** to recover a completed run without
 any video generation or `videos.insert` call. Enter its original `daily-<run ID>`.
 The cleanup worker rechecks private visibility, successful HD processing and
-exact metadata before resuming. The daily 01:00 Asia/Dhaka schedule is unchanged.
+exact metadata before resuming. The twice-daily 01:00 and 13:00 Asia/Dhaka schedule is unchanged.

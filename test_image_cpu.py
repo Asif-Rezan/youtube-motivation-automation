@@ -16,10 +16,14 @@ from scene_check import check_scene
 
 class ImageCPUChecks(unittest.TestCase):
     def test_models_and_resolution_configuration(self):
-        self.assertIn('photorealistic', image_cpu.NEGATIVE)
+        self.assertNotIn('photograph', image_cpu.NEGATIVE)
+        for term in ('watercolor', '3d render', 'blurry', 'low detail', 'poor quality', 'distorted anatomy', 'watermark', 'text'):
+            self.assertIn(term, image_cpu.NEGATIVE)
+        self.assertNotIn('cel shading', image_cpu.NEGATIVE)
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(image_cpu.image_config().model, image_cpu.MODEL)
-            self.assertEqual((image_cpu.image_config().width, image_cpu.image_config().height), (768, 432))
+            self.assertEqual((image_cpu.image_config().width, image_cpu.image_config().height), (1344, 768))
+            self.assertEqual((image_cpu.image_config().steps, image_cpu.image_config().guidance_scale), (32, 9.0))
         with patch.dict(os.environ, {'CPU_IMAGE_MODEL': image_cpu.SSD_MODEL,
                                      'CPU_IMAGE_WIDTH': '1024', 'CPU_IMAGE_HEIGHT': '576',
                                      'CPU_IMAGE_STEPS': '16', 'CPU_IMAGE_GUIDANCE_SCALE': '7.0'}):
@@ -33,12 +37,12 @@ class ImageCPUChecks(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'multiples of eight'):
                 image_cpu.image_config()
 
-    def test_story_image_prompt_adds_cartoon_style(self):
+    def test_story_image_prompt_adds_cinematic_style(self):
         with patch.object(image_cpu, 'generate') as generate:
             workflow.make_image('Mayra reads a letter', Path('sample.png'))
         prompt = generate.call_args.args[0]
         self.assertEqual(prompt.count(workflow.VISUAL_STYLE), 1)
-        self.assertIn('no photorealism', prompt)
+        self.assertIn('cinematic 2D editorial story illustration', prompt)
         self.assertIn('Mayra reads a letter', prompt)
 
     def test_ssd_uses_sdxl_and_dreamshaper_uses_sd15(self):
@@ -121,9 +125,10 @@ class ImageCPUChecks(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {'IMAGE_BACKEND': 'cpu'}, clear=True):
             root = Path(temp)
             shot = {'index': 0, 'seed': 1700, 'prompt': 'Maya repairs a bridge',
-                    'negative_prompt': '', 'duration': 7}
+                    'negative_prompt': '', 'duration': 5}
             (root/'plan.json').write_text(json.dumps({'storyboard_verified': True,
                 'scene_composition_version': 2, 'style': workflow.VISUAL_STYLE_ID,
+                'image_interval_seconds': long_video.INTERVAL,
                 'shots': [shot]}))
             image = root/'shot-000.png'
             image.write_bytes(b'stale')

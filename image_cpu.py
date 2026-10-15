@@ -1,4 +1,4 @@
-"""Local, deterministic CPU illustration generation using public model weights."""
+"""Local, deterministic CPU painting generation using public model weights."""
 import argparse
 from dataclasses import asdict, dataclass
 import json
@@ -14,9 +14,9 @@ SSD_REVISION = REVISION = '60987f37e94cd59c36b1cba832b9f97b57395a10'
 DREAMSHAPER_MODEL = 'Lykon/dreamshaper-8'
 DREAMSHAPER_REVISION = 'a7e52b98680b1ba8ff7bce97c7f9f2e2e5337917'
 SAFETY_MODEL = 'CompVis/stable-diffusion-safety-checker'
-NEGATIVE = ('blurry, low detail, distorted anatomy, extra arms, extra legs, '
-            'deformed hands, duplicate person, watermark, lettering, photograph, '
-            'photorealistic, realistic skin, 3d render, glossy plastic, anime')
+NEGATIVE = ('watercolor, 3d render, glossy plastic, realistic skin texture, '
+            'blurry, low detail, poor quality, distorted anatomy, extra arms, extra legs, '
+            'deformed hands, duplicate person, watermark, lettering, text')
 _pipeline = None
 _pipeline_key = None
 _safety_checker = None
@@ -38,12 +38,12 @@ def image_config():
     if model not in (DREAMSHAPER_MODEL, SSD_MODEL):
         raise ValueError(f'Unsupported CPU image model: {model}')
     revision = os.getenv('CPU_MODEL_REVISION') or (DREAMSHAPER_REVISION if model == DREAMSHAPER_MODEL else SSD_REVISION)
-    config = ImageConfig(model, revision, int(os.getenv('CPU_IMAGE_WIDTH', '768')),
-                         int(os.getenv('CPU_IMAGE_HEIGHT', '432')),
-                         int(os.getenv('CPU_IMAGE_STEPS', '28' if model == DREAMSHAPER_MODEL else '16')),
-                         float(os.getenv('CPU_IMAGE_GUIDANCE_SCALE', '7.5' if model == DREAMSHAPER_MODEL else '7.0')))
-    if config.width % 8 or config.height % 8 or not 256 <= config.width <= 1024 or not 256 <= config.height <= 1024:
-        raise ValueError('CPU image dimensions must be multiples of eight in 256–1024')
+    config = ImageConfig(model, revision, int(os.getenv('CPU_IMAGE_WIDTH', '768' if model == DREAMSHAPER_MODEL else '1344')),
+                         int(os.getenv('CPU_IMAGE_HEIGHT', '432' if model == DREAMSHAPER_MODEL else '768')),
+                         int(os.getenv('CPU_IMAGE_STEPS', '28' if model == DREAMSHAPER_MODEL else '32')),
+                         float(os.getenv('CPU_IMAGE_GUIDANCE_SCALE', '7.5' if model == DREAMSHAPER_MODEL else '9.0')))
+    if config.width % 8 or config.height % 8 or not 256 <= config.width <= 1536 or not 256 <= config.height <= 1536:
+        raise ValueError('CPU image dimensions must be multiples of eight in 256–1536')
     if not 1 <= config.steps <= 50 or not 1 <= config.guidance_scale <= 15:
         raise ValueError('CPU steps must be 1–50 and guidance scale 1–15')
     return config
