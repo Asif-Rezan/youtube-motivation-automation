@@ -1,13 +1,44 @@
-"""Free local CLIP comparison of object/group scenes against generic portrait frames."""
+"""Free local CLIP checks for every narrated scene, including character shots."""
+import hashlib
+import json
+from difflib import SequenceMatcher
+
 _model = None
 _processor = None
 
 
+def scene_signature(shot):
+    fields = {key: shot.get(key) for key in
+              ('prompt', 'negative_prompt', 'semantic_target', 'semantic_alternatives', 'narration')}
+    return hashlib.sha256(json.dumps(fields, sort_keys=True).encode()).hexdigest()
+
+
+def scene_candidates(shot):
+    target = shot.get('semantic_target', '').strip()
+    if not target:
+        raise ValueError('Every image needs a concrete narration-aligned semantic target')
+    alternatives = []
+    for candidate in shot.get('semantic_alternatives', []):
+        candidate = candidate.strip()
+        if (candidate and candidate not in alternatives and
+                SequenceMatcher(None, target.lower(), candidate.lower()).ratio() < .85):
+            alternatives.append(candidate)
+    alternatives += ['A close-up face portrait with no visible action or setting.',
+                     'An empty scenic landscape with no story action.',
+                     'An unrelated person posing for a generic studio photograph.']
+    return [target] + alternatives
+
+
+def evaluate_scores(scores):
+    if len(scores) < 2:
+        raise ValueError('Scene comparison requires competing images descriptions')
+    import math
+    return all(math.isfinite(score) for score in scores) and scores[0] > max(scores[1:])
+
+
 def check_scene(image, shot):
     global _model, _processor
-    import torch
     from PIL import Image, ImageFilter, ImageStat
-    from transformers import CLIPModel, CLIPProcessor
     with Image.open(image) as picture:
         gray = picture.convert('L')
         edges = gray.filter(ImageFilter.FIND_EDGES)
@@ -16,22 +47,18 @@ def check_scene(image, shot):
     if detail < 2.5:
         return {'passed': False, 'required': True, 'method': 'image-detail-check',
                 'detail_score': round(detail, 3)}
-    required = shot.get('focus') in ('object', 'group')
-    if not required:
-        return {'passed': True, 'required': False, 'method': 'detail-and-narration-plan',
-                'detail_score': round(detail, 3)}
+    candidates = scene_candidates(shot)
+    import torch
+    from transformers import CLIPModel, CLIPProcessor
     if _model is None:
         _model = CLIPModel.from_pretrained('openai/clip-vit-base-patch32', trust_remote_code=False).eval()
         _processor = CLIPProcessor.from_pretrained('openai/clip-vit-base-patch32', trust_remote_code=False)
-    target = shot['semantic_target']
-    alternatives = ['A close-up portrait of one woman wearing a safety helmet.',
-                    'One woman standing alone in an office.', 'An empty scenic landscape.']
     with Image.open(image) as picture:
-        inputs = _processor(text=[target]+alternatives, images=picture.convert('RGB'),
+        inputs = _processor(text=candidates, images=picture.convert('RGB'),
                             return_tensors='pt', padding=True, truncation=True)
     with torch.inference_mode():
         scores = _model(**inputs).logits_per_image[0].tolist()
-    passed = scores[0] > max(scores[1:])
-    return {'passed': passed, 'required': True, 'method': 'CLIP-scene-versus-portrait',
-            'detail_score': round(detail, 3),
+    return {'passed': evaluate_scores(scores), 'required': True,
+            'method': 'CLIP-narrated-scene-versus-other-events',
+            'detail_score': round(detail, 3), 'candidate_count': len(candidates),
             'scene_score': scores[0], 'alternative_score': max(scores[1:])}

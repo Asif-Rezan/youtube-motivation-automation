@@ -142,7 +142,9 @@ class ImageCPUChecks(unittest.TestCase):
                     'model': config.model, 'revision': config.revision,
                     'width': config.width, 'height': config.height,
                     'steps': config.steps, 'guidance_scale': config.guidance_scale}))
-            fake_scene = types.SimpleNamespace(check_scene=lambda image, shot: {'passed': True})
+            from scene_check import scene_signature
+            fake_scene = types.SimpleNamespace(check_scene=lambda image, shot: {'passed': True},
+                                               scene_signature=scene_signature)
             with patch.dict(sys.modules, {'scene_check': fake_scene}), \
                  patch.object(long_video.w, 'make_image', side_effect=make), \
                  patch.object(long_video, 'picture_clip'):

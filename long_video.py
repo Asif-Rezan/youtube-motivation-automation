@@ -76,14 +76,13 @@ def storyboard(root=ROOT, ask=None, pause=None):
         properties = {f"shot_{shot['index']:03}": {'type': 'string'} for shot in batch}
         schema = {'type': 'object', 'properties': properties,
                   'required': list(properties), 'additionalProperties': False}
-        context = {str(chapter): story['scenes'][chapter]['narration']
-                   for shot in batch for chapter in shot.get('chapters', [shot['chapter']])}
+        chapters = {chapter for shot in batch
+                    for chapter in shot.get('chapters', [shot['chapter']])}
+        context = {str(chapter): story['scenes'][chapter]['narration'] for chapter in chapters}
         prompt = f"""Storyboard this fictional narrated story. Return one image prompt per exact shot key.
 Each shot is a measured {INTERVAL}-second narration window (the final shot may be shorter). Depict ONLY the concrete action, location,
 objects and emotion being spoken in that window. Chapter text resolves pronouns and continuity only;
 NEVER illustrate a later or earlier chapter event in place of the current window.
-If a window crosses chapters, use both supplied chapters to resolve who and what is being described.
-Choose the main concrete event within that window; do not combine different locations into a collage.
 During a pause, continue the preceding scene rather than showing a future event early.
 For abstract reflection or dialogue, show the current character in the current physical scene.
 No metaphorical mountains, gardens or random scenery unless literally present in that event.
@@ -94,11 +93,12 @@ when the narration supplies them. Describe one drawable composition with a detai
 Use natural poses and facial expressions. Include other people only when narrated.
 Do not invent scenery, props, weather, clothing, or characters to add visual interest.
 Name the active character instead of using a pronoun when chapter context identifies them.
+When a window crosses events, depict the event occupying most of its spoken time; never combine different times or places.
+Use adjacent spoken words only to resolve a cut-off sentence, pronoun or location, never to jump ahead.
 Do not put style, camera lists, narration text, typography or character design into the prompt;
 the renderer adds character design and cinematic rendering detail. Do not replace specific objects with generic ones.
 Chapter context: {json.dumps(context)}
-Exact shot windows: {json.dumps([{'key': f"shot_{shot['index']:03}", 'start_seconds': shot['start'], 'end_seconds': shot['start'] + shot['duration'],
-    'primary_chapter': shot['chapter'], 'spoken': shot['narration']} for shot in batch])}
+Exact shot windows: {json.dumps([{'key': f"shot_{shot['index']:03}", 'start_seconds': shot['start'], 'duration_seconds': shot['duration'], 'end_seconds': shot['start']+shot['duration'], 'primary_chapter': shot['chapter'], 'spoken': shot['narration'], 'previous_spoken': shots[shot['index']-1]['narration'] if shot['index'] else '', 'next_spoken': shots[shot['index']+1]['narration'] if shot['index']+1 < len(shots) else ''} for shot in batch])}
 """
         result = ask('chat/completions', {'model': os.getenv('STORY_MODEL', 'openai/gpt-oss-120b'),
             'messages': [{'role': 'user', 'content': prompt}],
@@ -316,8 +316,6 @@ def refine_visual_plan(root=ROOT):
         raise ValueError('Protagonist name is needed for scene-specific character inclusion')
     for shot in plan['shots']:
         action = shot['visual_action'].strip().rstrip('.')
-        if ';' in action and re.search(r'\b(truck|vehicle|beam|river|bridge)\b', action.rsplit(';', 1)[-1], re.I):
-            action = action.rsplit(';', 1)[-1].strip()
         main = bool(re.search(r'\b'+re.escape(name)+r'\b', action, re.I))
         group = bool(re.search(r'\b(workers|crew|team|locals|people|crowd|volunteers)\b', action, re.I))
         group = group or bool(main and re.search(r'\b(boss|mayor|mother|father|brother|coworker)\b|\bMr\.', action, re.I))
@@ -339,11 +337,14 @@ def refine_visual_plan(root=ROOT):
         shot['prompt'] += '. Keep the narrated action prominent. ' + w.VISUAL_STYLE
         shot['focus'] = focus
         shot['negative_prompt'] = 'portrait, headshot, close-up face, face filling frame'
-        if focus == 'object':
-            shot['negative_prompt'] += ', person, people, woman, man, human face'
-        elif focus == 'group':
+        # Heuristic focus labels must not erase a narrated person with an unfamiliar name or action.
+        if focus == 'group':
             shot['negative_prompt'] += ', solo, one person alone'
         shot['semantic_target'] = action
+    # Competing events catch a plausible-looking image from the wrong story moment.
+    for index, shot in enumerate(plan['shots']):
+        shot['semantic_alternatives'] = [other['semantic_target']
+            for other in plan['shots'][max(0, index-2):index+3] if other is not shot]
     plan['storyboard_verified'] = True
     plan['style'] = w.VISUAL_STYLE_ID
     plan['visual_review'] = {'passed': False, 'phase': 'corrected-object-and-group-render-required'}
@@ -354,7 +355,7 @@ def refine_visual_plan(root=ROOT):
 
 
 def generate_shard(shard, root=ROOT, count=SHARDS):
-    from scene_check import check_scene
+    from scene_check import check_scene, scene_signature
     from image_cpu import image_config, metadata_path
     plan = json.loads((root/'plan.json').read_text())
     if plan.get('image_interval_seconds') != INTERVAL:
@@ -373,6 +374,16 @@ def generate_shard(shard, root=ROOT, count=SHARDS):
         image, clip = root/f'shot-{index:03}.png', root/f'shot-{index:03}.mp4'
         check = root/f'shot-{index:03}.qa.json'
         image_meta = metadata_path(image)
+        signature = scene_signature(shot)
+        if image.exists():
+            try:
+                previous_check = json.loads(check.read_text())
+            except (FileNotFoundError, json.JSONDecodeError):
+                previous_check = {}
+            if previous_check.get('source_signature') != signature:
+                image.unlink()
+                image_meta.unlink(missing_ok=True)
+                clip.unlink(missing_ok=True)
         expected = image_config() if os.getenv('IMAGE_BACKEND', 'cpu') == 'cpu' else None
         if image.exists() and expected:
             try:
@@ -388,15 +399,18 @@ def generate_shard(shard, root=ROOT, count=SHARDS):
         for attempt in range(3):
             os.environ['IMAGE_SEED'] = str(shot['seed']+attempt*10000)
             if not image.exists():
+                clip.unlink(missing_ok=True)
                 w.make_image(shot['prompt'], image)
             report = check_scene(image, shot)
             if report['passed']:
+                report['source_signature'] = signature
                 if expected:
                     report['image_generation'] = json.loads(image_meta.read_text())
                 check.write_text(json.dumps(report))
                 break
             image.unlink()
             image_meta.unlink(missing_ok=True)
+            clip.unlink(missing_ok=True)
             print(json.dumps({'shot': index, 'visual_check_passed': False, 'attempt': attempt+1}), flush=True)
         else:
             raise RuntimeError(f'Shot {index} did not match its narrated scene after three CPU renders')
@@ -450,7 +464,13 @@ def mix_audio(voice, music, target, seconds):
 def finish(root=ROOT):
     from PIL import Image, ImageOps
     from music_cpu import generate
+    from scene_check import scene_signature
     plan = json.loads((root/'plan.json').read_text())
+    scene_reports = [json.loads((root/f"shot-{s['index']:03}.qa.json").read_text()) for s in plan['shots']]
+    if not scene_reports or not all(report.get('passed') and report.get('required') and
+            report.get('source_signature') == scene_signature(shot)
+            for shot, report in zip(plan['shots'], scene_reports)):
+        raise RuntimeError('Every image must pass current narration-aligned scene checks before assembly')
     clips = [root/f"shot-{s['index']:03}.mp4" for s in plan['shots']]
     if not all(p.exists() for p in clips):
         raise RuntimeError('Not every seven-second image clip exists')
@@ -479,9 +499,6 @@ def finish(root=ROOT):
     image.save(root/'thumbnail.jpg', quality=92)
     if (root/'thumbnail.jpg').stat().st_size >= 2*1024*1024:
         raise RuntimeError('Thumbnail exceeds size limit')
-    scene_reports = [json.loads((root/f"shot-{s['index']:03}.qa.json").read_text()) for s in plan['shots']]
-    if not all(r['passed'] for r in scene_reports):
-        raise RuntimeError('Visual scene checks did not pass')
     image_models = {r.get('image_generation', {}).get('model') for r in scene_reports}
     if os.getenv('IMAGE_BACKEND', 'cpu') == 'cpu' and image_models != {os.getenv('CPU_IMAGE_MODEL', 'segmind/SSD-1B')}:
         raise RuntimeError(f'Image model mismatch across rendered shots: {image_models}')

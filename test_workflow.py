@@ -21,6 +21,7 @@ class Checks(unittest.TestCase):
         self.assertEqual(plan['shots'][0]['narration'], 'suitcase')
         self.assertEqual(plan['shots'][1]['narration'], 'suitcase clock')
         self.assertEqual(plan['shots'][1]['chapter'], 1)
+        self.assertEqual(plan['shots'][1]['chapters'], [0, 1])
         self.assertEqual(plan['shots'][2]['narration'], 'clock')
         self.assertNotIn('prompt', plan['shots'][0])
         with self.assertRaises(ValueError):
@@ -101,7 +102,7 @@ class Checks(unittest.TestCase):
             root = Path(temp)
             story = {'protagonist_name': 'Maya', 'character_description': 'woman in safety vest',
                      'scenes': [{'narration': 'A truck stalled.'}]}
-            plan = {'shots': [{'visual_action': 'Forecaster warns; delivery truck wheels sink into thick mud'},
+            plan = {'shots': [{'visual_action': 'Delivery truck wheels sink into thick mud'},
                               {'visual_action': 'Maya faces her boss Mr. Alvarez across a desk'},
                               {'visual_action': 'Roommate on speaker, hesitates then nods'},
                               {'visual_action': 'Mayra handing laptop to client'},
@@ -112,10 +113,10 @@ class Checks(unittest.TestCase):
             truck, meeting = result['shots'][:2]
             self.assertEqual(truck['focus'], 'object')
             self.assertNotIn('Main woman', truck['prompt'])
-            self.assertIn('delivery truck', truck['prompt'])
+            self.assertIn('delivery truck', truck['prompt'].lower())
             self.assertIn('cinematic 2D editorial story illustration', truck['prompt'])
             self.assertEqual(result['style'], 'cinematic-editorial-2d')
-            self.assertIn('person', truck['negative_prompt'])
+            self.assertNotIn(', person, people', truck['negative_prompt'])
             self.assertEqual(meeting['focus'], 'group')
             self.assertIn('multiple people', meeting['prompt'])
             self.assertIn('solo', meeting['negative_prompt'])
