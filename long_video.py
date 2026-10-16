@@ -43,13 +43,15 @@ def shot_plan(story, lengths, word_lists):
     for index in range(math.ceil(total/INTERVAL)):
         start, end = index*INTERVAL, min((index+1)*INTERVAL, total)
         spoken = [word for word in timeline if word['end'] > start and word['start'] < end]
-        # Silence keeps the nearest narrated event, never an unrelated chapter beat.
-        anchor = spoken or [min(timeline, key=lambda word: abs(word['start']-start))]
+        # Silence keeps the preceding narrated event; do not reveal a future event early.
+        previous = [word for word in timeline if word['end'] <= start]
+        anchor = spoken or [max(previous, key=lambda word: word['end']) if previous else timeline[0]]
         chapter = max(set(word['chapter'] for word in anchor),
                       key=lambda c: sum(max(0, min(end, word['end'])-max(start, word['start']))
                                         for word in anchor if word['chapter'] == c))
         shots.append({'index': index, 'start': start, 'duration': end-start,
-            'chapter': chapter, 'narration': ' '.join(word['word'] for word in anchor),
+            'chapter': chapter, 'chapters': sorted({word['chapter'] for word in anchor}),
+            'narration': ' '.join(word['word'] for word in anchor),
             'seed': 1700+index})
     return {'duration_seconds': total, 'image_interval_seconds': INTERVAL,
         'style': w.VISUAL_STYLE_ID, 'alignment': 'measured-word-timestamps', 'shots': shots}
@@ -74,11 +76,15 @@ def storyboard(root=ROOT, ask=None, pause=None):
         properties = {f"shot_{shot['index']:03}": {'type': 'string'} for shot in batch}
         schema = {'type': 'object', 'properties': properties,
                   'required': list(properties), 'additionalProperties': False}
-        context = {str(shot['chapter']): story['scenes'][shot['chapter']]['narration'] for shot in batch}
+        context = {str(chapter): story['scenes'][chapter]['narration']
+                   for shot in batch for chapter in shot.get('chapters', [shot['chapter']])}
         prompt = f"""Storyboard this fictional narrated story. Return one image prompt per exact shot key.
 Each shot is a measured {INTERVAL}-second narration window (the final shot may be shorter). Depict ONLY the concrete action, location,
 objects and emotion being spoken in that window. Chapter text resolves pronouns and continuity only;
 NEVER illustrate a later or earlier chapter event in place of the current window.
+If a window crosses chapters, use both supplied chapters to resolve who and what is being described.
+Choose the main concrete event within that window; do not combine different locations into a collage.
+During a pause, continue the preceding scene rather than showing a future event early.
 For abstract reflection or dialogue, show the current character in the current physical scene.
 No metaphorical mountains, gardens or random scenery unless literally present in that event.
 Keep recurring characters and clothes consistent. Main character design: {character}.
@@ -91,7 +97,8 @@ Name the active character instead of using a pronoun when chapter context identi
 Do not put style, camera lists, narration text, typography or character design into the prompt;
 the renderer adds character design and cinematic rendering detail. Do not replace specific objects with generic ones.
 Chapter context: {json.dumps(context)}
-Exact shot windows: {json.dumps([{'key': f"shot_{shot['index']:03}", 'spoken': shot['narration']} for shot in batch])}
+Exact shot windows: {json.dumps([{'key': f"shot_{shot['index']:03}", 'start_seconds': shot['start'], 'end_seconds': shot['start'] + shot['duration'],
+    'primary_chapter': shot['chapter'], 'spoken': shot['narration']} for shot in batch])}
 """
         result = ask('chat/completions', {'model': os.getenv('STORY_MODEL', 'openai/gpt-oss-120b'),
             'messages': [{'role': 'user', 'content': prompt}],

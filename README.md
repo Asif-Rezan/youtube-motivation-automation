@@ -19,7 +19,8 @@ The previous ten-second private test passed in Actions run 38450919780.
 The current seven-second update derives each visual from actual measured word
 timestamps after speech generation, including windows crossing chapter boundaries.
 Groq produces concise scene prompts using the exact words spoken in that window
-and chapter context for pronouns and continuity. Image generation refuses a plan
+and chapter context for pronouns and continuity. Windows that cross chapter boundaries
+include both chapters as context; silent windows retain the preceding narrated event. Image generation refuses a plan
 without full narration-window coverage. Subject/action/object prompts precede style
 text so the image model prioritizes the story. The final shorter shot covers the
 remaining narration. Component tests do not replace a complete live generation/upload verification.

@@ -26,6 +26,37 @@ class Checks(unittest.TestCase):
         with self.assertRaises(ValueError):
             shot_plan(story, [7.2, 8.3], [[], []])
 
+    def test_cross_chapter_window_includes_both_character_contexts(self):
+        from long_video import shot_plan, storyboard
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            story = {'character_description': 'Maya in a blue coat', 'scenes': [
+                {'narration': 'Maya gives Arun the red suitcase.'},
+                {'narration': 'He opens it at the station.'}]}
+            plan = shot_plan(story, [3, 4], [
+                [{'word': 'gives suitcase', 'start': 0, 'end': 3}],
+                [{'word': 'He opens it', 'start': 0, 'end': 4}]])
+            self.assertEqual(plan['shots'][0]['chapters'], [0, 1])
+            (root/'story.json').write_text(json.dumps(story))
+            (root/'plan.json').write_text(json.dumps(plan))
+            def ask(endpoint, payload):
+                prompt = payload['messages'][0]['content']
+                self.assertIn(story['scenes'][0]['narration'], prompt)
+                self.assertIn(story['scenes'][1]['narration'], prompt)
+                self.assertIn('"start_seconds": 0', prompt)
+                self.assertIn('"end_seconds": 7', prompt)
+                return {'choices': [{'message': {'content': json.dumps({
+                    'shot_000': 'Arun opens the red suitcase at the station while Maya watches beside him.'})}}]}
+            storyboard(root, ask=ask, pause=lambda _: None)
+
+    def test_silent_window_preserves_preceding_event(self):
+        from long_video import shot_plan
+        plan = shot_plan({'scenes': [{'narration': 'She waits. Later she leaves.'}]}, [21], [[
+            {'word': 'waits', 'start': 0, 'end': 1},
+            {'word': 'leaves', 'start': 14, 'end': 21}]])
+        self.assertEqual(plan['shots'][1]['narration'], 'waits')
+        self.assertEqual(plan['shots'][2]['narration'], 'leaves')
+
     def test_old_five_second_plan_requires_new_run(self):
         from long_video import generate_shard
         with tempfile.TemporaryDirectory() as temp:
