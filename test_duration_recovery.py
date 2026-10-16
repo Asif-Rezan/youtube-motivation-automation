@@ -16,7 +16,7 @@ class DurationRecoveryTests(unittest.TestCase):
             with self.subTest(seconds=seconds):
                 self.assertEqual(video.duration_action(seconds), action)
 
-    def test_tempo_scales_words_captions_and_five_second_shots(self):
+    def test_tempo_scales_words_captions_and_seven_second_shots(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             audio = root/'narration-00.wav'
@@ -34,8 +34,8 @@ class DurationRecoveryTests(unittest.TestCase):
             w.aligned_subtitles(aligned, lengths, root/'captions.srt')
             self.assertIn('00:14:55,000', (root/'captions.srt').read_text())
             plan = video.shot_plan({'scenes': [{'narration': 'opening ending'}]}, lengths, aligned)
-            self.assertEqual([s['start'] for s in plan['shots']], list(range(0, 895, 5)))
-            self.assertEqual(plan['shots'][-1]['duration'], 5)
+            self.assertEqual([s['start'] for s in plan['shots']], list(range(0, 895, 7)))
+            self.assertEqual(plan['shots'][-1]['duration'], 6)
             self.assertEqual(json.loads((root/'words-00.json').read_text()), aligned[0])
 
     def test_rewrite_preserves_final_cta(self):
@@ -86,7 +86,7 @@ class DurationRecoveryTests(unittest.TestCase):
             self.assertEqual(measure.call_count, 2)
             adjust.assert_called_once()
             self.assertEqual(plan['duration_seconds'], 895)
-            self.assertEqual(plan['shots'][-1]['duration'], 5)
+            self.assertEqual(plan['shots'][-1]['duration'], 6)
             self.assertIn('00:14:55,000', (root/'captions.srt').read_text())
 
     def test_changed_text_invalidates_audio_and_alignment_cache(self):

@@ -110,7 +110,7 @@ jobs:
           DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
         run: python -u long_video.py restore-images
-      - name: Generate distinct cinematic five-second clips without Google credentials
+      - name: Generate distinct cinematic seven-second clips without Google credentials
         run: python -u long_video.py generate-shard ${{ matrix.shard }}
       - name: Save images and clips privately
         env:

@@ -1,4 +1,4 @@
-"""10–15 minute videos with a distinct story image every five seconds."""
+"""10–15 minute videos with a distinct story image every seven seconds."""
 import datetime as dt
 import hashlib
 import json
@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 import workflow as w
 
 ROOT = Path(os.getenv('OUTPUT_DIR', 'output/ghibli-long-test'))
-INTERVAL = 5
+INTERVAL = w.IMAGE_INTERVAL_SECONDS
 SHARDS = 20
 ASSETS = ('story.json', 'plan.json', 'narration.wav', 'captions.srt')
 MIN_DURATION, MAX_DURATION = 600, 900
@@ -24,7 +24,7 @@ def run_id():
 
 
 def shot_plan(story, lengths, word_lists):
-    """Anchor every visual to words actually spoken in its global five-second window."""
+    """Anchor every visual to words actually spoken in its global seven-second window."""
     if len(lengths) != len(word_lists) or len(lengths) != len(story['scenes']):
         raise ValueError('Chapter audio, transcript and story must agree')
     total = sum(lengths)
@@ -76,7 +76,7 @@ def storyboard(root=ROOT, ask=None, pause=None):
                   'required': list(properties), 'additionalProperties': False}
         context = {str(shot['chapter']): story['scenes'][shot['chapter']]['narration'] for shot in batch}
         prompt = f"""Storyboard this fictional narrated story. Return one image prompt per exact shot key.
-Each shot is a measured five-second narration window. Depict ONLY the concrete action, location,
+Each shot is a measured {INTERVAL}-second narration window (the final shot may be shorter). Depict ONLY the concrete action, location,
 objects and emotion being spoken in that window. Chapter text resolves pronouns and continuity only;
 NEVER illustrate a later or earlier chapter event in place of the current window.
 For abstract reflection or dialogue, show the current character in the current physical scene.
@@ -446,10 +446,10 @@ def finish(root=ROOT):
     plan = json.loads((root/'plan.json').read_text())
     clips = [root/f"shot-{s['index']:03}.mp4" for s in plan['shots']]
     if not all(p.exists() for p in clips):
-        raise RuntimeError('Not every five-second image clip exists')
+        raise RuntimeError('Not every seven-second image clip exists')
     for shot, clip in zip(plan['shots'], clips):
         if abs(w.duration(clip)-shot['duration']) > .04:
-            raise RuntimeError('Shot timing differs from the global five-second plan')
+            raise RuntimeError('Shot timing differs from the global seven-second plan')
     (root/'clips.txt').write_text(''.join(f"file '{p.name}'\n" for p in clips))
     w.shell('ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', str(root/'clips.txt'), '-c', 'copy', str(root/'joined.mp4'))
     if not (root/'music.audio').exists():
@@ -573,7 +573,7 @@ def restore_clips():
         name = f"shot-{shot['index']:03}.mp4"
         file_id = store.find(f'runs/{run_id()}/{name}')
         if not file_id:
-            raise RuntimeError('Saved five-second clip missing')
+            raise RuntimeError('Saved seven-second clip missing')
         store.download(file_id, ROOT/name)
         qa_name = f"shot-{shot['index']:03}.qa.json"
         qa_id = store.find(f'runs/{run_id()}/{qa_name}')

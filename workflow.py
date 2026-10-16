@@ -23,6 +23,7 @@ VISUAL_STYLE = ('cinematic 2D editorial story illustration, clean dark outlines,
     'lighting appropriate to the scene, wide landscape composition, '
     'consistent character appearance and clothing')
 VISUAL_STYLE_ID = 'cinematic-editorial-2d'
+IMAGE_INTERVAL_SECONDS = 7
 
 
 def required(name):
@@ -575,7 +576,7 @@ def run(daily=False):
     root.mkdir(parents=True, exist_ok=True)
     store, key = Store(), f'runs/{run_id}/state.json'
     test_record = store.load('last-private-test.json', {}) if daily else {}
-    if daily and (not test_record.get('passed') or not test_record.get('remote_verification', {}).get('private_test_passed') or test_record.get('validation', {}).get('image_interval_seconds') != 5 or not test_record.get('validation', {}).get('storyboard_verified') or test_record.get('validation', {}).get('style') != VISUAL_STYLE_ID):
+    if daily and (not test_record.get('passed') or not test_record.get('remote_verification', {}).get('private_test_passed') or test_record.get('validation', {}).get('image_interval_seconds') != IMAGE_INTERVAL_SECONDS or not test_record.get('validation', {}).get('storyboard_verified') or test_record.get('validation', {}).get('style') != VISUAL_STYLE_ID):
         raise RuntimeError('No fully verified private HD upload test is recorded')
     state = store.load(key, {})
     if state.get('phase') in ('upload_started', 'uploaded', 'complete', 'published', 'verified_private'):

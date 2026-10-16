@@ -4,7 +4,7 @@
 
 - Original English motivational financial stories targeting 10–15 minutes (600–900 seconds).
 - 1920×1080 output at 30 fps.
-- A newly generated image at 0, 5, 10, 15 seconds and every five seconds thereafter.
+- A newly generated image at 0, 7, 14, 21 seconds and every seven seconds thereafter.
   The final image lasts only for the remaining duration. Chapter boundaries do not reset this timeline.
 - Narration-matched cinematic 2D editorial story images with clean outlines,
   restrained cel shading, muted natural colors and recognizable everyday settings at 1024×576, using pinned public
@@ -16,7 +16,7 @@
 - Generation starts once daily at 01:00 Asia/Dhaka; temporary run media is cleaned after verified private upload.
 
 The previous ten-second private test passed in Actions run 38450919780.
-The current five-second update derives each visual from actual measured word
+The current seven-second update derives each visual from actual measured word
 timestamps after speech generation, including windows crossing chapter boundaries.
 Groq produces concise scene prompts using the exact words spoken in that window
 and chapter context for pronouns and continuity. Image generation refuses a plan
@@ -110,7 +110,7 @@ Exact story hashes and history guard repeated scripts.
 
 Component checks cover private storage/quota rules, speech chunking,
 caption bounds, story validation, real 1080p rendering, the global shot plan and
-an actual image change across a five-second boundary. These checks run locally and in GitHub Actions. They do not replace the full private-video upload test.
+an actual image change across a seven-second boundary. These checks run locally and in GitHub Actions. They do not replace the full private-video upload test.
 
 ## Model documentation
 
@@ -129,7 +129,7 @@ with Actions and scheduled workflows enabled. Existing secrets are reused:
 `GROQ_API_KEY`, `DRIVE_TOKEN_JSON`, `DRIVE_FOLDER_ID`, `YOUTUBE_TOKEN_JSON`.
 The configured destination remains channel `UCztvMrNCT34DO3DtzLPgWaw`.
 
-The existing twenty CPU image workers, exact five-second narration timeline,
+The existing twenty CPU image workers, exact seven-second narration timeline,
 10–15 minute validation, local narration, original music, captions and thumbnail
 pipeline are reused. Fresh Groq financial stories cover financial growth, money
 psychology, saving and investing habits, business decisions, moral parables and
