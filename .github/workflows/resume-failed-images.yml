@@ -30,7 +30,7 @@ env:
   CPU_IMAGE_HEIGHT: '576'
   CPU_IMAGE_STEPS: '16'
   CPU_IMAGE_GUIDANCE_SCALE: '9.0'
-  CPU_STYLE_REFERENCE: references/financial-story-style-1024x576.png
+  CPU_STYLE_REFERENCE: references/financial-story-style-cool-1024x576.png
   CPU_REFERENCE_STRENGTH: '0.85'
   HF_HUB_DISABLE_XET: '1'
   OMP_NUM_THREADS: '4'

@@ -18,9 +18,9 @@ FINAL_CTA = (" Which choice would you have made in the protagonist's place? "
     'and subscribe for more stories of courage and growth.')
 
 VISUAL_STYLE = ('cinematic 2D editorial story illustration, clean dark outlines, '
-    'controlled cel shading, muted natural colors, expressive simplified faces, '
+    'controlled cel shading, muted slate blue, dusty teal and cool gray colors, expressive simplified faces, '
     'recognizable everyday environments with specific story objects, '
-    'lighting appropriate to the scene, wide landscape composition, '
+    'soft cool lighting appropriate to the scene, wide landscape composition, '
     'consistent character appearance and clothing')
 VISUAL_STYLE_ID = 'cinematic-editorial-2d'
 IMAGE_INTERVAL_SECONDS = 7

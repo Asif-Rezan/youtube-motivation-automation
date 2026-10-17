@@ -17,7 +17,8 @@ DREAMSHAPER_REVISION = 'a7e52b98680b1ba8ff7bce97c7f9f2e2e5337917'
 SAFETY_MODEL = 'CompVis/stable-diffusion-safety-checker'
 NEGATIVE = ('watercolor, 3d render, glossy plastic, realistic skin texture, '
             'blurry, low detail, poor quality, distorted anatomy, extra arms, extra legs, '
-            'deformed hands, duplicate person, watermark, lettering, text')
+            'deformed hands, duplicate person, watermark, lettering, text, '
+            'warm orange lighting, red color cast, sepia')
 _pipeline = None
 _pipeline_key = None
 _reference_pipeline = None

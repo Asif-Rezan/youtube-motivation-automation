@@ -4,14 +4,13 @@
 [POV: The Day Your Boss Realized You Could Walk Away Anytime](https://www.youtube.com/watch?v=DDLBhndYpfg).
 It is included as a visual reference for the outline, muted palette, and office setting.
 
-`financial-story-style-1024x576.png` is an original illustration made from that
-style reference. The automated SSD-1B renderer uses this original image as its
-image-to-image starting reference. It is exactly 1024 × 576 pixels.
+`financial-story-style-cool-1024x576.png` is an original illustration made from
+that style reference, then recolored to a cool slate blue, teal, and gray palette.
+The automated SSD-1B renderer uses it as its image-to-image starting reference.
+It is exactly 1024 × 576 pixels.
 
-`preview/financial-story-seed-1700.png` is an actual SSD-1B output made with
-the prompt and settings below. The matching `.image.json` records its pinned
-model revision, reference hash, seed, size, and render duration. This is a style
-preview; the generated action and character details still need human review.
+The `preview/` directory contains SSD-1B render metadata for a previous warm
+reference. A new cool-palette SSD-1B preview is pending verification.
 
 The [SSD-1B model card](https://huggingface.co/segmind/SSD-1B) demonstrates short,
 concrete prompts and recommends a negative prompt with guidance near 9.0. It does
@@ -21,11 +20,11 @@ detail-check retry. It keeps 16 steps and guidance 9.0.
 
 Example prompt for the reference scene:
 
-> A young office worker calmly leaves a modest workplace carrying a shoulder bag while his manager watches from the doorway. Cinematic 2D editorial story illustration, clean dark outlines, controlled cel shading, muted olive, tan and navy colors, wide landscape composition, consistent character clothing, no text.
+> A young office worker calmly leaves a modest workplace carrying a shoulder bag while his manager watches from the doorway. Cinematic 2D editorial story illustration, clean dark outlines, controlled cel shading, muted slate blue, dusty teal and cool gray colors, soft overcast daylight, wide landscape composition, consistent character clothing, no text.
 
 Example negative prompt:
 
-> watercolor, 3d render, glossy plastic, realistic skin texture, blurry, low detail, distorted anatomy, extra limbs, watermark, lettering, text
+> watercolor, 3d render, glossy plastic, realistic skin texture, blurry, low detail, distorted anatomy, extra limbs, watermark, lettering, text, warm orange lighting, red color cast, sepia
 
 Example settings: `seed=1700`, `width=1024`, `height=576`, `steps=16`,
 `guidance_scale=9.0`, `reference_strength=0.85`. The model and revision are pinned
