@@ -1,0 +1,44 @@
+name: Preview SSD-1B financial story style
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CPU_IMAGE_MODEL: segmind/SSD-1B
+      CPU_IMAGE_WIDTH: '1024'
+      CPU_IMAGE_HEIGHT: '576'
+      CPU_IMAGE_STEPS: '16'
+      CPU_IMAGE_GUIDANCE_SCALE: '9.0'
+      CPU_STYLE_REFERENCE: references/financial-story-style-1024x576.png
+      CPU_REFERENCE_STRENGTH: '0.85'
+      IMAGE_SEED: '1700'
+      OMP_NUM_THREADS: '4'
+      MKL_NUM_THREADS: '4'
+      HF_HUB_DISABLE_XET: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install CPU image dependencies
+        run: |
+          pip install 'torch==2.7.1' --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-cpu.txt
+      - name: Render one referenced story image
+        run: >-
+          python -u image_cpu.py
+          --prompt "A young office worker calmly leaves a modest workplace carrying a shoulder bag while his manager watches from the doorway. Cinematic 2D editorial story illustration, clean dark outlines, controlled cel shading, muted olive, tan and navy colors, wide landscape composition, consistent character clothing, no text."
+          --output preview/financial-story-seed-1700.png
+      - name: Save preview
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: financial-story-style-seed-1700
+          path: preview/
+          if-no-files-found: warn
