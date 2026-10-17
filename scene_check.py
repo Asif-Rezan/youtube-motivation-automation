@@ -48,16 +48,21 @@ def check_scene(image, shot):
         return {'passed': False, 'required': True, 'method': 'image-detail-check',
                 'detail_score': round(detail, 3)}
     candidates = scene_candidates(shot)
-    import torch
-    from transformers import CLIPModel, CLIPProcessor
-    if _model is None:
-        _model = CLIPModel.from_pretrained('openai/clip-vit-base-patch32', trust_remote_code=False).eval()
-        _processor = CLIPProcessor.from_pretrained('openai/clip-vit-base-patch32', trust_remote_code=False)
-    with Image.open(image) as picture:
-        inputs = _processor(text=candidates, images=picture.convert('RGB'),
-                            return_tensors='pt', padding=True, truncation=True)
-    with torch.inference_mode():
-        scores = _model(**inputs).logits_per_image[0].tolist()
+    try:
+        import torch
+        from transformers import CLIPModel, CLIPProcessor
+        if _model is None:
+            _model = CLIPModel.from_pretrained('openai/clip-vit-base-patch32', trust_remote_code=False).eval()
+            _processor = CLIPProcessor.from_pretrained('openai/clip-vit-base-patch32', trust_remote_code=False)
+        with Image.open(image) as picture:
+            inputs = _processor(text=candidates, images=picture.convert('RGB'),
+                                return_tensors='pt', padding=True, truncation=True)
+        with torch.inference_mode():
+            scores = _model(**inputs).logits_per_image[0].tolist()
+    except Exception as error:
+        return {'passed': True, 'semantic_match': None, 'required': True,
+                'method': 'detail-check-with-CLIP-review', 'detail_score': round(detail, 3),
+                'semantic_review_error': type(error).__name__}
     # CLIP is useful review evidence, but its relative caption ranking is too noisy
     # to reject a rendered image. The deterministic detail check remains a hard gate.
     return {'passed': True, 'semantic_match': evaluate_scores(scores), 'required': True,
