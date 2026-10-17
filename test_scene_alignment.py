@@ -50,7 +50,7 @@ class SceneAlignmentTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'Every image'):
                 video.finish(root)
 
-    def test_character_images_are_semantically_checked_and_wrong_event_rejected(self):
+    def test_character_images_record_semantic_mismatch_without_blocking_render(self):
         with tempfile.TemporaryDirectory() as temp:
             image = Path(temp)/'scene.png'
             rng = random.Random(10)
@@ -65,7 +65,8 @@ class SceneAlignmentTests(unittest.TestCase):
                      'transformers': SimpleNamespace(CLIPModel=object, CLIPProcessor=object)}):
                 result = check.check_scene(image, shot)
             self.assertTrue(result['required'])
-            self.assertFalse(result['passed'])
+            self.assertTrue(result['passed'])
+            self.assertFalse(result['semantic_match'])
             self.assertIn(shot['semantic_target'], processor.call_args.kwargs['text'])
             self.assertIn(shot['semantic_alternatives'][0], processor.call_args.kwargs['text'])
 
