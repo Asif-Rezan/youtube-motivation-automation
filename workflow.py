@@ -91,26 +91,70 @@ def check_recent_originality(story, history):
         raise ValueError('Story format repeats one of the last two uploads')
 
 
+def groq_retry_delay(response, attempt):
+    """Honor provider cooldowns, including HTTP-date Retry-After values."""
+    import math
+    from email.utils import parsedate_to_datetime
+    value = response.headers.get('retry-after', '').strip()
+    if value:
+        try:
+            delay = float(value)
+        except ValueError:
+            try:
+                delay = parsedate_to_datetime(value).timestamp() - time.time()
+            except (ValueError, TypeError, OverflowError):
+                delay = None
+        if delay is not None and math.isfinite(delay):
+            return max(1, math.ceil(delay)) + 1
+    # Groq may supply a more precise cooldown in the structured error message.
+    try:
+        message = response.json().get('error', {}).get('message', '')
+    except ValueError:
+        message = ''
+    match = re.search(r'try again in\s+((?:[\d.]+(?:ms|h|m|s)\s*)+)', message, re.I)
+    if match:
+        units = {'h': 3600, 'm': 60, 's': 1, 'ms': .001}
+        delay = sum(float(n)*units[u.lower()] for n,u in
+                    re.findall(r'([\d.]+)(ms|h|m|s)', match.group(1), re.I))
+        if math.isfinite(delay):
+            return max(1, math.ceil(delay)) + 1
+    return min(60 * 2**attempt, 300)
+
+
 def request_groq(endpoint, payload, binary=False):
     import requests
-    # Generation calls are not automatically repeated: repeats can consume credits.
-    for attempt in range(2):
+    # Retry only explicit provider rejections, never successful generation calls.
+    waited = 0
+    json_retried = False
+    for attempt in range(6):
         response = requests.post('https://api.groq.com/openai/v1/' + endpoint,
             headers={'Authorization': 'Bearer ' + required('GROQ_API_KEY')}, json=payload, timeout=180)
         if response.ok:
-            break
+            return response.content if binary else response.json()
         try:
             error_code = response.json().get('error', {}).get('code')
         except ValueError:
             error_code = None
         print(json.dumps({'check': 'Groq generation', 'http_status': response.status_code,
             'api_error_code': error_code, 'attempt': attempt+1}), flush=True)
-        if attempt == 0 and (response.status_code == 429 or
-                (response.status_code == 400 and error_code == 'json_validate_failed')):
+        if response.status_code == 429:
+            delay = groq_retry_delay(response, attempt)
+            if attempt == 5 or waited + delay > 900:
+                raise RuntimeError(
+                    f'Groq rate limit remains active; retry after at least {delay} seconds. '
+                    'Automatic retry budget exhausted (six requests / 900 seconds waiting). '
+                    'Check Groq organization quotas before starting another run.')
+            print(json.dumps({'check': 'Groq cooldown', 'retry_after_seconds': delay,
+                              'waited_seconds': waited}), flush=True)
+            time.sleep(delay)
+            waited += delay
+            continue
+        if response.status_code == 400 and error_code == 'json_validate_failed' and not json_retried and attempt < 5:
+            json_retried = True
             time.sleep(60)
+            waited += 60
             continue
         raise RuntimeError(f'Groq request failed with HTTP {response.status_code}; code={error_code}')
-    return response.content if binary else response.json()
 
 
 def make_story(day, previous):
