@@ -13,9 +13,9 @@ import textwrap
 import time
 from zoneinfo import ZoneInfo
 
-FINAL_CTA = (" Which choice would you have made in the protagonist's place? "
+FINAL_CTA = (" Which choice would you have made in that situation? "
     'Leave a comment with your answer, like this video if it inspired you, '
-    'and subscribe for more stories of courage and growth.')
+    'and subscribe for more stories about money, choices, and everyday life.')
 
 VISUAL_STYLE = ('cinematic 2D editorial story illustration, clean dark outlines, '
     'controlled cel shading, muted slate blue, dusty teal and cool gray colors, expressive simplified faces, '
@@ -75,6 +75,8 @@ def validate_story(data, word_range=(1200, 2500)):
         raise ValueError('Invalid thumbnail text')
     if not isinstance(data.get('thumbnail_prompt'), str):
         raise ValueError('Missing thumbnail prompt')
+    from content_strategy import validate_pov
+    validate_pov(data)
     return data
 
 
@@ -120,10 +122,14 @@ def make_story(day, previous):
         return {'type': 'object', 'properties': properties,
             'required': list(properties), 'additionalProperties': False}
     text_schema = {'type': 'string'}
+    financial = os.getenv('CONTENT_TYPE') == 'financial-storytelling'
+    from content_strategy import PROFILE, PILLARS, select_pillar, narration_direction
+    pillar = select_pillar(day, previous) if financial else None
     scene_schema = object_schema({'summary': text_schema, 'image_prompt': text_schema,
+        **({'continuity_note': text_schema} if financial else {}),
         'image_prompts': {'type': 'array', 'items': text_schema}})
     chapter_keys = [f'chapter_{i:02}' for i in range(1, 21)]
-    outline_schema = object_schema({**{k: text_schema for k in
+    outline_schema = object_schema({**({'story_bible': text_schema} if financial else {}), **{k: text_schema for k in
         ('title', 'description', 'thumbnail_text', 'thumbnail_prompt', 'character_description', 'protagonist_name')},
         'tags': {'type': 'array', 'items': text_schema},
         'scenes': object_schema({k: scene_schema for k in chapter_keys})})
@@ -137,7 +143,6 @@ def make_story(day, previous):
         if choice.get('finish_reason') == 'length':
             raise RuntimeError('Story response was truncated; refusing incomplete script')
         return json.loads(choice['message']['content'])
-    financial = os.getenv('CONTENT_TYPE') == 'financial-storytelling'
     formats = (
         ('decision_drama', 'A character must choose between two costly financial options; show the consequences of the choice.'),
         ('business_postmortem', 'Reconstruct a fictional small business failure, then show the specific decisions that enabled recovery.'),
@@ -155,18 +160,42 @@ def make_story(day, previous):
     selected_format, format_direction = next(
         ((name, direction) for name, direction in formats if name not in recent_formats),
         formats[0])
-    theme = ('Motivational financial storytelling: rotate poor-to-rich journeys, money psychology, '
-        'saving and investing habits, business successes and failures, financial moral parables, '
-        'and everyday money mistakes. Real financial history is allowed ONLY when verified source '
+    theme = ('Original immersive financial storytelling about money psychology, financial resilience, '
+        'work, family, business, lifestyle pressure and personal freedom. Real financial history is allowed ONLY when verified source '
         'material is supplied; otherwise choose fiction. Never invent historical facts or investment '
         'returns. Show realistic tradeoffs and uncertainty, no guaranteed wealth or personalized advice.'
         if financial else 'Motivational storytelling.')
+    pov_brief = (f'''Original second-person financial scenario for an adult US audience.
+    Today's topic pillar is {pillar}: {PILLARS[pillar]}
+    The viewer is the protagonist: narrate as you/your, never as a biography of a named hero.
+    Give that same person an internal first name for consistent image generation; it is not the narrator's viewpoint.
+    Open inside a concrete, ordinary money decision with an immediate consequence or revealing contradiction.
+    Establish the title's promised conflict within chapter 1. Curiosity can be implicit; do not force a rhetorical question.
+    Chapters 1-3: immediate scene, stakes and goal. Chapters 4-8: choices, budget constraints and first consequences.
+    Chapters 9-14: a believable setback, relationship tension and an imperfect adjustment.
+    Chapters 15-18: demonstrate the result with elapsed time, costs and remaining uncertainty.
+    Chapters 19-20: pay off the opening scene and show what changed in autonomy, time or trust.
+    Use one or two recurring people with their own motives, sensory everyday details and short natural dialogue.
+    Keep suspense through a pending decision or consequence, not repetitive teaser sentences or artificial cliffhangers.
+    No automatic millionaire ending, villainous poor friends, perfect savers or magical investment recovery.
+    Show the financial mechanism through a concrete choice, not a list of tips. Maintain consistent arithmetic:
+    distinguish gross pay from take-home pay, revenue from profit, savings from investment gains and cash from net worth.
+    Avoid specific investment returns, current tax limits, benefits rules or legal claims without supplied verified sources.
+    Story money amounts and circumstances are illustrative fiction. Do not present this as a true account.
+    Title must start "POV: You" and promise a specific decision or consequence, max 85 characters.
+    Invent the title, events and dialogue; do not reproduce another channel's titles, characters or plot sequence.
+    story_bible: max 180 words recording starting age/job, family, take-home income, recurring expenses,
+    opening cash/debt, goal, time horizon and the causal ending. Use only the numbers the plot actually needs.
+    Each chapter's continuity_note: max 30 words recording elapsed time, any money changes and unresolved setup/payoff.
+    Description must clearly disclose an original fictional, educational scenario, not personal financial advice.
+    ''' if financial else '')
     outline = ask(f'''Plan an original fictional English motivational story for {day}.
     Content direction: {theme}
+    {pov_brief}
     This video's format is {selected_format}: {format_direction}
     Make its central problem, setting, character relationships, turning points, and resolution materially distinct.
     Avoid these previous titles and plots: {json.dumps(previous[-30:])}.
-    A vivid crisis or impossible choice must open the FIRST sentence, with an unanswered question.
+    A concrete consequential choice or revealing contradiction must open the FIRST sentence.
     No greeting or generic motivational preamble. Give the protagonist one concrete goal, believable setbacks, and earned resolution.
     No random magical trials, repeated mentor lessons, or repeated endings. Escalate choices, setbacks, surprising reversals,
     specific dialogue, and emotional payoffs. Resolve the opening question in the final act.
@@ -181,9 +210,14 @@ def make_story(day, previous):
     image_prompts (four distinct visual beats, each max 8 words). Use clear scenes that work as
     cinematic 2D editorial illustrations grounded in each chapter's actual events, setting, and time of day.
     Show the specific narrated action or objects; include unusual or fantastical elements only when the story describes them.
-    Main character keeps the same appearance and clothing. Provide ONLY the plan, no full narration yet.''', 5200, outline_schema)
+    Main character keeps the same appearance and clothing. Provide ONLY the plan, no full narration yet.''', 6500 if financial else 5200, outline_schema)
     outline['scenes'] = [outline['scenes'][k] for k in chapter_keys]
     outline['format'] = selected_format
+    if financial:
+        outline['content_profile'] = PROFILE
+        outline['content_pillar'] = pillar
+    # Reject repeated packaging before spending requests on twenty narrated chapters.
+    check_recent_originality(outline, previous)
     if len(outline.get('scenes', [])) != 20:
         raise ValueError('Outline requires exactly twenty chapters')
     summaries = [scene['summary'] for scene in outline['scenes']]
@@ -195,6 +229,9 @@ def make_story(day, previous):
         group_schema = object_schema({'narrations': object_schema({k: text_schema for k in keys})})
         group = ask(f'''Write chapters {begin+1} through {begin+5} of this original fictional story.
         Content direction: {theme}
+        {narration_direction(outline)}
+        Story bible: {outline.get('story_bible', '')}
+        Full continuity map (context only, do not narrate future events): {json.dumps([{'chapter': i+1, 'event': s['summary'], 'continuity': s.get('continuity_note', '')} for i, s in enumerate(outline['scenes'])])}.
         Title: {outline['title']}. Character: {outline['character_description']}.
         Assigned chapter events ONLY: {json.dumps([{'chapter': i+1, 'event': summaries[i]} for i in range(begin, begin+5)])}.
         Previous chapter ending: {prior[-700:]}.
@@ -202,7 +239,10 @@ def make_story(day, previous):
         Each string MUST contain 82-88 English spoken words; total for this request 410-440 words.
         Aim for about 1650-1800 spoken words across all twenty chapters including the final CTA.
         Natural narration with concrete actions and dialogue, not generic advice.
-        Begin chapter 1 with the crisis immediately, no welcome or setup preamble.
+        Begin chapter 1 inside the promised money decision immediately, no welcome or setup preamble.
+        Vary sentence length for natural speech. Explain an unfamiliar money term briefly in context.
+        Preserve dates, balances and relationships from the continuity map; do not invent a new windfall or time jump.
+        Each chapter must advance a choice, consequence or relationship rather than repeat a lesson.
         Escalate stakes, introduce reversals and emotional payoffs every few chapters.
         Resolve the initial crisis by chapter 20. Do not include any viewer call to action in any chapter;
         the application adds a final like, comment, and subscribe request separately.
@@ -602,7 +642,9 @@ def run(daily=False):
     if os.getenv('UPLOAD_ENABLED') == 'true':
         upload_private(video, thumb, story, state, store, key, music_credit)
     if state['phase'] == 'complete':
-        history.append({'title': story['title'], 'format': story.get('format'), 'hash': digest, 'run': run_id})
+        history.append({'title': story['title'], 'format': story.get('format'),
+            'content_pillar': story.get('content_pillar'), 'content_profile': story.get('content_profile'),
+            'hash': digest, 'run': run_id})
         store.save('history.json', history)
         if not daily:
             store.save('last-private-test.json', {'passed': True, 'run': run_id, 'video_id': state['video_id'], 'validation': state['validation']})

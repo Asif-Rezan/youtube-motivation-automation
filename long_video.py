@@ -87,6 +87,8 @@ During a pause, continue the preceding scene rather than showing a future event 
 For abstract reflection or dialogue, show the current character in the current physical scene.
 No metaphorical mountains, gardens or random scenery unless literally present in that event.
 Keep recurring characters and clothes consistent. Main character design: {character}.
+For second-person narration, you/your refers to the protagonist named {story.get('protagonist_name', 'in the story')}.
+Depict that character externally, naming them in the prompt; never draw a narrator or a literal viewer camera.
 Each prompt MUST be 12-22 English words: subject and concrete action FIRST, then relevant objects
 and location. Identify the active character, physical action, important objects, and visible emotion
 when the narration supplies them. Describe one drawable composition with a detailed, accurate setting.
@@ -168,7 +170,9 @@ def rewrite_for_duration(story, total, lengths, ask=None):
                     'current': story['scenes'][i]['narration'],
                     'next': story['scenes'][i+1]['narration'][:250] if i+1 < len(lengths) else ''}
                    for i in group]
-        prompt = (f'Rewrite only these chapters of an existing fictional story to make spoken narration '
+        from content_strategy import narration_direction
+        prompt = (narration_direction(story) + f' Story bible: {story.get("story_bible", "")}. '
+                  f'Rewrite only these chapters of an existing fictional story to make spoken narration '
                   f'{"shorter" if ratio < 1 else "longer"}. Preserve each chapter event, character continuity, '
                   f'natural dialogue, opening hook, and ending. Keep the final like, comment, and subscribe CTA '
                   f'unchanged at the end of chapter 20 if present. Add meaningful action or dialogue when expanding; '
@@ -660,7 +664,9 @@ def upload():
     store.save(key, state)
     w.upload_private(ROOT/'video.mp4', ROOT/'thumbnail.jpg', story, state, store, key,
         'Background music: original Magenta MusicRNN melody with synthesized ambient piano.')
-    history.append({'title': story['title'], 'format': story.get('format'), 'hash': digest, 'run': run_id(), 'video_id': state['video_id']})
+    history.append({'title': story['title'], 'format': story.get('format'),
+        'content_pillar': story.get('content_pillar'), 'content_profile': story.get('content_profile'),
+        'hash': digest, 'run': run_id(), 'video_id': state['video_id']})
     store.save('history.json', history)
     store.save('last-private-test.json', {'passed': True, 'run': run_id(),
         'video_id': state['video_id'], 'validation': report, 'processing_status': state['processing_status']})

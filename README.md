@@ -1,5 +1,8 @@
 # Motivational financial storytelling automation
 
+New financial stories use original second-person POV narration, rotating money scenarios,
+and a shared chapter continuity bible. See [content direction](CONTENT_DIRECTION.md).
+
 ## Current format
 
 - Original English motivational financial stories targeting 10–15 minutes (600–900 seconds).
