@@ -407,6 +407,10 @@ def generate_shard(shard, root=ROOT, count=SHARDS):
                 if expected:
                     report['image_generation'] = json.loads(image_meta.read_text())
                 check.write_text(json.dumps(report))
+                if report.get('semantic_match') is False:
+                    print(json.dumps({'shot': index, 'semantic_review': 'mismatch',
+                                      'scene_score': report['scene_score'],
+                                      'alternative_score': report['alternative_score']}), flush=True)
                 break
             image.unlink()
             image_meta.unlink(missing_ok=True)
@@ -508,7 +512,8 @@ def finish(root=ROOT):
         'music': 'Magenta MusicRNN', 'image_model': next(iter(image_models)),
         'audio_validation': audio_report, 'timeline_verified': True, 'storyboard_verified': plan.get('storyboard_verified', False),
         'alignment': plan.get('alignment'), 'scene_composition_version': plan.get('scene_composition_version'),
-        'semantic_checked_images': sum(r.get('required', False) for r in scene_reports)}
+        'semantic_checked_images': sum(r.get('required', False) for r in scene_reports),
+        'semantic_review_mismatches': sum(r.get('semantic_match') is False for r in scene_reports)}
     (root/'validation.json').write_text(json.dumps(report))
     print(json.dumps(report), flush=True)
     return report
