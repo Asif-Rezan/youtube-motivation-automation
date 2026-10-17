@@ -21,8 +21,6 @@ NEGATIVE = ('watercolor, 3d render, glossy plastic, realistic skin texture, '
             'warm orange lighting, red color cast, sepia')
 _pipeline = None
 _pipeline_key = None
-_reference_pipeline = None
-_reference_pipeline_key = None
 _safety_checker = None
 _safety_processor = None
 
@@ -37,6 +35,33 @@ class ImageConfig:
     guidance_scale: float
     reference_sha256: str | None = None
     reference_strength: float = 0.0
+    reference_mode: str = 'none'
+    reference_style: str = ''
+
+
+# The reference supplies palette and an explicit illustration description, never
+# its scene geometry. This is text style guidance, not an IP-Adapter or img2img.
+STYLE_DESCRIPTION = ('cinematic 2D editorial illustration, clean dark outlines, controlled cel shading, '
+                     'expressive simplified faces, muted cool colors, soft overcast light')
+
+
+def reference_style_description(path):
+    from PIL import Image
+    # Summarize color frequencies only: no positions, objects, or image latents
+    # from the reference can leak into the generated composition.
+    palette = {'slate blue': (85, 105, 130), 'dusty teal': (70, 115, 120),
+               'cool gray': (140, 148, 160), 'navy blue': (35, 50, 75),
+               'muted green': (95, 120, 95), 'muted brown': (125, 100, 80)}
+    counts = dict.fromkeys(palette, 0)
+    with Image.open(path) as original:
+        colors = original.convert('RGB').resize((64, 64)).getdata()
+        for color in colors:
+            if max(color) < 35 or min(color) > 220:
+                continue
+            name = min(palette, key=lambda name: sum((a-b)**2 for a,b in zip(color,palette[name])))
+            counts[name] += 1
+    dominant = sorted(counts, key=counts.get, reverse=True)[:3]
+    return STYLE_DESCRIPTION + ', palette of ' + ', '.join(dominant)
 
 
 def image_config():
@@ -47,15 +72,13 @@ def image_config():
     reference = os.getenv('CPU_STYLE_REFERENCE', '').strip()
     if reference and model != SSD_MODEL:
         raise ValueError('CPU style reference requires SSD-1B')
-    strength = float(os.getenv('CPU_REFERENCE_STRENGTH', '0.35')) if reference else 0.0
-    if reference and not 0 < strength <= 1:
-        raise ValueError('CPU reference strength must be in (0, 1]')
     reference_sha = hashlib.sha256(Path(reference).read_bytes()).hexdigest() if reference else None
+    style = reference_style_description(reference) if reference else ''
     config = ImageConfig(model, revision, int(os.getenv('CPU_IMAGE_WIDTH', '768' if model == DREAMSHAPER_MODEL else '1024')),
                          int(os.getenv('CPU_IMAGE_HEIGHT', '432' if model == DREAMSHAPER_MODEL else '576')),
                          int(os.getenv('CPU_IMAGE_STEPS', '28' if model == DREAMSHAPER_MODEL else '16')),
                          float(os.getenv('CPU_IMAGE_GUIDANCE_SCALE', '7.5' if model == DREAMSHAPER_MODEL else '9.0')),
-                         reference_sha, strength)
+                         reference_sha, 0.0, 'style-only-v1' if reference else 'none', style)
     if config.width % 8 or config.height % 8 or not 256 <= config.width <= 1536 or not 256 <= config.height <= 1536:
         raise ValueError('CPU image dimensions must be multiples of eight in 256–1536')
     if not 1 <= config.steps <= 50 or not 1 <= config.guidance_scale <= 15:
@@ -108,14 +131,12 @@ def check_ssd_safety(image):
 
 
 def generate(prompt, path):
-    global _pipeline, _pipeline_key, _reference_pipeline, _reference_pipeline_key
+    global _pipeline, _pipeline_key
     config = image_config()
     key = (config.model, config.revision)
     if _pipeline is None or _pipeline_key != key:
         _pipeline = load_pipeline(config)
         _pipeline_key = key
-        _reference_pipeline = None
-        _reference_pipeline_key = None
     built_in_safety = getattr(_pipeline, 'safety_checker', None) is not None
     if not built_in_safety and config.model != SSD_MODEL and os.getenv('CPU_IMAGE_BENCHMARK') != 'true':
         raise RuntimeError(f'{config.model} has no content safety checker; refusing production inference')
@@ -127,19 +148,15 @@ def generate(prompt, path):
     options = {'prompt': prompt, 'negative_prompt': negative,
                'num_inference_steps': config.steps, 'guidance_scale': config.guidance_scale,
                'generator': torch.Generator(device='cpu').manual_seed(seed)}
+    options.update(width=config.width, height=config.height)
     if config.reference_sha256:
-        from diffusers import AutoPipelineForImage2Image
-        from PIL import Image, ImageOps
-        if _reference_pipeline is None or _reference_pipeline_key != key:
-            _reference_pipeline = AutoPipelineForImage2Image.from_pipe(_pipeline)
-            _reference_pipeline_key = key
-        pipe = _reference_pipeline
-        with Image.open(os.environ['CPU_STYLE_REFERENCE']) as reference:
-            options['image'] = ImageOps.fit(reference.convert('RGB'),
-                                            (config.width, config.height), method=Image.Resampling.LANCZOS)
-        options['strength'] = config.reference_strength
-    else:
-        options.update(width=config.width, height=config.height)
+        # Fresh noise for every narrated shot. A low-strength img2img start here
+        # would copy the same office, people and poses into unrelated scenes.
+        scene_prompt = prompt.strip()
+        options['prompt'] = scene_prompt
+        # SDXL has two text encoders: retain the action first in one and the
+        # concise reference-derived style first in the other.
+        options['prompt_2'] = config.reference_style + '. ' + scene_prompt
     result = pipe(**options)
     if any(getattr(result, 'nsfw_content_detected', None) or []):
         raise RuntimeError('Image blocked by model safety check')

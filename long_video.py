@@ -413,7 +413,7 @@ def generate_shard(shard, root=ROOT, count=SHARDS):
                 cached = {}
             if any(cached.get(field) != getattr(expected, field) for field in
                    ('model', 'revision', 'width', 'height', 'steps', 'guidance_scale',
-                    'reference_sha256', 'reference_strength')):
+                    'reference_sha256', 'reference_strength', 'reference_mode', 'reference_style')):
                 image.unlink()
                 image_meta.unlink(missing_ok=True)
                 clip.unlink(missing_ok=True)

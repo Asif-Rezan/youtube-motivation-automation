@@ -195,3 +195,19 @@ Use **Resume verified private video cleanup** to recover a completed run without
 any video generation or `videos.insert` call. Enter its original `daily-<run ID>`.
 The cleanup worker rechecks private visibility, successful HD processing and
 exact metadata before resuming. The daily 01:00 Asia/Dhaka schedule is unchanged.
+
+
+## Reference style without repeated scenes
+
+The cool reference supplies a dominant-color summary alongside the established
+2D editorial style description. SSD-1B generates each narrated composition from
+fresh noise using the shot-specific prompt and seed. The reference is never
+passed as an img2img starting image, so its office layout is not reused for
+other actions and settings. This is text/palette guidance, not a learned style
+adapter or pixel-level style transfer; visual consistency still needs review.
+Both images and thumbnails remain 1024×576, 16 steps, guidance 9.0, with a new
+video image every seven seconds. These are now 16 full text-to-image steps,
+so a render can take longer than the old 0.35-strength composition copy.
+Old img2img checkpoints are invalidated by reference-mode metadata.
+The manual style preview renders three different narrated situations in parallel
+and saves images plus per-scene settings for visual review.

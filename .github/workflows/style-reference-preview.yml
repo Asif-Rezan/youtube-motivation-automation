@@ -5,6 +5,11 @@ permissions:
   contents: read
 jobs:
   preview:
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        scene: [office, budget, repair]
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
@@ -14,7 +19,6 @@ jobs:
       CPU_IMAGE_STEPS: '16'
       CPU_IMAGE_GUIDANCE_SCALE: '9.0'
       CPU_STYLE_REFERENCE: references/financial-story-style-cool-1024x576.png
-      CPU_REFERENCE_STRENGTH: '0.35'
       IMAGE_SEED: '1700'
       OMP_NUM_THREADS: '4'
       MKL_NUM_THREADS: '4'
@@ -30,15 +34,12 @@ jobs:
         run: |
           pip install 'torch==2.7.1' --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements-cpu.txt
-      - name: Render one referenced story image
-        run: >-
-          python -u image_cpu.py
-          --prompt "A young office worker calmly leaves a modest workplace carrying a shoulder bag while his manager watches from the doorway. Cinematic 2D editorial story illustration, clean dark outlines, controlled cel shading, muted slate blue, dusty teal and cool gray colors, soft overcast daylight, wide landscape composition, consistent character clothing, no text."
-          --output preview/financial-story-seed-1700.png
+      - name: Render narration-specific scene with reference style
+        run: python -u preview_scene_styles.py --scene ${{ matrix.scene }}
       - name: Save preview
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: financial-story-style-seed-1700
+          name: financial-story-style-${{ matrix.scene }}
           path: preview/
           if-no-files-found: warn

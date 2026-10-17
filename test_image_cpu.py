@@ -109,43 +109,47 @@ class ImageCPUChecks(unittest.TestCase):
         image_cpu._pipeline = None
         image_cpu._pipeline_key = None
 
-    def test_style_reference_uses_img2img_at_1024_by_576_with_seed(self):
+    def test_style_reference_guides_style_without_copying_scene_geometry(self):
         class Pipe:
             safety_checker = object()
+            def __init__(self): self.calls = []
             def __call__(self, **kwargs):
-                self.kwargs = kwargs
+                self.calls.append(kwargs)
                 return types.SimpleNamespace(images=[Image.new('RGB', (1024, 576), 'blue')],
                                              nsfw_content_detected=[False])
-        text_pipe, image_pipe = Pipe(), Pipe()
-        adapter = types.SimpleNamespace(from_pipe=lambda pipe: image_pipe)
+        pipe = Pipe()
         generator = types.SimpleNamespace(Generator=lambda device: types.SimpleNamespace(
             manual_seed=lambda seed: seed))
+        prompts = ['Worker leaves the office', 'Hands count coins at a kitchen table',
+                   'Mechanic repairs a bicycle outside a garage']
         with tempfile.TemporaryDirectory() as temp:
             reference = Path(temp)/'reference.png'
-            Image.new('RGB', (1024, 576), 'green').save(reference)
+            Image.new('RGB', (1024, 576), (85, 105, 130)).save(reference)
             with patch.dict(os.environ, {'CPU_IMAGE_MODEL': image_cpu.SSD_MODEL,
-                    'CPU_IMAGE_WIDTH': '1024', 'CPU_IMAGE_HEIGHT': '576',
-                    'CPU_STYLE_REFERENCE': str(reference), 'CPU_REFERENCE_STRENGTH': '0.85',
-                    'IMAGE_SEED': '1700'}, clear=True), \
-                 patch.object(image_cpu, 'load_pipeline', return_value=text_pipe), \
+                    'CPU_STYLE_REFERENCE': str(reference), 'CPU_REFERENCE_STRENGTH': '0.35'}, clear=True), \
+                 patch.object(image_cpu, 'load_pipeline', return_value=pipe), \
                  patch.object(image_cpu, 'check_ssd_safety'), \
-                 patch.dict(sys.modules, {'torch': generator,
-                     'diffusers': types.SimpleNamespace(AutoPipelineForImage2Image=adapter)}):
+                 patch.dict(sys.modules, {'torch': generator}):
                 image_cpu._pipeline = None
                 image_cpu._pipeline_key = None
-                image_cpu._reference_pipeline = None
-                output = Path(temp)/'shot.png'
-                report = image_cpu.generate('Worker leaves the office', output)
-            self.assertEqual(image_pipe.kwargs['generator'], 1700)
-            self.assertEqual(image_pipe.kwargs['image'].size, (1024, 576))
-            self.assertEqual(image_pipe.kwargs['strength'], 0.85)
-            self.assertEqual(image_pipe.kwargs['guidance_scale'], 9.0)
-            self.assertEqual(report['reference_strength'], 0.85)
-            self.assertTrue(report['reference_sha256'])
-            image_cpu._pipeline = None
-            image_cpu._pipeline_key = None
-            image_cpu._reference_pipeline = None
-            image_cpu._reference_pipeline_key = None
+                for index, prompt in enumerate(prompts):
+                    os.environ['IMAGE_SEED'] = str(1700+index)
+                    report = image_cpu.generate(prompt, Path(temp)/f'shot-{index}.png')
+                    self.assertEqual(report['reference_mode'], 'style-only-v1')
+                    self.assertEqual(report['reference_strength'], 0)
+                    self.assertTrue(report['reference_sha256'])
+            for index, call in enumerate(pipe.calls):
+                self.assertEqual(call['prompt'], prompts[index])
+                self.assertIn('cel shading', call['prompt_2'])
+                self.assertIn('slate blue', call['prompt_2'])
+                self.assertIn(prompts[index], call['prompt_2'])
+                self.assertNotIn('image', call)
+                self.assertNotIn('strength', call)
+                self.assertEqual(call['generator'], 1700+index)
+                self.assertEqual(call['num_inference_steps'], 16)
+                self.assertEqual((call['width'], call['height']), (1024, 576))
+        image_cpu._pipeline = None
+        image_cpu._pipeline_key = None
 
     def test_blank_frame_is_rejected(self):
         with tempfile.TemporaryDirectory() as temp:

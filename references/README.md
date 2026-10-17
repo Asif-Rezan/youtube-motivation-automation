@@ -6,12 +6,15 @@ It is included as a visual reference for the outline, muted palette, and office 
 
 `financial-story-style-cool-1024x576.png` is an original illustration made from
 that style reference, then recolored to a cool slate blue, teal, and gray palette.
-The automated SSD-1B renderer uses it as its image-to-image starting reference.
+The automated SSD-1B renderer reads its dominant color palette and combines that
+with the project’s illustration description. Every scene starts from fresh noise,
+not this image. Style guidance is textual; it is not pixel-level style transfer.
 It is exactly 1024 × 576 pixels.
 
 `preview/faithful/financial-story-seed-1700.png` is the verified SSD-1B
-output using the cool reference and strength 0.35. It retains the two people and
-office layout much more closely. Its `.image.json` records the model revision,
+historical output using img2img strength 0.35. It retained the two people and
+office layout, which also caused unrelated scenes to repeat the reference.
+This composition-preserving path is no longer used. Its `.image.json` records the model revision,
 reference hash, seed, dimensions and render duration. The earlier `preview/cool/`
 image used strength 0.85 and changed the composition substantially. See
 [successful preview run #3](https://github.com/Asif-Rezan/youtube-motivation-automation/actions/runs/39021905959).
@@ -31,6 +34,6 @@ Example negative prompt:
 > watercolor, 3d render, glossy plastic, realistic skin texture, blurry, low detail, distorted anatomy, extra limbs, watermark, lettering, text, warm orange lighting, red color cast, sepia
 
 Example settings: `seed=1700`, `width=1024`, `height=576`, `steps=16`,
-`guidance_scale=9.0`, `reference_strength=0.35`. The model and revision are pinned
+`guidance_scale=9.0`, `reference_mode=style-only-v1`. The model and revision are pinned
 in `image_cpu.py`. A seed is reproducible only with the same model, revision,
 prompt, reference image, and generation settings.
