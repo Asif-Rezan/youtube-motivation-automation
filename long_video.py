@@ -412,7 +412,8 @@ def generate_shard(shard, root=ROOT, count=SHARDS):
             except (FileNotFoundError, json.JSONDecodeError):
                 cached = {}
             if any(cached.get(field) != getattr(expected, field) for field in
-                   ('model', 'revision', 'width', 'height', 'steps', 'guidance_scale')):
+                   ('model', 'revision', 'width', 'height', 'steps', 'guidance_scale',
+                    'reference_sha256', 'reference_strength')):
                 image.unlink()
                 image_meta.unlink(missing_ok=True)
                 clip.unlink(missing_ok=True)
