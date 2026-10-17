@@ -383,7 +383,7 @@ def refine_visual_plan(root=ROOT):
 
 def generate_shard(shard, root=ROOT, count=SHARDS):
     from scene_check import check_scene, scene_signature
-    from image_cpu import image_config, metadata_path
+    from image_cpu import ImageSafetyRejected, image_config, metadata_path
     plan = json.loads((root/'plan.json').read_text())
     if plan.get('image_interval_seconds') != INTERVAL:
         raise RuntimeError('Saved visual plan uses a different image interval; prepare a new run')
@@ -428,7 +428,19 @@ def generate_shard(shard, root=ROOT, count=SHARDS):
             os.environ['IMAGE_SEED'] = str(shot['seed']+attempt*10000)
             if not image.exists():
                 clip.unlink(missing_ok=True)
-                render_image_with_retry(shot['prompt'], image, image_meta, index)
+                try:
+                    render_image_with_retry(shot['prompt'], image, image_meta, index)
+                except ImageSafetyRejected:
+                    # Discard this candidate. The next bounded attempt uses fresh
+                    # noise and must pass the same safety and visual checks.
+                    image.unlink(missing_ok=True)
+                    image_meta.unlink(missing_ok=True)
+                    check.unlink(missing_ok=True)
+                    print(json.dumps({'shot': index, 'image_safety_rejected': True,
+                                      'attempt': attempt+1}), flush=True)
+                    if attempt == 2:
+                        raise
+                    continue
             report = check_scene(image, shot)
             if report['passed']:
                 report['source_signature'] = signature

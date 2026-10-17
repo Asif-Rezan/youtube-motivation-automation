@@ -194,6 +194,44 @@ class ImageCPUChecks(unittest.TestCase):
             self.assertEqual(calls, [shot['prompt']])
             self.assertEqual(json.loads((root/'shot-000.qa.json').read_text())['image_generation']['model'], image_cpu.MODEL)
 
+    def test_shard_safety_rejections_use_new_seeds_and_remain_bounded(self):
+        for rejected in (1, 3):
+            with self.subTest(rejected=rejected), tempfile.TemporaryDirectory() as temp, \
+                 patch.dict(os.environ, {'IMAGE_BACKEND': 'cpu'}, clear=True):
+                root = Path(temp)
+                shot = {'index': 0, 'seed': 1700, 'prompt': 'An adult repairs a bridge',
+                        'duration': 5}
+                (root/'plan.json').write_text(json.dumps({'storyboard_verified': True,
+                    'scene_composition_version': 2, 'style': workflow.VISUAL_STYLE_ID,
+                    'image_interval_seconds': long_video.INTERVAL, 'shots': [shot]}))
+                seeds = []
+                def render(prompt, target):
+                    seeds.append(int(os.environ['IMAGE_SEED']))
+                    if len(seeds) <= rejected:
+                        target.write_bytes(b'rejected')
+                        image_cpu.metadata_path(target).write_text('{}')
+                        raise image_cpu.ImageSafetyRejected('Image blocked by local safety check')
+                    self.assertFalse(target.exists())
+                    target.write_bytes(b'accepted')
+                    image_cpu.metadata_path(target).write_text(json.dumps({'seed': seeds[-1]}))
+                with patch.object(long_video.w, 'make_image', side_effect=render), \
+                     patch('scene_check.check_scene', return_value={'passed': True}) as check, \
+                     patch.object(long_video, 'picture_clip') as clip:
+                    if rejected == 3:
+                        with self.assertRaises(image_cpu.ImageSafetyRejected):
+                            long_video.generate_shard(0, root)
+                        check.assert_not_called()
+                        clip.assert_not_called()
+                        self.assertFalse((root/'shot-000.png').exists())
+                        self.assertFalse((root/'shot-000.image.json').exists())
+                    else:
+                        long_video.generate_shard(0, root)
+                        check.assert_called_once()
+                        clip.assert_called_once()
+                        qa = json.loads((root/'shot-000.qa.json').read_text())
+                        self.assertEqual(qa['image_generation']['seed'], 11700)
+                self.assertEqual(seeds, [1700, 11700, 21700][:len(seeds)])
+
     def test_ssd_requires_local_safety_check_before_saving(self):
         class Pipe:
             safety_checker = None
