@@ -302,6 +302,27 @@ def picture_clip(image, seconds, target):
         '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-movflags', '+faststart', str(target))
 
 
+def render_image_with_retry(prompt, image, image_meta, shot_index):
+    """Retry transient model/network faults without retrying safety or validation failures."""
+    import time
+    for attempt in range(3):
+        try:
+            w.make_image(prompt, image)
+            return
+        except (ConnectionError, TimeoutError, OSError) as error:
+            reason = str(error).lower()
+            transient = isinstance(error, (ConnectionError, TimeoutError)) or any(
+                marker in reason for marker in ('timed out', 'connection', 'temporarily unavailable',
+                                                 'too many requests', '429', '502', '503', '504'))
+            if not transient or attempt == 2:
+                raise
+            image.unlink(missing_ok=True)
+            image_meta.unlink(missing_ok=True)
+            print(json.dumps({'shot': shot_index, 'image_render_retry': attempt+1,
+                              'error_type': type(error).__name__}), flush=True)
+            time.sleep(5 * (attempt+1))
+
+
 def refine_visual_plan(root=ROOT):
     """Keep each physical action dominant; omit the heroine from object-only shots."""
     import re
@@ -400,7 +421,7 @@ def generate_shard(shard, root=ROOT, count=SHARDS):
             os.environ['IMAGE_SEED'] = str(shot['seed']+attempt*10000)
             if not image.exists():
                 clip.unlink(missing_ok=True)
-                w.make_image(shot['prompt'], image)
+                render_image_with_retry(shot['prompt'], image, image_meta, index)
             report = check_scene(image, shot)
             if report['passed']:
                 report['source_signature'] = signature
