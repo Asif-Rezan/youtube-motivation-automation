@@ -8,6 +8,11 @@ It is included as a visual reference for the outline, muted palette, and office 
 style reference. The automated SSD-1B renderer uses this original image as its
 image-to-image starting reference. It is exactly 1024 × 576 pixels.
 
+`preview/financial-story-seed-1700.png` is an actual SSD-1B output made with
+the prompt and settings below. The matching `.image.json` records its pinned
+model revision, reference hash, seed, size, and render duration. This is a style
+preview; the generated action and character details still need human review.
+
 The [SSD-1B model card](https://huggingface.co/segmind/SSD-1B) demonstrates short,
 concrete prompts and recommends a negative prompt with guidance near 9.0. It does
 not publish an inference seed for its example images. This workflow uses a
