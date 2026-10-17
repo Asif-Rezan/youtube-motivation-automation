@@ -70,6 +70,20 @@ class SceneAlignmentTests(unittest.TestCase):
             self.assertIn(shot['semantic_target'], processor.call_args.kwargs['text'])
             self.assertIn(shot['semantic_alternatives'][0], processor.call_args.kwargs['text'])
 
+    def test_clip_load_failure_is_recorded_without_blocking_detailed_image(self):
+        with tempfile.TemporaryDirectory() as temp:
+            image = Path(temp)/'scene.png'
+            rng = random.Random(10)
+            Image.frombytes('RGB', (64, 64), bytes(rng.randrange(256) for _ in range(64*64*3))).save(image)
+            unavailable = SimpleNamespace(from_pretrained=MagicMock(side_effect=OSError('offline')))
+            with patch.object(check, '_model', None), patch.dict(sys.modules, {
+                    'torch': SimpleNamespace(),
+                    'transformers': SimpleNamespace(CLIPModel=unavailable, CLIPProcessor=object)}):
+                result = check.check_scene(image, {'semantic_target': 'A truck crosses a bridge.'})
+            self.assertTrue(result['passed'])
+            self.assertIsNone(result['semantic_match'])
+            self.assertEqual(result['semantic_review_error'], 'OSError')
+
     def test_nearly_identical_neighbor_is_not_used_as_wrong_event(self):
         target = 'Maya repairs the broken clock at her desk.'
         candidates = check.scene_candidates({'semantic_target': target,
