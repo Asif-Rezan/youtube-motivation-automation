@@ -16,7 +16,7 @@ SCENES = {
                'prompt': 'Close-up of hands counting coins beside household bills on a modest kitchen table, overhead view, no faces, no office.',
                'seed': 1701},
     'repair': {'narration': 'The next morning, Elias repaired a bicycle outside a small garage.',
-               'prompt': 'Elias, a young man with short dark hair and a teal jacket, kneels beside a bicycle repairing its chain outside a small garage.',
+               'prompt': 'A complete bicycle with two wheels fills the foreground while a mechanic in a teal jacket repairs its rear chain outside a small garage.',
                'seed': 1702},
 }
 

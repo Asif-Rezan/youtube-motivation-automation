@@ -1,6 +1,12 @@
 name: Preview SSD-1B financial story style
 on:
   workflow_dispatch:
+    inputs:
+      scene:
+        description: Scene to render
+        type: choice
+        default: all
+        options: [all, office, budget, repair]
 permissions:
   contents: read
 jobs:
@@ -9,7 +15,7 @@ jobs:
       fail-fast: false
       max-parallel: 3
       matrix:
-        scene: [office, budget, repair]
+        scene: ${{ fromJSON(inputs.scene == 'office' && '["office"]' || inputs.scene == 'budget' && '["budget"]' || inputs.scene == 'repair' && '["repair"]' || '["office","budget","repair"]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:

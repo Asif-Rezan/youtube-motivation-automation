@@ -90,6 +90,8 @@ Keep recurring characters and clothes consistent. Main character design: {charac
 Each prompt MUST be 12-22 English words: subject and concrete action FIRST, then relevant objects
 and location. Identify the active character, physical action, important objects, and visible emotion
 when the narration supplies them. Describe one drawable composition with a detailed, accurate setting.
+If the action concerns an object, name that object in the opening phrase and keep it fully visible;
+never replace the object with the person holding it or a minor component such as its chain.
 Use natural poses and facial expressions. Include other people only when narrated.
 Do not invent scenery, props, weather, clothing, or characters to add visual interest.
 Name the active character instead of using a pronoun when chapter context identifies them.
