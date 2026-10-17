@@ -411,13 +411,18 @@ def generate_shard(shard, root=ROOT, count=SHARDS):
                     print(json.dumps({'shot': index, 'semantic_review': 'mismatch',
                                       'scene_score': report['scene_score'],
                                       'alternative_score': report['alternative_score']}), flush=True)
+                elif report.get('semantic_review_error'):
+                    print(json.dumps({'shot': index, 'semantic_review': 'unavailable',
+                                      'error_type': report['semantic_review_error']}), flush=True)
                 break
             image.unlink()
             image_meta.unlink(missing_ok=True)
             clip.unlink(missing_ok=True)
-            print(json.dumps({'shot': index, 'visual_check_passed': False, 'attempt': attempt+1}), flush=True)
+            print(json.dumps({'shot': index, 'visual_check_passed': False,
+                              'method': report.get('method'), 'detail_score': report.get('detail_score'),
+                              'attempt': attempt+1}), flush=True)
         else:
-            raise RuntimeError(f'Shot {index} did not match its narrated scene after three CPU renders')
+            raise RuntimeError(f'Shot {index} failed image detail check after three CPU renders')
         if not clip.exists():
             picture_clip(image, shot['duration'], clip)
         print(json.dumps({'shard': shard, 'shot': index+1, 'total': len(plan['shots']), 'rendered': True,
@@ -513,7 +518,8 @@ def finish(root=ROOT):
         'audio_validation': audio_report, 'timeline_verified': True, 'storyboard_verified': plan.get('storyboard_verified', False),
         'alignment': plan.get('alignment'), 'scene_composition_version': plan.get('scene_composition_version'),
         'semantic_checked_images': sum(r.get('required', False) for r in scene_reports),
-        'semantic_review_mismatches': sum(r.get('semantic_match') is False for r in scene_reports)}
+        'semantic_review_mismatches': sum(r.get('semantic_match') is False for r in scene_reports),
+        'semantic_review_unavailable': sum(bool(r.get('semantic_review_error')) for r in scene_reports)}
     (root/'validation.json').write_text(json.dumps(report))
     print(json.dumps(report), flush=True)
     return report
