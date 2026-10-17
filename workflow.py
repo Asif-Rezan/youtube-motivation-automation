@@ -137,7 +137,8 @@ def request_gemini(payload):
             contents.append({'role': 'model' if message['role'] == 'assistant' else 'user',
                              'parts': [{'text': message['content']}]})
     config = {'temperature': payload.get('temperature', .2),
-              'maxOutputTokens': payload.get('max_completion_tokens', 1800) + 2048}
+              'maxOutputTokens': max(16384, payload.get('max_completion_tokens', 1800) + 8192),
+              'thinkingConfig': {'thinkingLevel': 'low'}}
     output = payload.get('response_format', {})
     if output.get('type') == 'json_schema':
         config.update(responseMimeType='application/json',

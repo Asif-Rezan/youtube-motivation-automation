@@ -41,6 +41,8 @@ class GeminiFallbackTests(unittest.TestCase):
         body = calls[1].kwargs['json']
         self.assertEqual(body['generationConfig']['responseJsonSchema'],PAYLOAD['response_format']['json_schema']['schema'])
         self.assertEqual(body['systemInstruction']['parts'],[{'text':'Return JSON.'}])
+        self.assertGreaterEqual(body['generationConfig']['maxOutputTokens'], 16384)
+        self.assertEqual(body['generationConfig']['thinkingConfig'], {'thinkingLevel':'low'})
         sleep.assert_called_once()  # Gemini pacing, not a Groq cooldown.
 
     def test_success_and_auth_errors_do_not_use_fallback(self):
