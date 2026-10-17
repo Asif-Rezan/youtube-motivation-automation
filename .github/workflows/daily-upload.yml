@@ -71,7 +71,7 @@ jobs:
       - name: Generate fresh financial story and exact narration storyboard
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY_BACKUP: ${{ secrets.GROQ_API_KEY_BACKUP }}
           DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
         run: |

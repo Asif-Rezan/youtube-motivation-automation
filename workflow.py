@@ -121,79 +121,29 @@ def groq_retry_delay(response, attempt):
     return min(60 * 2**attempt, 300)
 
 
-_gemini_fallback_active = False
-_gemini_last_request = None
-
-
-def request_gemini(payload):
-    """Translate text chat requests; preserve the response contract used by callers."""
-    import requests
-    global _gemini_last_request
-    contents, system = [], []
-    for message in payload['messages']:
-        if message['role'] == 'system':
-            system.append({'text': message['content']})
-        else:
-            contents.append({'role': 'model' if message['role'] == 'assistant' else 'user',
-                             'parts': [{'text': message['content']}]})
-    config = {'temperature': payload.get('temperature', .2),
-              'maxOutputTokens': max(16384, payload.get('max_completion_tokens', 1800) + 8192),
-              'thinkingConfig': {'thinkingLevel': 'low'}}
-    output = payload.get('response_format', {})
-    if output.get('type') == 'json_schema':
-        config.update(responseMimeType='application/json',
-                      responseJsonSchema=output['json_schema']['schema'])
-    body = {'contents': contents, 'generationConfig': config}
-    if system:
-        body['systemInstruction'] = {'parts': system}
-    # Free-tier Flash permits five requests/minute. Pace calls within this process.
-    if _gemini_last_request is not None:
-        remaining = 13 - (time.monotonic() - _gemini_last_request)
-        if remaining > 0:
-            time.sleep(remaining)
-    _gemini_last_request = time.monotonic()
-    model = os.getenv('GEMINI_MODEL', 'gemini-3.8-flash')
-    response = requests.post(
-        f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
-        headers={'X-goog-api-key': required('GEMINI_API_KEY')}, json=body, timeout=180)
-    if not response.ok:
-        # Never log provider response bodies: they can contain private prompts.
-        raise RuntimeError(f'Gemini fallback failed with HTTP {response.status_code}; '
-                           'check Gemini key access and project quotas')
-    result = response.json()
-    candidates = result.get('candidates', [])
-    if result.get('promptFeedback', {}).get('blockReason') or not candidates:
-        raise RuntimeError('Gemini fallback returned no usable candidate or blocked the prompt')
-    candidate = candidates[0]
-    reason = candidate.get('finishReason')
-    if reason != 'STOP':
-        raise RuntimeError(f'Gemini fallback did not complete successfully; finish_reason={reason}')
-    text = ''.join(part.get('text', '') for part in candidate.get('content', {}).get('parts', [])
-                   if not part.get('thought'))
-    if not text.strip():
-        raise RuntimeError('Gemini fallback returned empty text')
-    if output.get('type') == 'json_schema':
-        from jsonschema import validate, ValidationError
-        try:
-            validate(json.loads(text), output['json_schema']['schema'])
-        except (ValueError, ValidationError):
-            raise RuntimeError('Gemini fallback returned invalid structured JSON') from None
-    print(json.dumps({'check': 'Gemini fallback', 'passed': True, 'model': model}), flush=True)
-    return {'choices': [{'message': {'role': 'assistant', 'content': text}, 'finish_reason': 'stop'}]}
+_groq_backup_active = False
 
 
 def request_groq(endpoint, payload, binary=False):
     import requests
-    global _gemini_fallback_active
-    can_fallback = endpoint == 'chat/completions' and not binary and bool(os.getenv('GEMINI_API_KEY'))
-    if can_fallback and _gemini_fallback_active:
-        return request_gemini(payload)
+    global _groq_backup_active
+    primary = required('GROQ_API_KEY')
+    backup = os.getenv('GROQ_API_KEY_BACKUP', '').strip()
+    use_backup = _groq_backup_active and bool(backup) and backup != primary
     # Retry only explicit provider rejections, never successful generation calls.
     waited = 0
     json_retried = False
     for attempt in range(6):
-        response = requests.post('https://api.groq.com/openai/v1/' + endpoint,
-            headers={'Authorization': 'Bearer ' + required('GROQ_API_KEY')}, json=payload, timeout=180)
+        try:
+            response = requests.post('https://api.groq.com/openai/v1/' + endpoint,
+                headers={'Authorization': 'Bearer ' + (backup if use_backup else primary)}, json=payload, timeout=180)
+        except OSError:
+            if not use_backup and backup and backup != primary and attempt < 5:
+                use_backup = _groq_backup_active = True
+                print(json.dumps({'check': 'Groq key fallback', 'key_slot': 'backup',
+                                  'reason': 'connection_error'}), flush=True)
+                continue
+            raise
         if response.ok:
             return response.content if binary else response.json()
         try:
@@ -202,11 +152,11 @@ def request_groq(endpoint, payload, binary=False):
             error_code = None
         print(json.dumps({'check': 'Groq generation', 'http_status': response.status_code,
             'api_error_code': error_code, 'attempt': attempt+1}), flush=True)
-        if can_fallback and response.status_code in (429, 500, 502, 503, 504):
-            _gemini_fallback_active = True
-            print(json.dumps({'check': 'Text provider fallback', 'from': 'Groq',
-                              'to': 'Gemini', 'http_status': response.status_code}), flush=True)
-            return request_gemini(payload)
+        if not use_backup and backup and backup != primary and attempt < 5 and response.status_code in (401, 403, 429, 500, 502, 503, 504):
+            use_backup = _groq_backup_active = True
+            print(json.dumps({'check': 'Groq key fallback', 'key_slot': 'backup',
+                              'http_status': response.status_code}), flush=True)
+            continue
         if response.status_code == 429:
             delay = groq_retry_delay(response, attempt)
             if attempt == 5 or waited + delay > 900:
