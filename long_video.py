@@ -329,6 +329,37 @@ def render_image_with_retry(prompt, image, image_meta, shot_index):
             time.sleep(5 * (attempt+1))
 
 
+def render_safe_scene(shot, image, image_meta):
+    """Try five candidates per prompt, then one family-friendly scene rewrite."""
+    from image_cpu import ImageSafetyRejected
+    base_seed = int(os.environ.get('IMAGE_SEED', shot['seed']))
+    action = shot.get('visual_action') or shot.get('semantic_target') or shot['prompt']
+    safer_prompt = (
+        'Family-friendly editorial illustration of an ordinary everyday scene. '
+        'All people are fully clothed adults in modest everyday clothing. '
+        'Show the following action without nudity, sexual content, injury, blood or violence: '
+        + action + '. Use a neutral wide composition and focus on the everyday objects and task.')
+    try:
+        for phase, prompt in enumerate((shot['prompt'], safer_prompt)):
+            if phase:
+                print(json.dumps({'shot': shot['index'], 'image_prompt_rewritten': True,
+                                  'reason': 'five safety-rejected candidates'}), flush=True)
+            for attempt in range(5):
+                os.environ['IMAGE_SEED'] = str(base_seed + (phase*5+attempt)*1000)
+                try:
+                    render_image_with_retry(prompt, image, image_meta, shot['index'])
+                    return
+                except ImageSafetyRejected:
+                    image.unlink(missing_ok=True)
+                    image_meta.unlink(missing_ok=True)
+                    print(json.dumps({'shot': shot['index'], 'image_safety_rejected': True,
+                                      'prompt_phase': phase+1, 'attempt': attempt+1}), flush=True)
+                    if phase == 1 and attempt == 4:
+                        raise
+    finally:
+        os.environ['IMAGE_SEED'] = str(base_seed)
+
+
 def refine_visual_plan(root=ROOT):
     """Keep each physical action dominant; omit the heroine from object-only shots."""
     import re
@@ -428,7 +459,7 @@ def generate_shard(shard, root=ROOT, count=SHARDS):
             os.environ['IMAGE_SEED'] = str(shot['seed']+attempt*10000)
             if not image.exists():
                 clip.unlink(missing_ok=True)
-                render_image_with_retry(shot['prompt'], image, image_meta, index)
+                render_safe_scene(shot, image, image_meta)
             report = check_scene(image, shot)
             if report['passed']:
                 report['source_signature'] = signature

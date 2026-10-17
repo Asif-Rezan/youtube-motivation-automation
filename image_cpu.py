@@ -25,6 +25,10 @@ _safety_checker = None
 _safety_processor = None
 
 
+class ImageSafetyRejected(RuntimeError):
+    """A generated candidate was rejected; it must never be saved or used."""
+
+
 @dataclass(frozen=True)
 class ImageConfig:
     model: str
@@ -127,7 +131,7 @@ def check_ssd_safety(image):
     if not flags or len(flags) != 1:
         raise RuntimeError('Local image safety checker returned no decision')
     if flags[0]:
-        raise RuntimeError('Image blocked by local safety check')
+        raise ImageSafetyRejected('Image blocked by local safety check')
 
 
 def generate(prompt, path):
@@ -159,7 +163,7 @@ def generate(prompt, path):
         options['prompt_2'] = config.reference_style + '. ' + scene_prompt
     result = pipe(**options)
     if any(getattr(result, 'nsfw_content_detected', None) or []):
-        raise RuntimeError('Image blocked by model safety check')
+        raise ImageSafetyRejected('Image blocked by model safety check')
     image = result.images[0]
     if config.model == SSD_MODEL and os.getenv('CPU_IMAGE_BENCHMARK') != 'true':
         check_ssd_safety(image)
