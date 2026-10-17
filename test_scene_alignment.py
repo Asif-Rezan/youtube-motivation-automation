@@ -84,6 +84,35 @@ class SceneAlignmentTests(unittest.TestCase):
             self.assertIsNone(result['semantic_match'])
             self.assertEqual(result['semantic_review_error'], 'OSError')
 
+    def test_temporary_image_download_failure_retries_and_removes_partial_file(self):
+        with tempfile.TemporaryDirectory() as temp:
+            image = Path(temp)/'scene.png'
+            metadata = Path(temp)/'scene.image.json'
+            calls = []
+            def render(prompt, target):
+                calls.append(prompt)
+                if len(calls) == 1:
+                    target.write_bytes(b'partial')
+                    metadata.write_text('{}')
+                    raise OSError('Connection timed out')
+                self.assertFalse(target.exists())
+                self.assertFalse(metadata.exists())
+                target.write_bytes(b'complete')
+            with patch.object(video.w, 'make_image', side_effect=render), \
+                 patch('time.sleep') as sleep:
+                video.render_image_with_retry('scene', image, metadata, 0)
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(image.read_bytes(), b'complete')
+            sleep.assert_called_once()
+
+    def test_image_safety_rejection_is_not_retried(self):
+        with tempfile.TemporaryDirectory() as temp, \
+             patch.object(video.w, 'make_image', side_effect=RuntimeError('Image blocked by local safety check')) as render:
+            with self.assertRaisesRegex(RuntimeError, 'safety check'):
+                video.render_image_with_retry('scene', Path(temp)/'scene.png',
+                                              Path(temp)/'scene.image.json', 0)
+            render.assert_called_once()
+
     def test_nearly_identical_neighbor_is_not_used_as_wrong_event(self):
         target = 'Maya repairs the broken clock at her desk.'
         candidates = check.scene_candidates({'semantic_target': target,
