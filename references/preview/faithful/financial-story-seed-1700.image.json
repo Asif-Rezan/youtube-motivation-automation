@@ -1,0 +1,1 @@
+{"model": "segmind/SSD-1B", "revision": "60987f37e94cd59c36b1cba832b9f97b57395a10", "width": 1024, "height": 576, "steps": 16, "guidance_scale": 9.0, "reference_sha256": "d2e98e3cda3da46a7d7a6bf4d70675891be51db7587de07575abf68d8db31b64", "reference_strength": 0.35, "seed": 1700, "seconds": 200.15, "safety_check_available": true}

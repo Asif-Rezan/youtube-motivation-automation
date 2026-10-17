@@ -9,11 +9,12 @@ that style reference, then recolored to a cool slate blue, teal, and gray palett
 The automated SSD-1B renderer uses it as its image-to-image starting reference.
 It is exactly 1024 × 576 pixels.
 
-`preview/cool/financial-story-seed-1700.png` is the first cool SSD-1B output
-using the cool reference, prompt and settings below. Its matching `.image.json`
-records the model revision, reference hash, seed, dimensions and render duration.
-The older preview metadata in `preview/` documents the previous warm version.
-See [successful preview run #2](https://github.com/Asif-Rezan/youtube-motivation-automation/actions/runs/39007602721).
+`preview/faithful/financial-story-seed-1700.png` is the verified SSD-1B
+output using the cool reference and strength 0.35. It retains the two people and
+office layout much more closely. Its `.image.json` records the model revision,
+reference hash, seed, dimensions and render duration. The earlier `preview/cool/`
+image used strength 0.85 and changed the composition substantially. See
+[successful preview run #3](https://github.com/Asif-Rezan/youtube-motivation-automation/actions/runs/39021905959).
 
 The [SSD-1B model card](https://huggingface.co/segmind/SSD-1B) demonstrates short,
 concrete prompts and recommends a negative prompt with guidance near 9.0. It does
