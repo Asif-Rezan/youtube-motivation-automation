@@ -14,7 +14,7 @@ jobs:
       CPU_IMAGE_STEPS: '16'
       CPU_IMAGE_GUIDANCE_SCALE: '9.0'
       CPU_STYLE_REFERENCE: references/financial-story-style-cool-1024x576.png
-      CPU_REFERENCE_STRENGTH: '0.85'
+      CPU_REFERENCE_STRENGTH: '0.35'
       IMAGE_SEED: '1700'
       OMP_NUM_THREADS: '4'
       MKL_NUM_THREADS: '4'

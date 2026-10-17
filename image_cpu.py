@@ -47,7 +47,7 @@ def image_config():
     reference = os.getenv('CPU_STYLE_REFERENCE', '').strip()
     if reference and model != SSD_MODEL:
         raise ValueError('CPU style reference requires SSD-1B')
-    strength = float(os.getenv('CPU_REFERENCE_STRENGTH', '0.85')) if reference else 0.0
+    strength = float(os.getenv('CPU_REFERENCE_STRENGTH', '0.35')) if reference else 0.0
     if reference and not 0 < strength <= 1:
         raise ValueError('CPU reference strength must be in (0, 1]')
     reference_sha = hashlib.sha256(Path(reference).read_bytes()).hexdigest() if reference else None

@@ -9,7 +9,7 @@ that style reference, then recolored to a cool slate blue, teal, and gray palett
 The automated SSD-1B renderer uses it as its image-to-image starting reference.
 It is exactly 1024 × 576 pixels.
 
-`preview/cool/financial-story-seed-1700.png` is the verified SSD-1B output
+`preview/cool/financial-story-seed-1700.png` is the first cool SSD-1B output
 using the cool reference, prompt and settings below. Its matching `.image.json`
 records the model revision, reference hash, seed, dimensions and render duration.
 The older preview metadata in `preview/` documents the previous warm version.
@@ -30,6 +30,6 @@ Example negative prompt:
 > watercolor, 3d render, glossy plastic, realistic skin texture, blurry, low detail, distorted anatomy, extra limbs, watermark, lettering, text, warm orange lighting, red color cast, sepia
 
 Example settings: `seed=1700`, `width=1024`, `height=576`, `steps=16`,
-`guidance_scale=9.0`, `reference_strength=0.85`. The model and revision are pinned
+`guidance_scale=9.0`, `reference_strength=0.35`. The model and revision are pinned
 in `image_cpu.py`. A seed is reproducible only with the same model, revision,
 prompt, reference image, and generation settings.
