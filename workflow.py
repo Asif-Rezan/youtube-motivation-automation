@@ -186,7 +186,8 @@ def make_story(day, previous):
     Invent the title, events and dialogue; do not reproduce another channel's titles, characters or plot sequence.
     story_bible: max 180 words recording starting age/job, family, take-home income, recurring expenses,
     opening cash/debt, goal, time horizon and the causal ending. Use only the numbers the plot actually needs.
-    Each chapter's continuity_note: max 30 words recording elapsed time, any money changes and unresolved setup/payoff.
+    Each chapter's continuity_note: max 18 words recording elapsed time, any money changes and unresolved setup/payoff.
+    Keep chapter summaries to 18 words and image_prompt to 16 words to fit the outline response budget.
     Description must clearly disclose an original fictional, educational scenario, not personal financial advice.
     ''' if financial else '')
     outline = ask(f'''Plan an original fictional English motivational story for {day}.
@@ -207,10 +208,10 @@ def make_story(day, previous):
     protagonist_name (first name), character_description (max 24 words: age appearance,
     skin tone, face shape, hair color and style, consistent outfit),
     scenes (object with chapter_01 through chapter_20). Each chapter: summary (max 25 words), image_prompt,
-    image_prompts (four distinct visual beats, each max 8 words). Use clear scenes that work as
+    image_prompts ({'two' if financial else 'four'} distinct visual beats, each max 8 words). Use clear scenes that work as
     cinematic 2D editorial illustrations grounded in each chapter's actual events, setting, and time of day.
     Show the specific narrated action or objects; include unusual or fantastical elements only when the story describes them.
-    Main character keeps the same appearance and clothing. Provide ONLY the plan, no full narration yet.''', 6500 if financial else 5200, outline_schema)
+    Main character keeps the same appearance and clothing. Provide ONLY the plan, no full narration yet.''', 5200, outline_schema)
     outline['scenes'] = [outline['scenes'][k] for k in chapter_keys]
     outline['format'] = selected_format
     if financial:
