@@ -25,6 +25,8 @@ def saved_run_id():
 def render():
     from PIL import Image, ImageOps
     from music_cpu import generate
+    from image_cpu import metadata_path
+    from long_video import render_safe_scene, render_safe_thumbnail
     ROOT.mkdir(parents=True, exist_ok=True)
     story = w.validate_story(json.loads(Path('private-test-story.json').read_text()),
                              word_range=(500, 1000))
@@ -36,7 +38,8 @@ def render():
         image, audio, clip = [ROOT/f'{i:02}.{ext}' for ext in ('png', 'wav', 'mp4')]
         w.make_narration(scene['narration'], audio)
         words = w.transcribe(audio)
-        w.make_image(scene['image_prompt'], image)
+        render_safe_scene({'index': i, 'seed': 1700+i, 'prompt': scene['image_prompt'],
+                           'visual_action': scene['image_prompt']}, image, metadata_path(image))
         word_lists.append(words)
         lengths.append(w.render_scene(image, audio, clip))
         clips.append(clip)
@@ -56,7 +59,7 @@ def render():
         '-crf', '21', '-c:a', 'aac', '-movflags', '+faststart', str(ROOT/'video.mp4'))
     meta = check_test_video(ROOT/'video.mp4')
     source = ROOT/'thumbnail-source.png'
-    w.make_image(story['thumbnail_prompt'] + '. Main character: ' +
+    render_safe_thumbnail(story['thumbnail_prompt'] + '. Main character: ' +
         story.get('character_description', '') + '. Single clear cinematic story scene, '
         'no title text, labels, numbers, arrows, or interface elements.', source)
     image = ImageOps.fit(Image.open(source).convert('RGB'), (1280, 720))
