@@ -539,16 +539,44 @@ class Store:
         self.check_private(self.folder)
         self.check_quota(size)
         file_id = self.find(key)
-        if file_id:
-            return self.client.files().update(fileId=file_id, media_body=media, fields='id').execute()
+        creating = file_id is None
+        if creating:
+            file_id = self.client.files().generateIds(count=1, space='drive').execute()['ids'][0]
         metadata = {'name': key.replace('/', '__'), 'parents': [self.folder],
                     'appProperties': {'workflow_key': hashlib.sha256(key.encode()).hexdigest()}}
+        if creating:
+            metadata['id'] = file_id
         if os.getenv('RUN_SCOPED_CLEANUP') == 'true' and key.startswith('runs/'):
             parts = key.split('/')
             from daily_publish import disposable
             if len(parts) == 3 and disposable(parts[2]):
                 metadata['appProperties'].update(automation_run=parts[1], disposable='v1')
-        return self.client.files().create(body=metadata, media_body=media, fields='id').execute()
+        for attempt in range(5):
+            try:
+                if creating:
+                    return self.client.files().create(body=metadata, media_body=media, fields='id').execute(num_retries=3)
+                return self.client.files().update(fileId=file_id, media_body=media, fields='id').execute(num_retries=3)
+            except Exception as error:
+                status = getattr(getattr(error, 'resp', None), 'status', None)
+                if creating and (status == 409 or isinstance(error, (TimeoutError, ConnectionError))):
+                    # A timed-out create may already have completed. Never allocate a second ID.
+                    try:
+                        info = self.client.files().get(fileId=file_id, fields='id,size,parents,appProperties').execute(num_retries=3)
+                        if (int(info.get('size', -1)) == size and self.folder in info.get('parents', [])
+                                and info.get('appProperties', {}).get('workflow_key') == metadata['appProperties']['workflow_key']):
+                            self.check_private(file_id)
+                            return {'id': file_id}
+                    except Exception:
+                        if status == 409:
+                            raise RuntimeError('Media upload conflict requires reconciliation') from error
+                    if status == 409:
+                        raise RuntimeError('Media upload conflict requires reconciliation') from error
+                transient = isinstance(error, (TimeoutError, ConnectionError)) or status in (408, 429, 500, 502, 503, 504)
+                if not transient or attempt == 4:
+                    raise
+                print(json.dumps({'check': 'Drive media upload', 'retry': attempt + 1,
+                    'error_type': type(error).__name__}), flush=True)
+                time.sleep(min(2 ** (attempt + 1), 16))
 
     def save(self, key, value):
         """Retry checkpoint writes against one fixed Drive ID, including ambiguous creates."""
