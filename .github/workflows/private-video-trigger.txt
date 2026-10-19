@@ -1,1 +1,1 @@
-2026-10-15: start another fresh private financial storytelling video now, using the current cinematic 2D editorial story images, five-second shots, and 20 image workers. The twice-daily schedule remains in place.
+2026-10-19: start a fresh daily financial storytelling run after merging the bounded second-person narration repair in PR #8. Use the existing daily workflow settings, seven-second shots, 20 image workers, and private YouTube upload verification.
