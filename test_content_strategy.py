@@ -60,6 +60,16 @@ class ContentStrategyTests(unittest.TestCase):
         self.assertTrue(revised['scenes'][-1]['narration'].endswith(w.FINAL_CTA))
 
     def test_generated_story_preserves_profile_and_continuity_across_batches(self):
+        self._generated_story()
+
+    def test_missing_pov_repairs_only_failed_chapter_before_next_batch(self):
+        self._generated_story(bad_responses=1)
+
+    def test_persistent_missing_pov_stops_after_two_repairs(self):
+        with self.assertRaisesRegex(ValueError, 'after two repairs: chapter_01'):
+            self._generated_story(bad_responses=3)
+
+    def _generated_story(self, bad_responses=0):
         requests = []
         def ask(endpoint, payload, binary=False):
             requests.append(payload)
@@ -77,6 +87,11 @@ class ContentStrategyTests(unittest.TestCase):
             else:
                 keys = properties['narrations']['required']
                 result = {'narrations': {key: 'You weigh the extra pay against the hours you would lose. '*7 for key in keys}}
+                if 'chapter_01' in keys and len(requests) <= bad_responses + 1:
+                    result['narrations']['chapter_01'] = 'Maya weighs the extra pay against the hours she would lose. '*7
+                if len(keys) == 1:
+                    self.assertEqual(keys, ['chapter_01'])
+                    self.assertIn('Day 20; offer remains undecided.', payload['messages'][0]['content'])
             return {'choices': [{'message': {'content': json.dumps(result)}, 'finish_reason': 'stop'}]}
         with patch.dict(os.environ, {'CONTENT_TYPE': 'financial-storytelling'}, clear=True), \
              patch.object(w, 'request_groq', side_effect=ask), patch.object(w.time, 'sleep'):
@@ -84,7 +99,7 @@ class ContentStrategyTests(unittest.TestCase):
         self.assertEqual(story['content_profile'], PROFILE)
         self.assertIn(story['content_pillar'], PILLARS)
         self.assertEqual(len(story['scenes']), 20)
-        self.assertEqual(len(requests), 5)
+        self.assertEqual(len(requests), 5 + bad_responses)
         for request in requests[1:]:
             prompt = request['messages'][0]['content']
             self.assertIn(story['story_bible'], prompt)
