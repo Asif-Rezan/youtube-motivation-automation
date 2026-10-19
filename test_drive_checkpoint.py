@@ -57,3 +57,24 @@ class CheckpointTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.store.save('history.json', [])
         self.assertEqual(execute.call_count, 1)
+
+    def test_media_create_timeout_retries_with_one_id(self):
+        self.store.find.return_value = None
+        self.store.client.files().generateIds().execute.return_value = {'ids': ['fixed-id']}
+        self.store.client.files().get().execute.side_effect = RuntimeError('not found yet')
+        execute = self.store.client.files().create().execute
+        execute.side_effect = [TimeoutError(), {'id': 'fixed-id'}]
+        self.store.client.files().create.reset_mock()
+        self.store.put('runs/daily-1/shot-001.png', object(), 123)
+        self.assertEqual(execute.call_count, 2)
+        self.assertEqual({c.kwargs['body']['id'] for c in self.store.client.files().create.call_args_list}, {'fixed-id'})
+
+    def test_media_timeout_after_success_is_reconciled(self):
+        self.store.find.return_value = None
+        self.store.client.files().generateIds().execute.return_value = {'ids': ['fixed-id']}
+        self.store.client.files().create().execute.side_effect = TimeoutError()
+        self.store.client.files().get().execute.return_value = {
+            'id': 'fixed-id', 'size': '123', 'parents': ['folder'],
+            'appProperties': {'workflow_key': workflow.hashlib.sha256(b'asset').hexdigest()}}
+        self.store.put('asset', object(), 123)
+        self.assertEqual(self.store.client.files().create().execute.call_count, 1)
