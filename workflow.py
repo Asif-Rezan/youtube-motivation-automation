@@ -316,6 +316,34 @@ def make_story(day, previous):
         parts = [group['narrations'][k] for k in keys]
         if len(parts) != 5 or not all(isinstance(p, str) for p in parts):
             raise ValueError('Narration batch must contain five strings')
+        if financial:
+            for attempt in range(2):
+                missing = [key for key, part in zip(keys, parts)
+                           if not re.search(r'\b(you|your|yours|yourself)\b', part, re.I)]
+                if not missing:
+                    break
+                print(json.dumps({'narration_pov_retry': attempt + 1, 'chapters': missing}), flush=True)
+                time.sleep(60)
+                repair_schema = object_schema({'narrations': object_schema({k: text_schema for k in missing})})
+                repaired = ask(f'''Rewrite ONLY these chapters in second person, addressing the protagonist as you/your in EVERY chapter.
+                Keep 82-88 English spoken words per chapter. Preserve the events, dialogue meaning, money amounts and timeline.
+                {narration_direction(outline)}
+                Story bible: {outline.get('story_bible', '')}
+                Full continuity map: {json.dumps(outline['scenes'])}
+                Previous chapter ending: {prior[-700:]}
+                Chapters to rewrite: {json.dumps({key: part for key, part in zip(keys, parts) if key in missing})}
+                Return narrations with exactly these keys: {missing}. No headings or viewer calls to action.''',
+                    4200, repair_schema)
+                for index, key in enumerate(keys):
+                    if key in missing:
+                        replacement = repaired['narrations'][key]
+                        if not isinstance(replacement, str):
+                            raise ValueError(f'Financial POV {key} narration must be a string')
+                        parts[index] = replacement
+            missing = [key for key, part in zip(keys, parts)
+                       if not re.search(r'\b(you|your|yours|yourself)\b', part, re.I)]
+            if missing:
+                raise ValueError(f'Financial POV chapters lost second-person narration after two repairs: {", ".join(missing)}')
         for scene, narration in zip(outline['scenes'][begin:begin+5], parts):
             scene['narration'] = narration
         prior = parts[-1]
