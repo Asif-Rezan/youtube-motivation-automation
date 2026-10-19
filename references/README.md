@@ -6,8 +6,9 @@ It is included as a visual reference for the outline, muted palette, and office 
 
 `financial-story-style-cool-1024x576.png` is an original illustration made from
 that style reference, then recolored to a cool slate blue, teal, and gray palette.
-The automated SSD-1B renderer reads its dominant color palette and combines that
-with the project’s illustration description. Every scene starts from fresh noise,
+The automated SSD-1B renderer combines its illustration style with the project's
+brighter color description without copying the cool reference palette.
+Every scene starts from fresh noise,
 not this image. Style guidance is textual; it is not pixel-level style transfer.
 It is exactly 1024 × 576 pixels.
 
