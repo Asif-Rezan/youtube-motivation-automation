@@ -202,11 +202,11 @@ exact metadata before resuming. The daily 01:00 Asia/Dhaka schedule is unchanged
 
 ## Reference style without repeated scenes
 
-The cool reference supplies a dominant-color summary alongside the established
-2D editorial style description. SSD-1B generates each narrated composition from
+The reference supplies the established 2D editorial style description without
+copying its cool palette. SSD-1B generates each narrated composition from
 fresh noise using the shot-specific prompt and seed. The reference is never
 passed as an img2img starting image, so its office layout is not reused for
-other actions and settings. This is text/palette guidance, not a learned style
+other actions and settings. This is text style guidance, not a learned style
 adapter or pixel-level style transfer; visual consistency still needs review.
 Both images and thumbnails remain 1024×576, 16 steps, guidance 9.0, with a new
 video image every seven seconds. These are now 16 full text-to-image steps,
