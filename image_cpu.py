@@ -43,29 +43,11 @@ class ImageConfig:
     reference_style: str = ''
 
 
-# The reference supplies palette and an explicit illustration description, never
-# its scene geometry. This is text style guidance, not an IP-Adapter or img2img.
+# The reference identifies the illustration style, never its cool color palette or
+# scene geometry. This is text guidance, not an IP-Adapter or img2img.
 STYLE_DESCRIPTION = ('cinematic 2D editorial illustration, clean dark outlines, controlled cel shading, '
-                     'expressive simplified faces, muted cool colors, soft overcast light')
-
-
-def reference_style_description(path):
-    from PIL import Image
-    # Summarize color frequencies only: no positions, objects, or image latents
-    # from the reference can leak into the generated composition.
-    palette = {'slate blue': (85, 105, 130), 'dusty teal': (70, 115, 120),
-               'cool gray': (140, 148, 160), 'navy blue': (35, 50, 75),
-               'muted green': (95, 120, 95), 'muted brown': (125, 100, 80)}
-    counts = dict.fromkeys(palette, 0)
-    with Image.open(path) as original:
-        colors = original.convert('RGB').resize((64, 64)).getdata()
-        for color in colors:
-            if max(color) < 35 or min(color) > 220:
-                continue
-            name = min(palette, key=lambda name: sum((a-b)**2 for a,b in zip(color,palette[name])))
-            counts[name] += 1
-    dominant = sorted(counts, key=counts.get, reverse=True)[:3]
-    return STYLE_DESCRIPTION + ', palette of ' + ', '.join(dominant)
+                     'expressive simplified faces, bright whites, warm neutrals, balanced colorful accents, '
+                     'natural skin tones and luminous scene-appropriate lighting')
 
 
 def image_config():
@@ -77,7 +59,7 @@ def image_config():
     if reference and model != SSD_MODEL:
         raise ValueError('CPU style reference requires SSD-1B')
     reference_sha = hashlib.sha256(Path(reference).read_bytes()).hexdigest() if reference else None
-    style = reference_style_description(reference) if reference else ''
+    style = STYLE_DESCRIPTION if reference else ''
     config = ImageConfig(model, revision, int(os.getenv('CPU_IMAGE_WIDTH', '768' if model == DREAMSHAPER_MODEL else '1024')),
                          int(os.getenv('CPU_IMAGE_HEIGHT', '432' if model == DREAMSHAPER_MODEL else '576')),
                          int(os.getenv('CPU_IMAGE_STEPS', '28' if model == DREAMSHAPER_MODEL else '16')),
