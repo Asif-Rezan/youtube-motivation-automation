@@ -330,7 +330,7 @@ def render_image_with_retry(prompt, image, image_meta, shot_index):
 
 
 def render_safe_scene(shot, image, image_meta):
-    """Try five candidates per prompt, then one family-friendly scene rewrite."""
+    """Retry a rejected image, then use a family-friendly prompt with fresh seeds."""
     from image_cpu import ImageSafetyRejected
     base_seed = int(os.environ.get('IMAGE_SEED', shot['seed']))
     action = shot.get('visual_action') or shot.get('semantic_target') or shot['prompt']
@@ -340,12 +340,13 @@ def render_safe_scene(shot, image, image_meta):
         'Show the following action without nudity, sexual content, injury, blood or violence: '
         + action + '. Use a neutral wide composition and focus on the everyday objects and task.')
     try:
-        for phase, prompt in enumerate((shot['prompt'], safer_prompt)):
+        seed_offset = 0
+        for phase, (prompt, attempts) in enumerate(((shot['prompt'], 2), (safer_prompt, 5))):
             if phase:
                 print(json.dumps({'shot': shot['index'], 'image_prompt_rewritten': True,
-                                  'reason': 'five safety-rejected candidates'}), flush=True)
-            for attempt in range(5):
-                os.environ['IMAGE_SEED'] = str(base_seed + (phase*5+attempt)*1000)
+                                  'reason': 'two safety-rejected candidates'}), flush=True)
+            for attempt in range(attempts):
+                os.environ['IMAGE_SEED'] = str(base_seed + (seed_offset+attempt)*1000)
                 try:
                     render_image_with_retry(prompt, image, image_meta, shot['index'])
                     return
@@ -354,10 +355,18 @@ def render_safe_scene(shot, image, image_meta):
                     image_meta.unlink(missing_ok=True)
                     print(json.dumps({'shot': shot['index'], 'image_safety_rejected': True,
                                       'prompt_phase': phase+1, 'attempt': attempt+1}), flush=True)
-                    if phase == 1 and attempt == 4:
-                        raise
+                    if phase == 1 and attempt == attempts-1:
+                        raise RuntimeError(f"Image safety rejected all {seed_offset+attempts} candidates for {shot['index']}") from None
+            seed_offset += attempts
     finally:
         os.environ['IMAGE_SEED'] = str(base_seed)
+
+
+def render_safe_thumbnail(prompt, source):
+    """Apply scene image recovery to the final thumbnail."""
+    from image_cpu import metadata_path
+    render_safe_scene({'index': 'thumbnail', 'seed': int(os.environ.get('IMAGE_SEED', '9931')),
+                       'prompt': prompt, 'visual_action': prompt}, source, metadata_path(source))
 
 
 def refine_visual_plan(root=ROOT):
@@ -562,7 +571,7 @@ def finish(root=ROOT):
         story['character_description'] + '. Make a single story-specific cinematic thumbnail '
         'with the protagonist prominent and a clear contrasting background or supporting characters. '
         'No title text, labels, numbers, arrows, or interface elements.')
-    w.make_image(thumbnail_prompt, root/'thumbnail-source.png')
+    render_safe_thumbnail(thumbnail_prompt, root/'thumbnail-source.png')
     image = ImageOps.fit(Image.open(root/'thumbnail-source.png').convert('RGB'), (1280, 720))
     image.save(root/'thumbnail.jpg', quality=92)
     if (root/'thumbnail.jpg').stat().st_size >= 2*1024*1024:
