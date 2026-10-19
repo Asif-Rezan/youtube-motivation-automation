@@ -1,1 +1,1 @@
-2026-10-19: start a fresh daily financial storytelling run after merging the bounded second-person narration repair in PR #8. Use the existing daily workflow settings, seven-second shots, 20 image workers, and private YouTube upload verification.
+2026-10-19: start a fresh daily financial storytelling run with fixed-ID Drive media upload retries. Use the existing daily workflow settings, seven-second shots, 20 image workers, and private YouTube upload verification.
