@@ -141,7 +141,9 @@ class ImageCPUChecks(unittest.TestCase):
             for index, call in enumerate(pipe.calls):
                 self.assertEqual(call['prompt'], prompts[index])
                 self.assertIn('cel shading', call['prompt_2'])
-                self.assertIn('slate blue', call['prompt_2'])
+                self.assertIn('bright whites', call['prompt_2'])
+                self.assertIn('colorful accents', call['prompt_2'])
+                self.assertNotIn('slate blue', call['prompt_2'])
                 self.assertIn(prompts[index], call['prompt_2'])
                 self.assertNotIn('image', call)
                 self.assertNotIn('strength', call)
