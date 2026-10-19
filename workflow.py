@@ -18,9 +18,10 @@ FINAL_CTA = (" Which choice would you have made in that situation? "
     'and subscribe for more stories about money, choices, and everyday life.')
 
 VISUAL_STYLE = ('cinematic 2D editorial story illustration, clean dark outlines, '
-    'controlled cel shading, muted slate blue, dusty teal and cool gray colors, expressive simplified faces, '
+    'controlled cel shading, bright whites and warm neutral surfaces, balanced colorful accents '
+    'of coral, golden yellow, leafy green and clear blue, natural skin tones, expressive simplified faces, '
     'recognizable everyday environments with specific story objects, '
-    'soft cool lighting appropriate to the scene, wide landscape composition, '
+    'luminous balanced lighting appropriate to the scene, wide landscape composition, '
     'consistent character appearance and clothing')
 VISUAL_STYLE_ID = 'cinematic-editorial-2d'
 IMAGE_INTERVAL_SECONDS = 7
