@@ -1,1 +1,1 @@
-2026-10-19: start a fresh daily financial storytelling run after merging image safety retry fix PR #9. Generate a new story, narration, scene images, thumbnail, and private YouTube upload verification.
+2026-10-19: start a fresh daily financial storytelling run with the brighter, colorful image style from PR #10. Replace canceled run 39216004588 and verify the resulting private YouTube upload.
