@@ -1,1 +1,1 @@
-2026-10-19: start a fresh daily financial storytelling run with the brighter, colorful image style from PR #10. Replace canceled run 39216004588 and verify the resulting private YouTube upload.
+2026-10-21: user-requested fresh private video generation after OAuth preflight hardening. Require valid Drive authorization and Groq configuration before generation.
