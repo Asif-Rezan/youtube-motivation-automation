@@ -26,5 +26,6 @@ jobs:
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
           EXPECTED_CHANNEL_ID: UCztvMrNCT34DO3DtzLPgWaw
           REQUIRE_PUBLIC_PUBLISH: 'false'
+          REQUIRE_GROQ: 'true'
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: python oauth_check.py

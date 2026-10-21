@@ -67,6 +67,8 @@ jobs:
           YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
           EXPECTED_CHANNEL_ID: UCztvMrNCT34DO3DtzLPgWaw
           REQUIRE_PUBLIC_PUBLISH: 'false'
+          REQUIRE_GROQ: 'true'
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: python oauth_check.py
       - name: Generate fresh financial story and exact narration storyboard
         env:

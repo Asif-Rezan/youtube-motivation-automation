@@ -34,7 +34,13 @@ def report_error(name, error):
         if code in str(error):
             safe = code
             break
-    print(json.dumps({'check': name, 'passed': False, 'error': safe, 'http_status': status}))
+    result = {'check': name, 'passed': False, 'error': safe, 'http_status': status}
+    if safe == 'invalid_grant':
+        result['action'] = ('Google rejected the refresh token. Reauthorize the affected service and replace its '
+            'GitHub token secret. If the OAuth app is External/Testing, change it to Production before '
+            'issuing the replacement token to avoid the seven-day Testing expiry. '
+            'Use the original OAuth client for Drive to preserve drive.file access. See docs/oauth-recovery.md.')
+    print(json.dumps(result))
 
 try:
     creds = credentials('YOUTUBE_TOKEN_JSON')
@@ -93,5 +99,8 @@ try:
 except Exception as error:
     report_error('Drive OAuth', error)
 
-print(json.dumps({'check':'Groq secret presence','configured':bool(os.getenv('GROQ_API_KEY'))}))
+groq_configured = bool(os.getenv('GROQ_API_KEY', '').strip())
+print(json.dumps({'check': 'Groq secret presence', 'configured': groq_configured}))
+if os.getenv('REQUIRE_GROQ') == 'true' and not groq_configured:
+    report_error('Groq readiness', RuntimeError('missing_secret'))
 raise SystemExit(1 if failed else 0)
