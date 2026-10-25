@@ -1,0 +1,29 @@
+name: Real CPU narration check
+on:
+  push:
+    branches: [main]
+    paths: ['requirements-cpu.txt', 'voice_cpu.py', 'narration_check.py', '.github/workflows/narration-check.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  narration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HF_HUB_DISABLE_XET: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install production narration dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y espeak-ng
+          pip install -r requirements.txt
+          pip install 'torch==2.7.1' --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-cpu.txt
+          pip check
+      - name: Generate and validate real narration
+        run: python narration_check.py

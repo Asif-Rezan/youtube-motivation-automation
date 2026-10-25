@@ -6,3 +6,14 @@ safetensors>=0.4,<1
 kokoro==0.9.4
 soundfile==0.13.1
 faster-whisper==1.2.1
+
+# English tokenizer stack from the successful 2026-10-19 production run.
+# Keep the compiled hash-table libraries compatible with spaCy's tokenizer.
+misaki[en]==0.9.4
+spacy==3.8.16
+thinc==8.3.13
+preshed==3.0.13
+cymem==2.0.13
+murmurhash==1.0.15
+srsly==2.5.4
+en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
