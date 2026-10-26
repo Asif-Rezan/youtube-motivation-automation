@@ -5,20 +5,25 @@ import re
 
 PROFILE = 'ancient-humans-explainer-v1'
 IMAGE_PREFIX = 'Hand-drawn 2D cartoon.'
-IMAGE_NEGATIVE = 'tiny figure, distant person, panoramic landscape, realistic anatomy, detailed scenery, modern clothes, hat, crown'
+IMAGE_NEGATIVE = 'beard, muscular, tiny figure, distant person, panoramic landscape, detailed scenery, modern clothes, hat, crown'
+
+
+def image_negative(action):
+    cold = re.search(r'\bcold\b|\bgray ashes\b|\bgrey ashes\b', action, re.I)
+    return ('flames, burning fire, glowing fire, smoke, ' if cold else '') + IMAGE_NEGATIVE
 
 
 def visual_prompt(action, name='Ari', people=True, thumbnail=False):
     """Keep the subject and action ahead of scenery within the short CLIP window."""
     action = re.split(r'\. (?:Character|Main character):', action, maxsplit=1)[0].strip().rstrip('.')
     if people:
-        action = re.sub(r'\b'+re.escape(name)+r'\b', 'the caveman', action, flags=re.I)
-        design = 'Stickman caveman, large white round face, black dot eyes, messy brown hair, brown fur tunic, black line limbs. '
+        action = re.sub(r'\b'+re.escape(name)+r'\b', 'the figure', action, flags=re.I)
+        design = 'Simple stick figure, white circle head, dot eyes, brown hair, brown tunic, thin black arms and legs. '
     else:
         design = ''
-    framing = 'Large face and main object fill frame, top strip empty. ' if thumbnail else 'Subject and action fill foreground. '
+    framing = 'Large face and object, empty top strip. ' if thumbnail else 'Large subject and object. '
     return (IMAGE_PREFIX + ' ' + design + action + '. ' + framing +
-            'Simple background, thick black outlines, flat colors.')
+            'Flat colors, black outlines.')
 PILLARS = {
     'food_storage': 'How Ancient Humans Kept Food Before Refrigerators',
     'water': 'How Ancient Humans Found Water in Dry Landscapes',

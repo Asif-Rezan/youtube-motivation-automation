@@ -9,22 +9,22 @@ from PIL import Image, ImageOps
 from image_cpu import metadata_path
 from long_video import render_safe_scene, render_safe_thumbnail
 from thumbnail_style import add_caption
-from human_history import visual_prompt, IMAGE_NEGATIVE
+from human_history import visual_prompt, image_negative
 import workflow
 
 TITLE = 'What Ancient Humans Did When Their Fire Went Out'
 SAMPLES = {
     'background-01': {
         'seed': 1700,
-        'prompt': 'Ari kneels beside a stone hearth filled with gray ashes, mouth open in worry. Plain cave wall.',
+        'prompt': 'Ari sits cross-legged, looking sadly at gray ashes inside a ring of six stones. Plain tan ground.',
     },
     'background-02': {
         'seed': 1701,
-        'prompt': 'Ari blows on a red ember in dry grass held between both hands. Plain green ground.',
+        'prompt': 'Ari blows on a single red coal cupped in dry grass between both hands. Plain tan ground.',
     },
     'thumbnail': {
         'seed': 9931,
-        'prompt': 'Ari stares shocked at a large stone hearth filled with cold gray ashes. Plain blue background.',
+        'prompt': 'Ari holds both cheeks, shocked beside cold gray ashes inside a ring of six stones. Plain blue background.',
     },
 }
 
@@ -38,7 +38,7 @@ def main():
     sample = SAMPLES[args.asset]
     os.environ['IMAGE_SEED'] = str(sample['seed'])
     prompt = visual_prompt(sample['prompt'], thumbnail=args.asset == 'thumbnail')
-    os.environ['IMAGE_NEGATIVE_PROMPT'] = IMAGE_NEGATIVE
+    os.environ['IMAGE_NEGATIVE_PROMPT'] = image_negative(sample['prompt'])
     path = args.output / f'{args.asset}.png'
     if args.asset == 'thumbnail':
         source = args.output / 'thumbnail-source.png'

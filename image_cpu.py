@@ -127,6 +127,9 @@ def generate(prompt, path):
     import torch
     seed = int(os.getenv('IMAGE_SEED', '42'))
     negative = ', '.join(filter(None, (NEGATIVE, os.getenv('IMAGE_NEGATIVE_PROMPT', '').strip())))
+    from human_history import IMAGE_PREFIX
+    if prompt.startswith(IMAGE_PREFIX):
+        negative = ', '.join(filter(None, (os.getenv('IMAGE_NEGATIVE_PROMPT', '').strip(), NEGATIVE)))
     start = time.monotonic()
     pipe = _pipeline
     options = {'prompt': prompt, 'negative_prompt': negative,

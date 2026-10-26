@@ -410,10 +410,10 @@ def refine_visual_plan(root=ROOT):
         shot['prompt'] += '. Keep the narrated action prominent. ' + w.VISUAL_STYLE
         shot['focus'] = focus
         shot['negative_prompt'] = 'portrait, headshot, close-up face, face filling frame'
-        from human_history import PROFILE as HISTORY_PROFILE, visual_prompt, IMAGE_NEGATIVE
+        from human_history import PROFILE as HISTORY_PROFILE, visual_prompt, image_negative
         if story.get('content_profile') == HISTORY_PROFILE:
             shot['prompt'] = visual_prompt(action, name, people=focus != 'object')
-            shot['negative_prompt'] = IMAGE_NEGATIVE
+            shot['negative_prompt'] = image_negative(action)
         # Heuristic focus labels must not erase a narrated person with an unfamiliar name or action.
         if focus == 'group':
             shot['negative_prompt'] += ', solo, one person alone'
@@ -581,10 +581,10 @@ def finish(root=ROOT):
         story['character_description'] + '. Make a single topic-specific hand-drawn cartoon thumbnail '
         'with the protagonist prominent and a clear contrasting background or supporting characters. '
         'No title text, labels, numbers, arrows, or interface elements.')
-    from human_history import PROFILE as HISTORY_PROFILE, visual_prompt, IMAGE_NEGATIVE
+    from human_history import PROFILE as HISTORY_PROFILE, visual_prompt, image_negative
     if story.get('content_profile') == HISTORY_PROFILE:
         thumbnail_prompt = visual_prompt(story['thumbnail_prompt'], story['protagonist_name'], thumbnail=True)
-        os.environ['IMAGE_NEGATIVE_PROMPT'] = IMAGE_NEGATIVE
+        os.environ['IMAGE_NEGATIVE_PROMPT'] = image_negative(story['thumbnail_prompt'])
     render_safe_thumbnail(thumbnail_prompt, root/'thumbnail-source.png')
     image = ImageOps.fit(Image.open(root/'thumbnail-source.png').convert('RGB'), (1280, 720))
     from human_history import PROFILE as HISTORY_PROFILE
