@@ -30,12 +30,12 @@ source-based editorial review remains necessary before treating a script as veri
 Revision 2: use compact subject-first prompts for the human-history profile, suppress panoramic
 scenery and tiny characters, and allow large faces. Keep both SSD text encoders focused on the
 same subject/action; explicitly bound their token inputs. White round face, messy brown hair,
-brown fur tunic and black line limbs replace the longer character description. Object-only
+brown tunic and thin black limbs replace the longer character description. Object-only
 shots omit the character. The new style ID invalidates old visual plans during refinement.
 
-Original hand-drawn 2D stick figures, cream oval heads, expressive simple faces, thin limbs,
+Original hand-drawn 2D stick figures, white circle heads, expressive simple faces, thin limbs,
 bold irregular black contours, flat natural colors and little shading. Recurring illustration
-character: short curly dark hair, ochre tunic and blue wrist tie. Backgrounds follow the actual
+character: brown hair, brown tunic and thin black arms and legs. Backgrounds follow the actual
 narration: camp, grassland, woodland, dry riverbed, shelter interior, or white for explanatory objects.
 Do not force a mascot into object-only scenes or use the same camp for every explanation.
 

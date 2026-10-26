@@ -11,6 +11,13 @@ import workflow as w
 
 
 class HumanHistoryTests(unittest.TestCase):
+    def test_cold_ashes_suppress_flames_without_suppressing_ember_scenes(self):
+        self.assertIn('flames', h.image_negative('Ari examines cold gray ashes'))
+        self.assertNotIn('flames', h.image_negative('Ari blows on a red ember'))
+        prompt = h.visual_prompt('Ari sits beside gray ashes')
+        self.assertIn('Simple stick figure', prompt)
+        self.assertNotIn('caveman', prompt)
+
     def test_scene_plan_preserves_action_and_allows_large_character(self):
         from long_video import refine_visual_plan
         with tempfile.TemporaryDirectory() as temp:
