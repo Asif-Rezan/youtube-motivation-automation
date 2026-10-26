@@ -4,6 +4,21 @@ import json
 import re
 
 PROFILE = 'ancient-humans-explainer-v1'
+IMAGE_PREFIX = 'Hand-drawn 2D cartoon.'
+IMAGE_NEGATIVE = 'tiny figure, distant person, panoramic landscape, realistic anatomy, detailed scenery, modern clothes, hat, crown'
+
+
+def visual_prompt(action, name='Ari', people=True, thumbnail=False):
+    """Keep the subject and action ahead of scenery within the short CLIP window."""
+    action = re.split(r'\. (?:Character|Main character):', action, maxsplit=1)[0].strip().rstrip('.')
+    if people:
+        action = re.sub(r'\b'+re.escape(name)+r'\b', 'the caveman', action, flags=re.I)
+        design = 'Stickman caveman, large white round face, black dot eyes, messy brown hair, brown fur tunic, black line limbs. '
+    else:
+        design = ''
+    framing = 'Large face and main object fill frame, top strip empty. ' if thumbnail else 'Subject and action fill foreground. '
+    return (IMAGE_PREFIX + ' ' + design + action + '. ' + framing +
+            'Simple background, thick black outlines, flat colors.')
 PILLARS = {
     'food_storage': 'How Ancient Humans Kept Food Before Refrigerators',
     'water': 'How Ancient Humans Found Water in Dry Landscapes',
@@ -74,15 +89,15 @@ def generate(day, history, ask, pause, check_originality, schema):
     Avoid medical advice, present-day political claims and speculative evolutionary just-so stories.
     story_bible: <=180 words defining region, broad period, mechanisms, uncertainty and visual continuity.
     Description must identify an educational overview with illustrative reconstructions and uncertainty.
-    Character is an ORIGINAL hand-drawn stick figure with cream oval head, dot eyes, black line limbs,
-    short curly dark hair, ochre tunic and blue wrist tie; avoid another channel's mascot.
+    Character is an ORIGINAL hand-drawn stick figure with large white round face, dot eyes, black line limbs,
+    messy brown hair and brown fur tunic; avoid another channel's mascot.
     Give it an internal first name for visual continuity only. No photorealistic face description.
-    Scene image prompts: subject + action + relevant objects + setting. Two visual beats per chapter.
+    Scene image prompts: subject + action + relevant objects + setting, maximum 18 words. Two visual beats per chapter.
     Alternate literal environmental scenes with simple explanatory object drawings on white when useful.
     Settings vary with the explanation: dry riverbed, camp, woodland, shelter interior, open grassland.
     Keep tools, plants, animals and clothing appropriate to the selected place and period.
     No generic scenic filler, modern offices, modern money props or decorative scenery.
-    Thumbnail: ONE clear visual tension, expressive stick figure, one large relevant object,
+    Thumbnail: ONE clear visual tension, large expressive stick figure, one large relevant object,
     colorful simplified background, bold black contours. Reserve the TOP QUARTER for a text overlay.
     thumbnail_text: 2–5 short curiosity words that complement rather than repeat the full title.
     thumbnail_prompt: original scene, no generated letters, no logos or copied compositions.

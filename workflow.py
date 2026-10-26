@@ -23,7 +23,7 @@ VISUAL_STYLE = ('hand-drawn 2D educational cartoon, expressive simple stick figu
     'scene-specific simplified environment or white explanatory background, '
     'sky blue, grass green, ochre earth and natural brown palette with lighting matching the narrated scene, '
     'wide landscape composition, consistent character appearance and clothing')
-VISUAL_STYLE_ID = 'hand-drawn-human-history-v1'
+VISUAL_STYLE_ID = 'hand-drawn-human-history-v2'
 IMAGE_INTERVAL_SECONDS = 7
 
 
@@ -363,11 +363,13 @@ def make_story(day, previous):
 
 
 def make_image(prompt, path):
-    if VISUAL_STYLE not in prompt:
+    from human_history import IMAGE_PREFIX
+    compact = prompt.startswith(IMAGE_PREFIX)
+    if VISUAL_STYLE not in prompt and not compact:
         prompt += '. ' + VISUAL_STYLE
     if os.getenv('IMAGE_BACKEND', 'cpu') == 'cpu':
         from image_cpu import generate
-        generate(prompt + ', no text, no letters, no watermark', path)
+        generate(prompt if compact else prompt + ', no text, no letters, no watermark', path)
         return
     if os.getenv('IMAGE_BACKEND') != 'hf':
         raise ValueError('IMAGE_BACKEND must be cpu or hf')

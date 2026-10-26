@@ -9,22 +9,22 @@ from PIL import Image, ImageOps
 from image_cpu import metadata_path
 from long_video import render_safe_scene, render_safe_thumbnail
 from thumbnail_style import add_caption
+from human_history import visual_prompt, IMAGE_NEGATIVE
 import workflow
 
 TITLE = 'What Ancient Humans Did When Their Fire Went Out'
-CHARACTER = 'Ari, cream oval head, dot eyes, black line limbs, short curly dark hair, ochre tunic, blue wrist tie'
 SAMPLES = {
     'background-01': {
         'seed': 1700,
-        'prompt': 'Ari kneels worried beside cold hearth ashes outside a rock shelter, dry twigs nearby, grassy prehistoric camp at dawn.',
+        'prompt': 'Ari kneels beside a stone hearth filled with gray ashes, mouth open in worry. Plain cave wall.',
     },
     'background-02': {
         'seed': 1701,
-        'prompt': 'Ari crouches blowing gently on a glowing ember inside dry grass, kindling nearby, sheltered prehistoric woodland camp in daylight.',
+        'prompt': 'Ari blows on a red ember in dry grass held between both hands. Plain green ground.',
     },
     'thumbnail': {
         'seed': 9931,
-        'prompt': 'Worried Ari beside a large cold stone hearth, tiny red ember, dark rock shelter and blue evening sky; clear silhouettes, top quarter empty.',
+        'prompt': 'Ari stares shocked at a large stone hearth filled with cold gray ashes. Plain blue background.',
     },
 }
 
@@ -37,7 +37,8 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     sample = SAMPLES[args.asset]
     os.environ['IMAGE_SEED'] = str(sample['seed'])
-    prompt = sample['prompt'] + '. Character: ' + CHARACTER
+    prompt = visual_prompt(sample['prompt'], thumbnail=args.asset == 'thumbnail')
+    os.environ['IMAGE_NEGATIVE_PROMPT'] = IMAGE_NEGATIVE
     path = args.output / f'{args.asset}.png'
     if args.asset == 'thumbnail':
         source = args.output / 'thumbnail-source.png'

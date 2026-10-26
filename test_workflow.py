@@ -115,7 +115,7 @@ class Checks(unittest.TestCase):
             self.assertNotIn('Main woman', truck['prompt'])
             self.assertIn('delivery truck', truck['prompt'].lower())
             self.assertIn('hand-drawn 2D educational cartoon', truck['prompt'])
-            self.assertEqual(result['style'], 'hand-drawn-human-history-v1')
+            self.assertEqual(result['style'], 'hand-drawn-human-history-v2')
             self.assertNotIn(', person, people', truck['negative_prompt'])
             self.assertEqual(meeting['focus'], 'group')
             self.assertIn('multiple people', meeting['prompt'])

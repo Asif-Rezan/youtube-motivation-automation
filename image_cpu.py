@@ -137,6 +137,19 @@ def generate(prompt, path):
         # Put the compact style first in the second encoder so long action and
         # continuity prompts cannot crowd it out of the model's text window.
         options['prompt_2'] = STYLE_DESCRIPTION + '. ' + prompt
+        from human_history import IMAGE_PREFIX
+        if prompt.startswith(IMAGE_PREFIX):
+            # Both encoders see the subject/action instead of repeated long style prose.
+            options['prompt_2'] = prompt
+            for field, tokenizer in (('prompt', getattr(pipe, 'tokenizer', None)),
+                                     ('prompt_2', getattr(pipe, 'tokenizer_2', None))):
+                if tokenizer is not None:
+                    tokens = tokenizer.encode(options[field], add_special_tokens=False)
+                    budget = tokenizer.model_max_length - 2
+                    if len(tokens) > budget:
+                        options[field] = tokenizer.decode(tokens[:budget], skip_special_tokens=True)
+                        print(json.dumps({'image_prompt_trimmed': field, 'tokens_before': len(tokens),
+                                          'tokens_after': budget}), flush=True)
     if config.reference_sha256:
         # Fresh noise for every narrated shot. A low-strength img2img start here
         # would copy the same office, people and poses into unrelated scenes.

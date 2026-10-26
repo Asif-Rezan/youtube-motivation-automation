@@ -1,6 +1,8 @@
 import copy
 import json
 import os
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -9,6 +11,26 @@ import workflow as w
 
 
 class HumanHistoryTests(unittest.TestCase):
+    def test_scene_plan_preserves_action_and_allows_large_character(self):
+        from long_video import refine_visual_plan
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            story = dict(content_profile=h.PROFILE, protagonist_name='Ari',
+                character_description='Ari in a tunic', scenes=[{'narration': 'Ari watches cold ashes.'}])
+            plan = {'shots': [{'visual_action': 'Ari kneels beside cold hearth ashes'},
+                              {'visual_action': 'Gray ashes fill a stone hearth'}]}
+            (root/'story.json').write_text(json.dumps(story))
+            (root/'plan.json').write_text(json.dumps(plan))
+            result = refine_visual_plan(root)
+            person, objects = result['shots']
+            self.assertIn('kneels beside cold hearth ashes', person['prompt'])
+            self.assertNotIn('close-up face', person['negative_prompt'])
+            self.assertNotIn('wide scene', person['prompt'])
+            self.assertNotIn('caveman', objects['prompt'])
+            with patch('image_cpu.generate') as generate:
+                w.make_image(person['prompt'], root/'sample.png')
+            self.assertEqual(generate.call_args.args[0], person['prompt'])
+
     def test_fresh_run_uses_explainer_and_keyword_contract(self):
         calls = []
         def ask(endpoint, payload):
