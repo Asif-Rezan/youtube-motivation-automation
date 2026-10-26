@@ -18,7 +18,7 @@ concurrency:
 env:
   SAVED_RUN_ID: ${{ inputs.source_run_id }}
   RUN_SCOPED_CLEANUP: 'true'
-  CONTENT_TYPE: financial-storytelling
+  CONTENT_TYPE: human-history
   OUTPUT_DIR: output/ghibli-long-test
   TTS_BACKEND: kokoro
   CAPTION_BACKEND: cpu
@@ -30,7 +30,7 @@ env:
   CPU_IMAGE_HEIGHT: '576'
   CPU_IMAGE_STEPS: '16'
   CPU_IMAGE_GUIDANCE_SCALE: '9.0'
-  CPU_STYLE_REFERENCE: references/financial-story-style-cool-1024x576.png
+  CPU_STYLE_REFERENCE: ''
   HF_HUB_DISABLE_XET: '1'
   OMP_NUM_THREADS: '4'
   MKL_NUM_THREADS: '4'

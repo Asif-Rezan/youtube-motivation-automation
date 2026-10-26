@@ -42,7 +42,7 @@ class ImageCPUChecks(unittest.TestCase):
             workflow.make_image('Mayra reads a letter', Path('sample.png'))
         prompt = generate.call_args.args[0]
         self.assertEqual(prompt.count(workflow.VISUAL_STYLE), 1)
-        self.assertIn('cinematic 2D editorial story illustration', prompt)
+        self.assertIn('hand-drawn 2D educational cartoon', prompt)
         self.assertIn('Mayra reads a letter', prompt)
 
     def test_ssd_uses_sdxl_and_dreamshaper_uses_sd15(self):
@@ -140,7 +140,7 @@ class ImageCPUChecks(unittest.TestCase):
                     self.assertTrue(report['reference_sha256'])
             for index, call in enumerate(pipe.calls):
                 self.assertEqual(call['prompt'], prompts[index])
-                self.assertIn('cel shading', call['prompt_2'])
+                self.assertIn('flat natural colors', call['prompt_2'])
                 self.assertIn('bright whites', call['prompt_2'])
                 self.assertIn('colorful accents', call['prompt_2'])
                 self.assertNotIn('slate blue', call['prompt_2'])

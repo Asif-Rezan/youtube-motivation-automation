@@ -18,7 +18,7 @@ SAFETY_MODEL = 'CompVis/stable-diffusion-safety-checker'
 NEGATIVE = ('watercolor, 3d render, glossy plastic, realistic skin texture, '
             'blurry, low detail, poor quality, distorted anatomy, extra arms, extra legs, '
             'deformed hands, duplicate person, watermark, lettering, text, '
-            'warm orange lighting, red color cast, sepia')
+            'photorealistic, cinematic realism, heavy gradients, red color cast, sepia')
 _pipeline = None
 _pipeline_key = None
 _safety_checker = None
@@ -43,11 +43,9 @@ class ImageConfig:
     reference_style: str = ''
 
 
-# The reference identifies the illustration style, never its cool color palette or
-# scene geometry. This is text guidance, not an IP-Adapter or img2img.
-STYLE_DESCRIPTION = ('cinematic 2D editorial illustration, clean dark outlines, controlled cel shading, '
-                     'expressive simplified faces, bright whites, warm neutrals, balanced colorful accents, '
-                     'natural skin tones and luminous scene-appropriate lighting')
+# Reference guidance never copies scene geometry or an old cool palette.
+STYLE_DESCRIPTION = ('hand-drawn 2D educational cartoon, expressive simple stick figures, '
+                     'bold black outlines, flat natural colors, bright whites, balanced colorful accents, minimal shading')
 
 
 def image_config():
@@ -135,6 +133,10 @@ def generate(prompt, path):
                'num_inference_steps': config.steps, 'guidance_scale': config.guidance_scale,
                'generator': torch.Generator(device='cpu').manual_seed(seed)}
     options.update(width=config.width, height=config.height)
+    if config.model == SSD_MODEL:
+        # Put the compact style first in the second encoder so long action and
+        # continuity prompts cannot crowd it out of the model's text window.
+        options['prompt_2'] = STYLE_DESCRIPTION + '. ' + prompt
     if config.reference_sha256:
         # Fresh noise for every narrated shot. A low-strength img2img start here
         # would copy the same office, people and poses into unrelated scenes.

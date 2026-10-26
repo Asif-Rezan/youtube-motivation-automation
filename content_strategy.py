@@ -24,6 +24,9 @@ def select_pillar(day, history):
 
 
 def narration_direction(story):
+    from human_history import direction
+    if direction(story):
+        return direction(story)
     if story.get('content_profile') != PROFILE:
         return ''
     return ('Tell the story in second person: you/your is the protagonist, while the internal '

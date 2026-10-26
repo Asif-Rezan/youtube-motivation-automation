@@ -79,7 +79,8 @@ def storyboard(root=ROOT, ask=None, pause=None):
         chapters = {chapter for shot in batch
                     for chapter in shot.get('chapters', [shot['chapter']])}
         context = {str(chapter): story['scenes'][chapter]['narration'] for chapter in chapters}
-        prompt = f"""Storyboard this fictional narrated story. Return one image prompt per exact shot key.
+        from human_history import direction
+        prompt = f"""Storyboard this narrated video. {direction(story)} Return one image prompt per exact shot key.
 Each shot is a measured {INTERVAL}-second narration window (the final shot may be shorter). Depict ONLY the concrete action, location,
 objects and emotion being spoken in that window. Chapter text resolves pronouns and continuity only;
 NEVER illustrate a later or earlier chapter event in place of the current window.
@@ -100,7 +101,10 @@ Name the active character instead of using a pronoun when chapter context identi
 When a window crosses events, depict the event occupying most of its spoken time; never combine different times or places.
 Use adjacent spoken words only to resolve a cut-off sentence, pronoun or location, never to jump ahead.
 Do not put style, camera lists, narration text, typography or character design into the prompt;
-the renderer adds character design and cinematic rendering detail. Do not replace specific objects with generic ones.
+the renderer adds character design and hand-drawn cartoon styling. Do not replace specific objects with generic ones.
+For explainers, illustrate the physical mechanism rather than adding the mascot to every frame.
+Use a white background for an isolated explanatory object; use a concrete place for an environmental action.
+Never merge different time periods, add modern equipment to prehistoric scenes, or repeat one camp background everywhere.
 Chapter context: {json.dumps(context)}
 Exact shot windows: {json.dumps([{'key': f"shot_{shot['index']:03}", 'start_seconds': shot['start'], 'duration_seconds': shot['duration'], 'end_seconds': shot['start']+shot['duration'], 'primary_chapter': shot['chapter'], 'spoken': shot['narration'], 'previous_spoken': shots[shot['index']-1]['narration'] if shot['index'] else '', 'next_spoken': shots[shot['index']+1]['narration'] if shot['index']+1 < len(shots) else ''} for shot in batch])}
 """
@@ -172,10 +176,10 @@ def rewrite_for_duration(story, total, lengths, ask=None):
                    for i in group]
         from content_strategy import narration_direction
         prompt = (narration_direction(story) + f' Story bible: {story.get("story_bible", "")}. '
-                  f'Rewrite only these chapters of an existing fictional story to make spoken narration '
+                  f'Rewrite only these chapters of the existing narrated video to make spoken narration '
                   f'{"shorter" if ratio < 1 else "longer"}. Preserve each chapter event, character continuity, '
                   f'natural dialogue, opening hook, and ending. Keep the final like, comment, and subscribe CTA '
-                  f'unchanged at the end of chapter 20 if present. Add meaningful action or dialogue when expanding; '
+                  f'unchanged at the end of chapter 20 if present. Add meaningful explanation or action when expanding; '
                   f'never pad or repeat. Original measured duration is {total:.1f}s; target is about {target:.0f}s. '
                   f'Aim for approximately {ratio:.2f} times the current word count in each returned chapter. '
                   f'Return only JSON with exactly these keys: {keys}. Context: {json.dumps(context)}')
@@ -192,10 +196,12 @@ def rewrite_for_duration(story, total, lengths, ask=None):
             raise ValueError('Duration rewrite returned incomplete chapters')
         updates.update({i: values[f'chapter_{i+1:02}'].strip() for i in group})
     revised = json.loads(json.dumps(story))
+    from human_history import PROFILE as HISTORY_PROFILE, CTA as HISTORY_CTA
+    cta = HISTORY_CTA if story.get('content_profile') == HISTORY_PROFILE else w.FINAL_CTA
     for index, text in updates.items():
-        if index == len(lengths)-1 and story['scenes'][-1]['narration'].endswith(w.FINAL_CTA):
+        if index == len(lengths)-1 and story['scenes'][-1]['narration'].endswith(cta):
             # The CTA is application-owned text, not material for the model to revise.
-            text = text.split('Which choice would you have made', 1)[0].rstrip() + w.FINAL_CTA
+            text = text.split(cta.strip().split('?')[0], 1)[0].rstrip() + cta
         revised['scenes'][index]['narration'] = text
     validate_engagement(revised)
     w.validate_story(revised)
@@ -388,7 +394,7 @@ def refine_visual_plan(root=ROOT):
         group = group or bool(main and re.search(r'\b(boss|mayor|mother|father|brother|coworker)\b|\bMr\.', action, re.I))
         human = bool(re.search(
             r'\b(man|woman|worker|coworker|engineer|mayor|boss|forecaster|roommate|manager|'
-            r'client|friend|neighbor|colleague|mentor|partner|mother|father|brother|sister|'
+            r'humans|human|hunter|gatherer|child|children|client|friend|neighbor|colleague|mentor|partner|mother|father|brother|sister|'
             r'son|daughter)\b|\bMr\.', action, re.I))
         # Storyboard names can differ from the outline's protagonist spelling.
         # A named person performing an action must never get a "no people" prompt.
@@ -568,11 +574,15 @@ def finish(root=ROOT):
     os.environ['IMAGE_NEGATIVE_PROMPT'] = ''
     os.environ['IMAGE_SEED'] = '9931'
     thumbnail_prompt = (story['thumbnail_prompt'] + '. Main character: ' +
-        story['character_description'] + '. Make a single story-specific cinematic thumbnail '
+        story['character_description'] + '. Make a single topic-specific hand-drawn cartoon thumbnail '
         'with the protagonist prominent and a clear contrasting background or supporting characters. '
         'No title text, labels, numbers, arrows, or interface elements.')
     render_safe_thumbnail(thumbnail_prompt, root/'thumbnail-source.png')
     image = ImageOps.fit(Image.open(root/'thumbnail-source.png').convert('RGB'), (1280, 720))
+    from human_history import PROFILE as HISTORY_PROFILE
+    if story.get('content_profile') == HISTORY_PROFILE:
+        from thumbnail_style import add_caption
+        add_caption(image, story['thumbnail_text'])
     image.save(root/'thumbnail.jpg', quality=92)
     if (root/'thumbnail.jpg').stat().st_size >= 2*1024*1024:
         raise RuntimeError('Thumbnail exceeds size limit')

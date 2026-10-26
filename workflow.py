@@ -17,13 +17,13 @@ FINAL_CTA = (" Which choice would you have made in that situation? "
     'Leave a comment with your answer, like this video if it inspired you, '
     'and subscribe for more stories about money, choices, and everyday life.')
 
-VISUAL_STYLE = ('cinematic 2D editorial story illustration, clean dark outlines, '
-    'controlled cel shading, bright whites and warm neutral surfaces, balanced colorful accents '
-    'of coral, golden yellow, leafy green and clear blue, natural skin tones, expressive simplified faces, '
-    'recognizable everyday environments with specific story objects, '
-    'luminous balanced lighting appropriate to the scene, wide landscape composition, '
-    'consistent character appearance and clothing')
-VISUAL_STYLE_ID = 'cinematic-editorial-2d'
+VISUAL_STYLE = ('hand-drawn 2D educational cartoon, expressive simple stick figures, '
+    'cream oval heads, dot eyes, thin black line limbs, bold slightly irregular black outlines, '
+    'flat colors, minimal shading, clear readable silhouettes, '
+    'scene-specific simplified environment or white explanatory background, '
+    'sky blue, grass green, ochre earth and natural brown palette with lighting matching the narrated scene, '
+    'wide landscape composition, consistent character appearance and clothing')
+VISUAL_STYLE_ID = 'hand-drawn-human-history-v1'
 IMAGE_INTERVAL_SECONDS = 7
 
 
@@ -78,6 +78,8 @@ def validate_story(data, word_range=(1200, 2500)):
         raise ValueError('Missing thumbnail prompt')
     from content_strategy import validate_pov
     validate_pov(data)
+    from human_history import validate
+    validate(data)
     return data
 
 
@@ -208,6 +210,12 @@ def make_story(day, previous):
         if choice.get('finish_reason') == 'length':
             raise RuntimeError('Story response was truncated; refusing incomplete script')
         return json.loads(choice['message']['content'])
+    if os.getenv('CONTENT_TYPE', 'human-history') == 'human-history':
+        from human_history import generate
+        outline = generate(day, previous, ask, time.sleep, check_recent_originality, object_schema)
+        from long_video import validate_engagement
+        validate_engagement(outline)
+        return validate_story(outline)
     formats = (
         ('decision_drama', 'A character must choose between two costly financial options; show the consequences of the choice.'),
         ('business_postmortem', 'Reconstruct a fictional small business failure, then show the specific decisions that enabled recovery.'),

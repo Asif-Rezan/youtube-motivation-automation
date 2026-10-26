@@ -1,41 +1,57 @@
-# Original financial POV stories
+# Ancient Humans explainers
 
-The financial-storytelling workflow places the viewer inside an original money scenario,
-using second-person English narration. The internal protagonist name identifies that same
-person for images; scenes show the character externally performing the narrated action.
+Updated 2026-10-26. New runs use `CONTENT_TYPE=human-history`; existing saved scripts are not replaced.
+The legacy financial profile remains explicitly selectable for compatibility.
 
-## Editorial reference
+## Titles and topics
 
-Reviewed 2026-10-17: [POV Finance](https://www.youtube.com/@POVFinanceUS/videos),
-including [one representative narration](https://www.youtube.com/watch?v=y8OUcvFTOWU).
-Useful general techniques: an immediate everyday scene, private financial tension,
-decisions with consequences over time, and an emotional payoff tied to personal freedom.
-These observations do not establish what causes channel performance. No reference transcript,
-title list, character or plot is fed into generation.
+Every new title must contain **Ancient Humans** (preferred) or **Humans**, naturally and once.
+The validator rejects titles missing Humans. Use a concrete question, problem or consequence,
+with the keyword preferably early; no keyword stuffing or guaranteed ranking claims.
 
-## New-run content
+Eight rotating directions: food preservation, finding water, maintaining fire, learning survival
+skills, making tools, sharing, choosing camps and transmitting knowledge. Avoid the last three
+pillars and favor less-used recent ones. Original titles and explanations; no copied reference plots.
 
-- Twenty chapters, approximately 1,650–1,800 spoken words, measured to 10–15 minutes.
-- Specific `POV: You…` titles with the promised conflict introduced in chapter one.
-- Eight topic pillars: career options, lifestyle pressure, family boundaries, debt recovery,
-  income fragility, quiet progress, business tradeoffs, and enough versus time.
-  Selection avoids the last three recorded pillars and favors less-used recent pillars.
-- Progression from immediate stakes through choices, setback, consequences and a resolution
-  returning to the opening. Existing format rotation supplies additional variety.
-- A story bible and chapter continuity notes passed to every narration batch. Preserve money
-  amounts, elapsed time, relationships and unresolved promises; duration rewrites get the bible too.
-- Explain financial mechanisms through observable choices and costs. Avoid automatic millionaire
-  endings, guaranteed returns, invented current rules and fictional accounts presented as true.
-- Fiction disclosure in descriptions, with a short closing question and call to action.
+Example directions:
+- How Ancient Humans Kept Food Before Refrigerators
+- What Ancient Humans Did When Their Fire Went Out
+- How Ancient Humans Found Water in Dry Landscapes
+- Why Ancient Humans Spent So Much Time Making Tools
 
-Validation rejects missing second-person narration, missing continuity records, absent fiction
-disclosure and incompatible title framing. It cannot prove arithmetic, factual accuracy,
-literary quality or perfect image alignment. Editorial review is still needed.
-Legacy saved stories remain compatible; resuming a run does not replace its existing script.
+Twenty chapters retain the existing approximate 1,650–1,800 word target and measured 10–15 minute
+video duration. Explain one central question progressively. Historical evidence, inference and
+illustrative reconstructions must be distinguished. Do not fabricate sources, studies, statistics,
+quotes or exact dates. The prompts encourage these limits but do not fact-check model output;
+source-based editorial review remains necessary before treating a script as verified history.
 
-## Production settings retained
+## Scene images
 
-SSD-1B CPU, 1024×576, 16 steps, guidance 9.0; separate narration-based images every seven seconds
-with cool editorial illustration styling. Final video stays 1080p/30fps with Kokoro `am_michael`,
-captions, Magenta music and private upload to Rezan Relaxation. This update does not itself
-start a full video run or publish a public video.
+Original hand-drawn 2D stick figures, cream oval heads, expressive simple faces, thin limbs,
+bold irregular black contours, flat natural colors and little shading. Recurring illustration
+character: short curly dark hair, ochre tunic and blue wrist tie. Backgrounds follow the actual
+narration: camp, grassland, woodland, dry riverbed, shelter interior, or white for explanatory objects.
+Do not force a mascot into object-only scenes or use the same camp for every explanation.
+
+Prompt pattern: active subject + concrete action + important objects + period-appropriate setting.
+Example: “Ari shields fading embers with a clay-free stone windbreak beside a grassy camp at dusk.”
+This is a visual prompt example, not an archaeological claim about a specific population.
+The renderer adds the cartoon styling. SSD's second text encoder receives compact style guidance
+first to reduce style loss from long continuity descriptions. The old financial reference palette
+is disabled for new workflow runs.
+
+## Thumbnails
+
+One expressive cartoon figure or small group, one large problem/contrast, simple colorful setting,
+clear silhouette, room in the top quarter for a caption. Generate art without letters; overlay
+2–5 uppercase yellow words with a black outline afterward for reliable readability.
+Example: fire topic → cold embers and worried figure, caption “FIRE GONE?”
+Adapt the general visual approach with original scenes and character design.
+
+## Production retained
+
+No changes to schedule, hosting, credentials, voice, music, safety checks, checkpoint storage,
+upload/publishing logic, image interval or render size/steps. Existing workflow: SSD-1B CPU,
+1024×576, 16 steps, guidance 9.0, new images every seven seconds, 1080p/30fps final video,
+Kokoro am_michael, captions and Magenta music.
+These are local source changes; no workflow was triggered, deployed or uploaded by this update.
