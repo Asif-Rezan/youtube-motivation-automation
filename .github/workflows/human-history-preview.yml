@@ -1,6 +1,12 @@
 name: Preview Ancient Humans backgrounds and thumbnail
 on:
   workflow_dispatch:
+    inputs:
+      model:
+        description: 'Production SSD-1B or existing alternative CPU model comparison'
+        type: choice
+        default: ssd1b
+        options: [ssd1b, dreamshaper]
 permissions:
   contents: read
 jobs:
@@ -13,11 +19,11 @@ jobs:
     timeout-minutes: 60
     env:
       IMAGE_BACKEND: cpu
-      CPU_IMAGE_MODEL: segmind/SSD-1B
-      CPU_IMAGE_WIDTH: '1024'
-      CPU_IMAGE_HEIGHT: '576'
-      CPU_IMAGE_STEPS: '16'
-      CPU_IMAGE_GUIDANCE_SCALE: '9.0'
+      CPU_IMAGE_MODEL: ${{ inputs.model == 'dreamshaper' && 'Lykon/dreamshaper-8' || 'segmind/SSD-1B' }}
+      CPU_IMAGE_WIDTH: ${{ inputs.model == 'dreamshaper' && '768' || '1024' }}
+      CPU_IMAGE_HEIGHT: ${{ inputs.model == 'dreamshaper' && '432' || '576' }}
+      CPU_IMAGE_STEPS: ${{ inputs.model == 'dreamshaper' && '28' || '16' }}
+      CPU_IMAGE_GUIDANCE_SCALE: ${{ inputs.model == 'dreamshaper' && '7.5' || '9.0' }}
       CPU_STYLE_REFERENCE: ''
       HF_HUB_DISABLE_XET: '1'
       OMP_NUM_THREADS: '4'

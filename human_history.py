@@ -17,12 +17,12 @@ def visual_prompt(action, name='Ari', people=True, thumbnail=False):
     """Keep the subject and action ahead of scenery within the short CLIP window."""
     action = re.split(r'\. (?:Character|Main character):', action, maxsplit=1)[0].strip().rstrip('.')
     if people:
-        action = re.sub(r'\b'+re.escape(name)+r'\b', 'the figure', action, flags=re.I)
+        action = re.sub(r'\b'+re.escape(name)+r'\b', 'A stick figure', action, flags=re.I)
         design = 'Simple stick figure, white circle head, dot eyes, brown hair, brown tunic, thin black arms and legs. '
     else:
         design = ''
     framing = 'Large face and object, empty top strip. ' if thumbnail else 'Large subject and object. '
-    return (IMAGE_PREFIX + ' ' + design + action + '. ' + framing +
+    return (IMAGE_PREFIX + ' ' + action + '. ' + design + framing +
             'Flat colors, black outlines.')
 PILLARS = {
     'food_storage': 'How Ancient Humans Kept Food Before Refrigerators',

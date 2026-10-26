@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 from PIL import Image, ImageOps
-from image_cpu import metadata_path
+from image_cpu import metadata_path, image_config
 from long_video import render_safe_scene, render_safe_thumbnail
 from thumbnail_style import add_caption
 from human_history import visual_prompt, image_negative
@@ -16,15 +16,15 @@ TITLE = 'What Ancient Humans Did When Their Fire Went Out'
 SAMPLES = {
     'background-01': {
         'seed': 1700,
-        'prompt': 'Ari sits cross-legged, looking sadly at gray ashes inside a ring of six stones. Plain tan ground.',
+        'prompt': 'Ari kneels sadly beside a small pile of cold gray ashes. Simple cave background.',
     },
     'background-02': {
         'seed': 1701,
-        'prompt': 'Ari blows on a single red coal cupped in dry grass between both hands. Plain tan ground.',
+        'prompt': 'Ari crouches, blowing gently on a single glowing red ember held in dry grass. Plain tan ground.',
     },
     'thumbnail': {
         'seed': 9931,
-        'prompt': 'Ari holds both cheeks, shocked beside cold gray ashes inside a ring of six stones. Plain blue background.',
+        'prompt': 'Ari looks shocked at a large pile of cold gray ashes, close view. Plain blue background.',
     },
 }
 
@@ -36,6 +36,7 @@ def main():
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     sample = SAMPLES[args.asset]
+    config = image_config()
     os.environ['IMAGE_SEED'] = str(sample['seed'])
     prompt = visual_prompt(sample['prompt'], thumbnail=args.asset == 'thumbnail')
     os.environ['IMAGE_NEGATIVE_PROMPT'] = image_negative(sample['prompt'])
@@ -54,13 +55,13 @@ def main():
         render_safe_scene({'index': args.asset, 'seed': sample['seed'],
             'prompt': prompt, 'visual_action': sample['prompt']}, path, metadata_path(path))
         metadata = json.loads(metadata_path(path).read_text())
-        expected = (1024, 576)
+        expected = (config.width, config.height)
     with Image.open(path) as picture:
         if picture.size != expected or picture.convert('L').getextrema()[0] == picture.convert('L').getextrema()[1]:
             raise RuntimeError('Preview dimensions or nonblank validation failed')
         picture.resize((384, 216)).save(args.output / f'{args.asset}-mobile.jpg')
-    if metadata['model'] != 'segmind/SSD-1B' or metadata['steps'] != 16 or metadata['reference_mode'] != 'none':
-        raise RuntimeError('Preview differs from production model/style settings')
+    if metadata['model'] != config.model or metadata['steps'] != config.steps or metadata['reference_mode'] != 'none':
+        raise RuntimeError('Preview differs from selected model/style settings')
     report = {'title': TITLE, 'asset': args.asset, 'prompt': prompt,
         'style': workflow.VISUAL_STYLE, 'caption': 'FIRE GONE?' if args.asset == 'thumbnail' else None,
         'production_image_metadata': metadata,
