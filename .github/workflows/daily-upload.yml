@@ -1,4 +1,4 @@
-name: Daily financial storytelling publishing
+name: Daily Ancient Humans video generation
 on:
   push:
     branches: [main]
@@ -72,7 +72,7 @@ jobs:
         run: python oauth_check.py
       - name: Verify real CPU narration before story generation
         run: python narration_check.py
-      - name: Generate fresh financial story and exact narration storyboard
+      - name: Generate fresh Ancient Humans explainer and exact narration storyboard
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GROQ_API_KEY_BACKUP: ${{ secrets.GROQ_API_KEY_BACKUP }}
