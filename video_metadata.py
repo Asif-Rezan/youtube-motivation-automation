@@ -33,6 +33,79 @@ Tags support relevance; do not treat them as a substitute for an accurate title 
 Return only the requested title, description and tags JSON fields.'''
 
 
+def _valid_hashtag_line(line):
+    hashtags = line.split()
+    return (3 <= len(hashtags) <= 5 and
+            all(re.fullmatch(r'#[A-Za-z][A-Za-z0-9_]*', tag) for tag in hashtags) and
+            hashtags[0].lower() == '#ancienthumans' and
+            len({tag.lower() for tag in hashtags}) == len(hashtags))
+
+
+def repair_hashtag_footer(data, story):
+    """Repair footer formatting locally; preserve prose and strict validation.
+
+    Mechanical formatting should not discard successfully generated narration.
+    Specific replacement
+    hashtags must occur in the completed script; broad fallbacks describe this
+    channel's Ancient Humans subject without inventing facts or trend claims.
+    """
+    description = data.get('description')
+    if not isinstance(description, str) or not description.strip():
+        return data
+    if _valid_hashtag_line(description.strip().splitlines()[-1]):
+        return data
+
+    lines = description.rstrip().splitlines()
+    footer = []
+    while lines:
+        line = lines[-1].strip()
+        if not line:
+            lines.pop()
+            continue
+        unlabelled = re.sub(r'^hashtags?\s*:\s*', '', line, flags=re.I)
+        # Accept malformed hashtag-only lines so duplicates, comma-separated
+        # tags and extra footer lines are replaced rather than left in prose.
+        remainder = re.sub(r'#[^\s#]+', '', unlabelled)
+        if '#' in unlabelled and not remainder.strip(' ,;|'):
+            footer.insert(0, lines.pop())
+            continue
+        inline = re.search(r'(?<!\S)#[^\s#]+(?:\s+#[^\s#]+)*\s*$', lines[-1])
+        if inline:
+            footer.insert(0, inline.group())
+            lines[-1] = lines[-1][:inline.start()].rstrip()
+        break
+
+    context = ' '.join([story.get('title', '')] +
+                       [scene.get('narration', '') for scene in story.get('scenes', [])])
+    compact_context = re.sub(r'[^a-z0-9]', '', context.casefold())
+    candidates = re.findall(r'#[A-Za-z][A-Za-z0-9_]*', ' '.join(footer))
+    tags = data.get('tags')
+    if isinstance(tags, list):
+        candidates.extend('#' + ''.join(word.capitalize() for word in
+                          re.findall(r'[A-Za-z0-9]+', tag))
+                          for tag in tags if isinstance(tag, str))
+    hashtags = ['#AncientHumans']
+    seen = {'#ancienthumans'}
+    for tag in candidates:
+        if (not re.fullmatch(r'#[A-Za-z][A-Za-z0-9_]{0,39}', tag) or
+                tag.casefold() in seen or
+                tag.casefold() in {'#viral', '#trending', '#shorts', '#youtube'}):
+            continue
+        if re.sub(r'[^a-z0-9]', '', tag[1:].casefold()) not in compact_context:
+            continue
+        hashtags.append(tag)
+        seen.add(tag.casefold())
+        if len(hashtags) == 5:
+            break
+    for tag in ('#HumanHistory', '#AncientHistory'):
+        if len(hashtags) >= 3:
+            break
+        if tag.casefold() not in seen:
+            hashtags.append(tag)
+            seen.add(tag.casefold())
+    return {**data, 'description': '\n'.join(lines).rstrip() + '\n\n' + ' '.join(hashtags)}
+
+
 def validate_metadata(data):
     title, description, tags = (data.get(k) for k in ('title', 'description', 'tags'))
     if not isinstance(title, str) or len(title) > 85 or not re.search(r'\bHumans\b', title, re.I):
@@ -42,11 +115,7 @@ def validate_metadata(data):
     if re.search(r'background music|music credits?|magenta|musicrnn|synthesized ambient piano', description, re.I):
         raise ValueError('Description must not include background-music or production notes')
     final_line = description.strip().splitlines()[-1]
-    hashtags = final_line.split()
-    if (not 3 <= len(hashtags) <= 5 or
-            not all(re.fullmatch(r'#[A-Za-z][A-Za-z0-9_]*', tag) for tag in hashtags) or
-            hashtags[0].lower() != '#ancienthumans' or
-            len({tag.lower() for tag in hashtags}) != len(hashtags)):
+    if not _valid_hashtag_line(final_line):
         raise ValueError('Final line must contain 3–5 unique relevant hashtags starting with #AncientHumans')
     if (not isinstance(tags, list) or not 8 <= len(tags) <= 18 or
             not all(isinstance(t, str) and t.strip() and '#' not in t for t in tags) or
@@ -68,6 +137,7 @@ def generate_metadata(story, ask, pause, schema):
         pause(60)
         result = ask(METADATA_BRIEF + '\nCompleted video context:\n' + json.dumps(context) + feedback,
                      4000, response_schema)
+        result = repair_hashtag_footer(result, story)
         try:
             return validate_metadata(result)
         except ValueError as error:

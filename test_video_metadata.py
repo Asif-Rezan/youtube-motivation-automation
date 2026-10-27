@@ -1,6 +1,6 @@
 import copy
 import unittest
-from video_metadata import generate_metadata, validate_metadata, public_description
+from video_metadata import generate_metadata, validate_metadata, public_description, repair_hashtag_footer
 
 
 def metadata_fixture():
@@ -27,6 +27,55 @@ Which challenge would you like us to explore next: finding dry fuel or choosing 
 
 
 class VideoMetadataTests(unittest.TestCase):
+    def test_malformed_footer_is_repaired_without_another_model_call(self):
+        original = metadata_fixture()
+        prose = original['description'].rsplit('\n\n', 1)[0]
+        story = {'title': original['title'], 'scenes': [
+            {'narration': 'Ancient humans worked on fire maintenance and sheltered camps.'}]}
+        for footer in ('', '\n\n#FireMaintenance #AncientHumans',
+                       '\n\n#AncientHumans #ancienthumans #FireMaintenance',
+                       '\n\nHashtags: #AncientHumans, #FireMaintenance, #Viral',
+                       '\n\n#AncientHumans\n#FireMaintenance\n#Trending',
+                       '\n\n#AncientHumans #FireMaintenance #One #Two #Three #Four'):
+            with self.subTest(footer=footer):
+                draft = {**original, 'description': prose + footer}
+                before = copy.deepcopy(draft)
+                requests = []
+                def ask(*args):
+                    requests.append(args)
+                    return draft
+                result = generate_metadata(story, ask, lambda _: None, lambda props: props)
+                validate_metadata(result)
+                self.assertEqual(len(requests), 1)
+                self.assertEqual(result['description'].rsplit('\n\n', 1)[0], prose)
+                self.assertTrue(result['description'].splitlines()[-1].startswith('#AncientHumans '))
+                self.assertIn('#FireMaintenance', result['description'].splitlines()[-1])
+                self.assertNotIn('#Viral', result['description'])
+                self.assertNotIn('#Trending', result['description'])
+                self.assertEqual(draft, before)
+
+    def test_inline_hashtags_move_to_footer_without_losing_prose(self):
+        draft = metadata_fixture()
+        prose = draft['description'].rsplit('\n\n', 1)[0]
+        draft['description'] = prose + ' #AncientHumans #FireMaintenance'
+        result = repair_hashtag_footer(draft, {'title': draft['title'], 'scenes': []})
+        validate_metadata(result)
+        self.assertEqual(result['description'].rsplit('\n\n', 1)[0], prose)
+
+    def test_valid_metadata_is_preserved_exactly(self):
+        draft = metadata_fixture()
+        self.assertEqual(repair_hashtag_footer(draft, {}), draft)
+
+    def test_footer_repair_cannot_bypass_description_or_tag_validation(self):
+        for change in ({'description': 'Too short.'},
+                       {'description': 'A' * 4600},
+                       {'description': metadata_fixture()['description'].rsplit('\n\n', 1)[0] + '\nBackground music: Magenta'},
+                       {'tags': ['duplicate'] * 10}):
+            with self.subTest(change=change):
+                draft = {**metadata_fixture(), **change}
+                with self.assertRaises(ValueError):
+                    validate_metadata(repair_hashtag_footer(draft, {}))
+
     def test_detailed_description_hashtags_and_distinct_tags(self):
         validate_metadata(metadata_fixture())
         for change in ({'description': 'An educational overview.'},
