@@ -11,6 +11,22 @@ import workflow as w
 
 
 class HumanHistoryTests(unittest.TestCase):
+    def test_thumbnail_recovery_and_strict_validation(self):
+        for pillar in h.PILLARS:
+            for value in ('', 'FIRE', 'one two three four five six', 'x'*46 + ' y', None, [], 42):
+                with self.subTest(pillar=pillar, value=value):
+                    story = dict(content_profile=h.PROFILE, content_pillar=pillar,
+                                 title=h.PILLARS[pillar], story_bible='Evidence limits',
+                                 thumbnail_text=value)
+                    with self.assertRaises(ValueError):
+                        h.validate(story)
+                    h.repair_thumbnail_text(story)
+                    h.validate(story)
+                    self.assertEqual(story['thumbnail_text'], h.THUMBNAIL_FALLBACKS[pillar])
+        story = {'content_pillar': 'fire', 'thumbnail_text': '  FIRE  GONE?\n'}
+        self.assertIs(h.repair_thumbnail_text(story), story)
+        self.assertEqual(story['thumbnail_text'], 'FIRE GONE?')
+
     def test_narrated_humans_and_animals_are_kept_in_visual_plan(self):
         from long_video import refine_visual_plan
         with tempfile.TemporaryDirectory() as temp:
@@ -77,9 +93,10 @@ class HumanHistoryTests(unittest.TestCase):
             calls.append(payload)
             props = payload['response_format']['json_schema']['schema']['properties']
             if 'scenes' in props:
+                self.assertEqual(props['thumbnail_text'], h.THUMBNAIL_SCHEMA)
                 result = dict(title='How Ancient Humans Kept Their Fire Alive',
                     description='Educational overview with illustrative reconstructions and uncertainty.',
-                    tags=['Ancient Humans'], thumbnail_text='FIRE GONE?',
+                    tags=['Ancient Humans'], thumbnail_text='What happens when the fire goes out?',
                     thumbnail_prompt='A worried cartoon person beside cold embers',
                     character_description='Cream oval head, ochre tunic, blue wrist tie',
                     protagonist_name='Ari', story_bible='Illustrative camp; time and region unspecified; avoid precise claims.',
@@ -98,6 +115,7 @@ class HumanHistoryTests(unittest.TestCase):
             story = w.make_story('daily-123', [{'format': 'human_history_explainer'}])
         self.assertEqual(story['content_profile'], h.PROFILE)
         self.assertEqual(len(calls), 6)
+        self.assertEqual(story['thumbnail_text'], h.THUMBNAIL_FALLBACKS[story['content_pillar']])
         self.assertTrue(story['scenes'][-1]['narration'].endswith(h.CTA))
         w.validate_story(story)
         invalid = copy.deepcopy(story)
