@@ -21,7 +21,7 @@ and a shared chapter continuity bible. See [content direction](CONTENT_DIRECTION
 The previous ten-second private test passed in Actions run 38450919780.
 The current seven-second update derives each visual from actual measured word
 timestamps after speech generation, including windows crossing chapter boundaries.
-Groq produces concise scene prompts using the exact words spoken in that window
+Local Qwen produces concise scene prompts using the exact words spoken in that window
 and chapter context for pronouns and continuity. Windows that cross chapter boundaries
 include both chapters as context; silent windows retain the preceding narrated event. Image generation refuses a plan
 without full narration-window coverage. Subject/action/object prompts precede style
@@ -30,9 +30,9 @@ remaining narration. Component tests do not replace a complete live generation/u
 
 The reviewed story has a direct opening crisis, coherent escalating setbacks,
 and a final narrator request to like, comment and subscribe. Future stories
-use Groq GPT-OSS 120B with strict chapter schemas and rate-spaced batches;
+use Qwen3-4B-Instruct-2507 locally on CPU with strict chapter schemas;
 the final CTA is added reliably by the application. Previous story titles are
-included in Groq planning to reduce repeated topics. Historical private tests
+included in local model planning to reduce repeated topics. Historical private tests
 remain manual; the new daily workflow generates a fresh story on each run.
 
 ## Free cloud infrastructure
@@ -83,11 +83,9 @@ Set GitHub Actions secrets directly; do not commit real credentials:
   folder is automatically discovered; DRIVE_FOLDER_ID is optional.
 - YOUTUBE_TOKEN_JSON: authorized Google OAuth JSON with upload/read access
   for Rezan Relaxation. Private daily uploads reuse the existing upload/read OAuth permissions.
-  No public-publishing permission is required.
+  Scheduled publishing requires youtube.force-ssl authorization.
   The expected channel ID is UCztvMrNCT34DO3DtzLPgWaw.
-- GROQ_API_KEY: required for fresh unattended daily story generation. It is also
-  required for narration-aligned scene prompts. Fresh tests generate an original
-  story and store all unpublished content privately.
+- No external text API credentials are required. Pinned Qwen Q4_K_M weights run locally through llama.cpp.
 
 IMAGE_BACKEND=cpu, TTS_BACKEND=kokoro, CAPTION_BACKEND=cpu and
 MUSIC_BACKEND=magenta are free-model defaults. See .env.example.
@@ -130,12 +128,12 @@ an actual image change across a seven-second boundary. These checks run locally 
 (`0 19 * * *` UTC), and supports manual dispatch.
 GitHub may delay scheduled starts. The workflow must be on the default branch,
 with Actions and scheduled workflows enabled. Existing secrets are reused:
-`GROQ_API_KEY`, `DRIVE_TOKEN_JSON`, `DRIVE_FOLDER_ID`, `YOUTUBE_TOKEN_JSON`.
+`DRIVE_TOKEN_JSON`, `DRIVE_FOLDER_ID`, `YOUTUBE_TOKEN_JSON`.
 The configured destination remains channel `UCztvMrNCT34DO3DtzLPgWaw`.
 
 The existing twenty CPU image workers, exact seven-second narration timeline,
 10–15 minute validation, local narration, original music, captions and thumbnail
-pipeline are reused. Fresh Groq financial stories cover financial growth, money
+pipeline are reused. Fresh local-model stories cover financial growth, money
 psychology, saving and investing habits, business decisions, moral parables and
 everyday money mistakes. Historical documentaries require verified source material;
 without it, generation uses clearly labelled fiction. Prior titles are included
@@ -151,7 +149,7 @@ monetization eligibility.
 Uploads remain **private**. `daily_publish.py` reads back the exact video ID,
 channel, title, tags, complete description, successful processing and HD
 definition, requires confirmed thumbnail upload, and verifies private visibility
-before deletion. It never calls `videos.update` or changes visibility.
+before deletion. It sets the AI disclosure and schedules the first 06:00 New York at least 24 hours after upload completion.
 Failed, incomplete, ambiguous, or unverified uploads retain all Drive assets.
 
 Disposable media created by this daily workflow receive run-specific Drive

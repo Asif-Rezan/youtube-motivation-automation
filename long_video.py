@@ -60,8 +60,8 @@ def shot_plan(story, lengths, word_lists):
 def storyboard(root=ROOT, ask=None, pause=None):
     """Create concrete visual prompts AFTER narration timing, never from outline beats."""
     import time
-    ask = ask or w.request_groq
-    pause = pause or time.sleep
+    ask = ask or w.request_text
+    pause = pause or w.text_batch_pause
     story = json.loads((root/'story.json').read_text())
     plan = json.loads((root/'plan.json').read_text())
     character = story.get('character_description', '').strip()
@@ -111,7 +111,7 @@ Never merge different time periods, add modern equipment to prehistoric scenes, 
 Chapter context: {json.dumps(context)}
 Exact shot windows: {json.dumps([{'key': f"shot_{shot['index']:03}", 'start_seconds': shot['start'], 'duration_seconds': shot['duration'], 'end_seconds': shot['start']+shot['duration'], 'primary_chapter': shot['chapter'], 'spoken': shot['narration'], 'previous_spoken': shots[shot['index']-1]['narration'] if shot['index'] else '', 'next_spoken': shots[shot['index']+1]['narration'] if shot['index']+1 < len(shots) else ''} for shot in batch])}
 """
-        result = ask('chat/completions', {'model': os.getenv('STORY_MODEL', 'openai/gpt-oss-120b'),
+        result = ask('chat/completions', {'model': os.getenv('STORY_MODEL', 'Qwen/Qwen3-4B-Instruct-2507'),
             'messages': [{'role': 'user', 'content': prompt}],
             'response_format': {'type': 'json_schema', 'json_schema': {'name': 'aligned_shots',
                 'strict': True, 'schema': schema}}, 'reasoning_effort': 'low',
@@ -151,7 +151,7 @@ def narration_digest(text):
 
 def rewrite_for_duration(story, total, lengths, ask=None):
     """Rewrite only the chapters needed to move measured speech toward the safe band."""
-    ask = ask or w.request_groq
+    ask = ask or w.request_text
     # Aim for the nearest comfortable edge; this limits how many chapters need
     # new speech when the script is only a little outside the allowed range.
     target = PREFERRED_MAX if total > MAX_DURATION else PREFERRED_MIN
@@ -186,7 +186,7 @@ def rewrite_for_duration(story, total, lengths, ask=None):
                   f'never pad or repeat. Original measured duration is {total:.1f}s; target is about {target:.0f}s. '
                   f'Aim for approximately {ratio:.2f} times the current word count in each returned chapter. '
                   f'Return only JSON with exactly these keys: {keys}. Context: {json.dumps(context)}')
-        result = ask('chat/completions', {'model': os.getenv('STORY_MODEL', 'openai/gpt-oss-120b'),
+        result = ask('chat/completions', {'model': os.getenv('STORY_MODEL', 'Qwen/Qwen3-4B-Instruct-2507'),
             'messages': [{'role': 'user', 'content': prompt}],
             'response_format': {'type': 'json_schema', 'json_schema': {'name': 'duration_rewrite',
                 'strict': True, 'schema': schema}}, 'reasoning_effort': 'low',

@@ -57,7 +57,8 @@ def validate_metadata(data):
 
 def generate_metadata(story, ask, pause, schema):
     text = {'type': 'string'}
-    response_schema = schema({'title': text, 'description': text,
+    response_schema = schema({'title': {'type': 'string', 'maxLength': 85},
+                              'description': {'type': 'string', 'minLength': 3500, 'maxLength': 4500},
                               'tags': {'type': 'array', 'items': text}})
     context = {'working_title': story['title'], 'topic_pillar': story.get('content_pillar'),
                'evidence_and_continuity': story.get('story_bible'),

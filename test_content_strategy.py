@@ -94,7 +94,7 @@ class ContentStrategyTests(unittest.TestCase):
                     self.assertIn('Day 20; offer remains undecided.', payload['messages'][0]['content'])
             return {'choices': [{'message': {'content': json.dumps(result)}, 'finish_reason': 'stop'}]}
         with patch.dict(os.environ, {'CONTENT_TYPE': 'financial-storytelling'}, clear=True), \
-             patch.object(w, 'request_groq', side_effect=ask), patch.object(w.time, 'sleep'):
+             patch.object(w, 'request_text', side_effect=ask), patch.object(w.time, 'sleep'):
             story = w.make_story('daily-123', [])
         self.assertEqual(story['content_profile'], PROFILE)
         self.assertIn(story['content_pillar'], PILLARS)

@@ -137,17 +137,21 @@ def generate(day, history, ask, pause, check_originality, schema):
     for begin in (0, 5, 10, 15):
         pause(60)
         group_keys = keys[begin:begin+5]
+        # Constrain local decoding to complete chapters near the spoken-duration target.
+        word = r"[A-Za-z0-9][A-Za-z0-9,.;:!?'\-]*"
+        final_word = r"[A-Za-z0-9][A-Za-z0-9'\-]*[.!?]"
+        narration_schema = {'type': 'string', 'pattern': '^' + word + '( ' + word + '){72,102} ' + final_word + '$'}
         group = ask(f'''Write only chapters {begin+1}–{begin+5} of this explainer.
         {direction(outline)}
         Title: {outline['title']}. Evidence and continuity brief: {outline['story_bible']}
         Full chapter plan: {json.dumps(outline['scenes'])}
         Previous ending: {previous[-700:]}
-        Each chapter 82–88 spoken English words. Explain its assigned mechanism only; do not jump ahead.
+        Each chapter targets 82–88 spoken English words (74–104 permitted). Use plain English, single spaces and ASCII punctuation; finish with a complete sentence. Explain its assigned mechanism only; do not jump ahead.
         Keep a curious, conversational, lightly humorous tone. Use everyday comparisons with clear limits.
         No fictional financial plot, filler, headings, invented dialogue or viewer calls to action.
         Open chapter 1 inside the concrete problem; conclude the answer in chapter 20.
         Return narrations with exactly these keys: {group_keys}.''', 4200,
-        schema({'narrations': schema({key: text for key in group_keys})}))
+        schema({'narrations': schema({key: narration_schema for key in group_keys})}))
         for key, chapter in zip(group_keys, outline['scenes'][begin:begin+5]):
             narration = group['narrations'][key]
             if not isinstance(narration, str) or not narration.strip():

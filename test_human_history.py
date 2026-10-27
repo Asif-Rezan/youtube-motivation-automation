@@ -93,7 +93,7 @@ class HumanHistoryTests(unittest.TestCase):
                 from test_video_metadata import metadata_fixture
                 result = metadata_fixture()
             return {'choices': [{'message': {'content': json.dumps(result)}, 'finish_reason': 'stop'}]}
-        with patch.dict(os.environ, {}, clear=True), patch.object(w, 'request_groq', side_effect=ask), \
+        with patch.dict(os.environ, {}, clear=True), patch.object(w, 'request_text', side_effect=ask), \
                 patch.object(w.time, 'sleep'):
             story = w.make_story('daily-123', [{'format': 'human_history_explainer'}])
         self.assertEqual(story['content_profile'], h.PROFILE)

@@ -36,7 +36,7 @@ env:
   MKL_NUM_THREADS: '4'
   DAILY_ENABLED: 'true'
   GENERATE_FRESH_STORY: 'false'
-  STORY_MODEL: openai/gpt-oss-120b
+  STORY_MODEL: Qwen/Qwen3-4B-Instruct-2507
 jobs:
   prepare:
     runs-on: ubuntu-latest

@@ -1,1 +1,1 @@
-2026-10-21: user-requested fresh private video generation after OAuth preflight hardening. Require valid Drive authorization and Groq configuration before generation.
+2026-10-27: User-requested fresh generation using pinned local Qwen text model, Kokoro narration, local Whisper and SSD-1B images.

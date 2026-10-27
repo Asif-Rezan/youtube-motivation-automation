@@ -18,13 +18,11 @@ all image workers depend on private Drive checkpoints.
    Use the existing workflow folder ID from your Drive/Actions configuration.
    The helper verifies access and owner-only permissions before replacing
    `DRIVE_TOKEN_JSON` through GitHub CLI stdin. It never prints or saves tokens.
-5. Run **Google OAuth check** in Actions. Both Google checks and Groq readiness
-   must pass. Then start **Daily financial storytelling publishing** with
+5. Run **Google OAuth check** in Actions. Both Google authorization checks must pass. Then start **Daily financial storytelling publishing** with
    `cleanup_run` blank. Alternatively add `--run-test` to the helper to request
    one fresh private generation after saving the validated token.
 
-The daily preflight now receives `GROQ_API_KEY` and requires it before generation.
-Previously its missing-key message only reflected an omitted environment binding.
+Text is generated locally by Qwen; external text credentials are not required.
 Scheduled publication and explicit AI-disclosure updates now require a publish scope.
 For `publish_scope_missing` or HTTP 403 insufficient authentication scopes, run
 `python authorize_youtube.py --client client_secrets.json` locally and approve

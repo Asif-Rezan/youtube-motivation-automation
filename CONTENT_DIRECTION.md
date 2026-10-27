@@ -69,3 +69,6 @@ The preview action generates sample images only and never uploads a video to You
 Daily uploads declare synthetic media, English (United States) metadata/audio, and no paid promotion. After HD verification, schedule the first 06:00 America/New_York at least 24 elapsed hours after upload completion. Persist the UTC anchor and target across retries; follow New York daylight saving. Old runs without a scheduling request remain private.
 
 Native end screens, cards and quizzes require YouTube Studio and are not supported by the uploader API. These elements are not claimed as inserted. This change applies to future uploads.
+
+All text generation (outline, narration, metadata, measured-shot prompts and duration rewrites) uses local Qwen/Qwen3-4B-Instruct-2507, Q4_K_M, with pinned public weights and checksum verification. No hosted text service, external text key or fallback is used. Kokoro, local Whisper and SSD-1B remain unchanged. Reference implementation: Asif-Rezan/youtube-dark-psychology-automation story_cpu.py.
+Reference snapshot: d5dd9c6c755be7a3118d48282358a09ed78bffe1. The daily prepare job allows up to 300 minutes for CPU text generation; image jobs retain their existing SSD-1B settings.

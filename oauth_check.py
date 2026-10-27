@@ -102,8 +102,5 @@ try:
 except Exception as error:
     report_error('Drive OAuth', error)
 
-groq_configured = bool(os.getenv('GROQ_API_KEY', '').strip())
-print(json.dumps({'check': 'Groq secret presence', 'configured': groq_configured}))
-if os.getenv('REQUIRE_GROQ') == 'true' and not groq_configured:
-    report_error('Groq readiness', RuntimeError('missing_secret'))
+print(json.dumps({'check': 'Local Qwen text generation', 'external_text_credentials_required': False}))
 raise SystemExit(1 if failed else 0)

@@ -90,97 +90,23 @@ def check_recent_originality(story, history):
         raise ValueError('Story format repeats one of the last two uploads')
 
 
-def groq_retry_delay(response, attempt):
-    """Honor provider cooldowns, including HTTP-date Retry-After values."""
-    import math
-    from email.utils import parsedate_to_datetime
-    value = response.headers.get('retry-after', '').strip()
-    if value:
-        try:
-            delay = float(value)
-        except ValueError:
-            try:
-                delay = parsedate_to_datetime(value).timestamp() - time.time()
-            except (ValueError, TypeError, OverflowError):
-                delay = None
-        if delay is not None and math.isfinite(delay):
-            return max(1, math.ceil(delay)) + 1
-    # Groq may supply a more precise cooldown in the structured error message.
-    try:
-        message = response.json().get('error', {}).get('message', '')
-    except ValueError:
-        message = ''
-    match = re.search(r'try again in\s+((?:[\d.]+(?:ms|h|m|s)\s*)+)', message, re.I)
-    if match:
-        units = {'h': 3600, 'm': 60, 's': 1, 'ms': .001}
-        delay = sum(float(n)*units[u.lower()] for n,u in
-                    re.findall(r'([\d.]+)(ms|h|m|s)', match.group(1), re.I))
-        if math.isfinite(delay):
-            return max(1, math.ceil(delay)) + 1
-    return min(60 * 2**attempt, 300)
+def request_text(endpoint, payload):
+    if os.getenv('TEXT_BACKEND', 'qwen-local') != 'qwen-local':
+        raise ValueError('Only the local Qwen text backend is supported')
+    from story_cpu import request_story
+    return request_story(endpoint, payload)
 
 
-_groq_backup_active = False
-
-
-def request_groq(endpoint, payload, binary=False):
-    import requests
-    global _groq_backup_active
-    primary = required('GROQ_API_KEY')
-    backup = os.getenv('GROQ_API_KEY_BACKUP', '').strip()
-    use_backup = _groq_backup_active and bool(backup) and backup != primary
-    # Retry only explicit provider rejections, never successful generation calls.
-    waited = 0
-    json_retried = False
-    for attempt in range(6):
-        try:
-            response = requests.post('https://api.groq.com/openai/v1/' + endpoint,
-                headers={'Authorization': 'Bearer ' + (backup if use_backup else primary)}, json=payload, timeout=180)
-        except OSError:
-            if not use_backup and backup and backup != primary and attempt < 5:
-                use_backup = _groq_backup_active = True
-                print(json.dumps({'check': 'Groq key fallback', 'key_slot': 'backup',
-                                  'reason': 'connection_error'}), flush=True)
-                continue
-            raise
-        if response.ok:
-            return response.content if binary else response.json()
-        try:
-            error_code = response.json().get('error', {}).get('code')
-        except ValueError:
-            error_code = None
-        print(json.dumps({'check': 'Groq generation', 'http_status': response.status_code,
-            'api_error_code': error_code, 'attempt': attempt+1}), flush=True)
-        if not use_backup and backup and backup != primary and attempt < 5 and response.status_code in (401, 403, 429, 500, 502, 503, 504):
-            use_backup = _groq_backup_active = True
-            print(json.dumps({'check': 'Groq key fallback', 'key_slot': 'backup',
-                              'http_status': response.status_code}), flush=True)
-            continue
-        if response.status_code == 429:
-            delay = groq_retry_delay(response, attempt)
-            if attempt == 5 or waited + delay > 900:
-                raise RuntimeError(
-                    f'Groq rate limit remains active; retry after at least {delay} seconds. '
-                    'Automatic retry budget exhausted (six requests / 900 seconds waiting). '
-                    'Check Groq organization quotas before starting another run.')
-            print(json.dumps({'check': 'Groq cooldown', 'retry_after_seconds': delay,
-                              'waited_seconds': waited}), flush=True)
-            time.sleep(delay)
-            waited += delay
-            continue
-        if response.status_code == 400 and error_code == 'json_validate_failed' and not json_retried and attempt < 5:
-            json_retried = True
-            time.sleep(60)
-            waited += 60
-            continue
-        raise RuntimeError(f'Groq request failed with HTTP {response.status_code}; code={error_code}')
+def text_batch_pause(seconds=60):
+    """Local inference needs no provider cooldown between batches."""
+    return None
 
 
 def make_story(day, previous):
     if os.getenv('STORY_FILE'):
         # Explicit original test story only; daily jobs must generate fresh stories.
         return validate_story(json.loads(Path(os.environ['STORY_FILE']).read_text()))
-    model = os.getenv('STORY_MODEL', 'openai/gpt-oss-120b')
+    model = os.getenv('STORY_MODEL', 'Qwen/Qwen3-4B-Instruct-2507')
     def object_schema(properties):
         return {'type': 'object', 'properties': properties,
             'required': list(properties), 'additionalProperties': False}
@@ -197,7 +123,7 @@ def make_story(day, previous):
         'tags': {'type': 'array', 'items': text_schema},
         'scenes': object_schema({k: scene_schema for k in chapter_keys})})
     def ask(prompt, limit, schema):
-        result = request_groq('chat/completions', {'model': model,
+        result = request_text('chat/completions', {'model': model,
             'messages': [{'role': 'user', 'content': prompt}],
             'response_format': {'type': 'json_schema', 'json_schema': {'name': 'story_payload',
                 'strict': True, 'schema': schema}}, 'reasoning_effort': 'low',
@@ -208,7 +134,7 @@ def make_story(day, previous):
         return json.loads(choice['message']['content'])
     if os.getenv('CONTENT_TYPE', 'human-history') == 'human-history':
         from human_history import generate
-        outline = generate(day, previous, ask, time.sleep, check_recent_originality, object_schema)
+        outline = generate(day, previous, ask, text_batch_pause, check_recent_originality, object_schema)
         from long_video import validate_engagement
         validate_engagement(outline)
         return validate_story(outline)
@@ -294,7 +220,7 @@ def make_story(day, previous):
     prior = ''
     for begin in (0, 5, 10, 15):
         # Separate bursts fit the free plan; never switch to a paid provider.
-        time.sleep(60)
+        text_batch_pause()
         keys = chapter_keys[begin:begin+5]
         group_schema = object_schema({'narrations': object_schema({k: text_schema for k in keys})})
         group = ask(f'''Write chapters {begin+1} through {begin+5} of this original fictional story.
@@ -328,7 +254,7 @@ def make_story(day, previous):
                 if not missing:
                     break
                 print(json.dumps({'narration_pov_retry': attempt + 1, 'chapters': missing}), flush=True)
-                time.sleep(60)
+                text_batch_pause()
                 repair_schema = object_schema({'narrations': object_schema({k: text_schema for k in missing})})
                 repaired = ask(f'''Rewrite ONLY these chapters in second person, addressing the protagonist as you/your in EVERY chapter.
                 Keep 82-88 English spoken words per chapter. Preserve the events, dialogue meaning, money amounts and timeline.
@@ -393,41 +319,17 @@ def speech_chunks(text, limit=200):
 
 
 def make_narration(text, path):
-    if os.getenv('TTS_BACKEND', 'kokoro') == 'kokoro':
-        from voice_cpu import generate
-        generate(text, path)
-        return
-    parts = []
-    for index, chunk in enumerate(speech_chunks(text)):
-        part = path.with_name(path.stem + f'-part-{index:03}.wav')
-        if not part.exists():
-            part.write_bytes(request_groq('audio/speech', {
-                'model': os.getenv('TTS_MODEL') or 'canopylabs/orpheus-v1-english',
-                'voice': os.getenv('TTS_VOICE') or 'troy', 'input': chunk, 'response_format': 'wav'}, True))
-        parts.append(part)
-    playlist = path.with_suffix('.txt')
-    playlist.write_text(''.join(f"file '{p.name}'\n" for p in parts))
-    shell('ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', str(playlist), '-ar', '48000',
-          '-ac', '2', '-c:a', 'pcm_s16le', str(path))
+    if os.getenv('TTS_BACKEND', 'kokoro') != 'kokoro':
+        raise ValueError('Only local Kokoro narration is supported')
+    from voice_cpu import generate
+    generate(text, path)
 
 
 def transcribe(audio):
-    if os.getenv('CAPTION_BACKEND', 'cpu') == 'cpu':
-        from voice_cpu import transcribe_audio
-        return transcribe_audio(audio)
-    import requests
-    with audio.open('rb') as stream:
-        response = requests.post('https://api.groq.com/openai/v1/audio/transcriptions',
-            headers={'Authorization': 'Bearer ' + required('GROQ_API_KEY')},
-            files={'file': (audio.name, stream, 'audio/wav')},
-            data={'model': 'whisper-large-v3', 'response_format': 'verbose_json',
-                  'timestamp_granularities[]': 'word', 'language': 'en'}, timeout=180)
-    if not response.ok:
-        raise RuntimeError(f'Transcription failed with HTTP {response.status_code}')
-    words = response.json().get('words')
-    if not words:
-        raise RuntimeError('Transcription did not return word timings')
-    return words
+    if os.getenv('CAPTION_BACKEND', 'cpu') != 'cpu':
+        raise ValueError('Only local CPU captions are supported')
+    from voice_cpu import transcribe_audio
+    return transcribe_audio(audio)
 
 
 def aligned_subtitles(word_lists, lengths, path):
@@ -714,8 +616,14 @@ def upload_private(video, thumbnail, story, state, store, key, music_credit=''):
 
 def preflight():
     needed = ['DRIVE_TOKEN_JSON']
-    if not os.getenv('STORY_FILE') or os.getenv('TTS_BACKEND', 'kokoro') == 'groq' or os.getenv('CAPTION_BACKEND', 'cpu') == 'groq':
-        needed.append('GROQ_API_KEY')
+    if os.getenv('TEXT_BACKEND', 'qwen-local') != 'qwen-local':
+        raise ValueError('Only the local Qwen text backend is supported')
+    if os.getenv('TTS_BACKEND', 'kokoro') != 'kokoro' or os.getenv('CAPTION_BACKEND', 'cpu') != 'cpu':
+        raise ValueError('Narration and captions must use local models')
+    if not os.getenv('STORY_FILE'):
+        import importlib.util
+        if importlib.util.find_spec('llama_cpp') is None:
+            needed.append('llama_cpp (local text dependency)')
     if os.getenv('IMAGE_BACKEND', 'cpu') == 'hf':
         needed += ['HF_TOKEN', 'IMAGE_MODEL']
     else:
