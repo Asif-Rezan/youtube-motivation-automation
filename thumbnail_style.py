@@ -3,7 +3,7 @@ from pathlib import Path
 from PIL import ImageDraw, ImageFont
 
 
-def add_caption(image, text):
+def add_caption(image, text, placement='top'):
     text = ' '.join(text.upper().split())
     if not 2 <= len(text.split()) <= 5 or len(text) > 45:
         raise ValueError('Thumbnail caption must have 2–5 words and at most 45 characters')
@@ -12,6 +12,25 @@ def add_caption(image, text):
                   '/System/Library/Fonts/Supplemental/Arial Bold.ttf')
     font_path = next((p for p in candidates if Path(p).is_file()), 'DejaVuSans-Bold.ttf')
     draw = ImageDraw.Draw(image)
+    if placement == 'upper-left':
+        words = text.split()
+        # Two compact lines stay inside the negative space requested from the model.
+        split = min(range(1, len(words)), key=lambda i: max(len(' '.join(words[:i])), len(' '.join(words[i:]))))
+        lines = [' '.join(words[:split]), ' '.join(words[split:])]
+        for size in range(118, 31, -2):
+            font = ImageFont.truetype(font_path, size)
+            boxes = [draw.textbbox((0, 0), line, font=font, stroke_width=6) for line in lines]
+            if max(box[2]-box[0] for box in boxes) <= image.width*.42:
+                break
+        else:
+            raise ValueError('Thumbnail caption does not fit reserved area')
+        y = 38
+        for line, box in zip(lines, boxes):
+            draw.text((42-box[0], y-box[1]), line, font=font, fill='#FFF244', stroke_width=6, stroke_fill='black')
+            y += box[3]-box[1]+12
+        return image
+    if placement != 'top':
+        raise ValueError('Unknown thumbnail caption placement')
     for size in range(108, 31, -2):
         font = ImageFont.truetype(font_path, size)
         box = draw.textbbox((0, 0), text, font=font, stroke_width=5)

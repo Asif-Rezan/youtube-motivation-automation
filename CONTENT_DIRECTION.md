@@ -39,9 +39,14 @@ Rotate food preservation, water, fire, learning survival skills, tools, sharing,
 transmitting knowledge. Distinguish archaeological evidence, inference and reconstruction;
 do not invent sources, quotes, studies, dates or statistics. Source review remains necessary.
 
-Thumbnails use one clear object/place and visual tension, realistic textures and readable lighting.
-Reserve an uncluttered upper area for the existing 2–5 word yellow caption with a black outline.
+Thumbnails use a dedicated composition, not a reused wide scenic background: tight framing,
+one dominant narrated subject on the right, truthful visual tension, realistic textures and
+warm focal light against cool shadows. Use relevant human/animal emotion when supported.
+Reserve dark negative space upper-left for a short two-line yellow caption with a black outline.
 Generated art contains no letters; caption typography is added afterward.
+The planning model receives the title and story context and writes a concise thumbnail scene
+and complementary curiosity text. These are design heuristics, not measured CTR predictions.
+Only live audience testing can establish an improvement in clicks and watch time.
 
 ## Production retained
 

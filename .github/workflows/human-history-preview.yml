@@ -1,6 +1,12 @@
 name: Preview Ancient Humans backgrounds and thumbnail
 on:
   workflow_dispatch:
+    inputs:
+      asset:
+        description: 'Render all samples or one requested asset'
+        type: choice
+        default: all
+        options: [all, background-01, background-02, thumbnail]
 permissions:
   contents: read
 jobs:
@@ -8,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        asset: [background-01, background-02, thumbnail]
+        asset: ${{ fromJSON(inputs.asset == 'thumbnail' && '["thumbnail"]' || inputs.asset == 'background-01' && '["background-01"]' || inputs.asset == 'background-02' && '["background-02"]' || '["background-01","background-02","thumbnail"]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:

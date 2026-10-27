@@ -24,7 +24,7 @@ SAMPLES = {
     },
     'thumbnail': {
         'seed': 9931,
-        'prompt': 'Close view of cold gray hearth ashes and abandoned firewood beneath a dark rock overhang, blue dusk beyond.',
+        'prompt': 'A worried prehistoric adult in hide clothing cups one glowing coal in dry grass near their face inside a cave.',
     },
 }
 
@@ -38,15 +38,16 @@ def main():
     sample = SAMPLES[args.asset]
     config = image_config()
     os.environ['IMAGE_SEED'] = str(sample['seed'])
-    prompt = visual_prompt(sample['prompt'], people=False, thumbnail=args.asset == 'thumbnail')
-    os.environ['IMAGE_NEGATIVE_PROMPT'] = image_negative(sample['prompt'], people=False)
+    people = args.asset == 'thumbnail'
+    prompt = visual_prompt(sample['prompt'], people=people, thumbnail=args.asset == 'thumbnail')
+    os.environ['IMAGE_NEGATIVE_PROMPT'] = image_negative(sample['prompt'], people=people)
     path = args.output / f'{args.asset}.png'
     if args.asset == 'thumbnail':
         source = args.output / 'thumbnail-source.png'
         render_safe_thumbnail(prompt, source)
         with Image.open(source) as original:
             picture = ImageOps.fit(original.convert('RGB'), (1280, 720))
-        add_caption(picture, 'FIRE GONE?')
+        add_caption(picture, 'LAST EMBER', placement='upper-left')
         picture.save(path)
         picture.save(args.output / 'thumbnail.jpg', quality=92)
         metadata = json.loads(metadata_path(source).read_text())
@@ -63,7 +64,7 @@ def main():
     if metadata['model'] != config.model or metadata['steps'] != config.steps or metadata['reference_mode'] != 'none':
         raise RuntimeError('Preview differs from selected model/style settings')
     report = {'title': TITLE, 'asset': args.asset, 'prompt': prompt,
-        'style': workflow.VISUAL_STYLE, 'caption': 'FIRE GONE?' if args.asset == 'thumbnail' else None,
+        'style': workflow.VISUAL_STYLE, 'caption': 'LAST EMBER' if args.asset == 'thumbnail' else None,
         'production_image_metadata': metadata,
         'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
     (args.output / f'{args.asset}-review.json').write_text(json.dumps(report, indent=2))
