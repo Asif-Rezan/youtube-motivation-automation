@@ -19,7 +19,7 @@ class ImageCPUChecks(unittest.TestCase):
         self.assertNotIn('photograph', image_cpu.NEGATIVE)
         for term in ('watercolor', '3d render', 'blurry', 'low detail', 'poor quality', 'distorted anatomy', 'watermark', 'text'):
             self.assertIn(term, image_cpu.NEGATIVE)
-        self.assertNotIn('cel shading', image_cpu.NEGATIVE)
+        self.assertIn('cel shading', image_cpu.NEGATIVE)
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(image_cpu.image_config().model, image_cpu.MODEL)
             self.assertEqual((image_cpu.image_config().width, image_cpu.image_config().height), (1024, 576))
