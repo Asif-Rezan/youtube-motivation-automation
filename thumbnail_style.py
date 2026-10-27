@@ -12,6 +12,30 @@ def add_caption(image, text, placement='top'):
                   '/System/Library/Fonts/Supplemental/Arial Bold.ttf')
     font_path = next((p for p in candidates if Path(p).is_file()), 'DejaVuSans-Bold.ttf')
     draw = ImageDraw.Draw(image)
+    if placement == 'left-center':
+        words = text.split()
+        split = min(range(1, len(words)), key=lambda i: max(len(' '.join(words[:i])), len(' '.join(words[i:]))))
+        lines = [' '.join(words[:split]), ' '.join(words[split:])]
+        maximum_width = image.width*.33
+        fonts, boxes = [], []
+        for line, maximum in zip(lines, (76, 104)):
+            for size in range(maximum, 29, -2):
+                font = ImageFont.truetype(font_path, size)
+                box = draw.textbbox((0, 0), line, font=font, stroke_width=2)
+                if box[2]-box[0] <= maximum_width:
+                    break
+            else:
+                raise ValueError('Thumbnail caption does not fit left column')
+            fonts.append(font)
+            boxes.append(box)
+        gap = 12
+        height = sum(box[3]-box[1] for box in boxes)+gap
+        y = image.height*.48-height/2
+        for line, font, box, color in zip(lines, fonts, boxes, ('#FFFFFF', '#FFD45A')):
+            draw.text((54-box[0], y-box[1]), line, font=font, fill=color,
+                      stroke_width=2, stroke_fill='#17120D')
+            y += box[3]-box[1]+gap
+        return image
     if placement == 'upper-left':
         words = text.split()
         # Two compact lines stay inside the negative space requested from the model.

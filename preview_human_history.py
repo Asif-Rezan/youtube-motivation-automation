@@ -47,7 +47,7 @@ def main():
         render_safe_thumbnail(prompt, source)
         with Image.open(source) as original:
             picture = ImageOps.fit(original.convert('RGB'), (1280, 720))
-        add_caption(picture, 'NO MATCHES', placement='upper-left')
+        add_caption(picture, 'NO MATCHES', placement='left-center')
         picture.save(path)
         picture.save(args.output / 'thumbnail.jpg', quality=92)
         metadata = json.loads(metadata_path(source).read_text())

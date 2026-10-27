@@ -601,7 +601,7 @@ def finish(root=ROOT):
     from human_history import PROFILE as HISTORY_PROFILE
     if story.get('content_profile') == HISTORY_PROFILE:
         from thumbnail_style import add_caption
-        add_caption(image, story['thumbnail_text'], placement='upper-left')
+        add_caption(image, story['thumbnail_text'], placement='left-center')
     image.save(root/'thumbnail.jpg', quality=92)
     if (root/'thumbnail.jpg').stat().st_size >= 2*1024*1024:
         raise RuntimeError('Thumbnail exceeds size limit')

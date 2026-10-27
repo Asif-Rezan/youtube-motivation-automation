@@ -28,7 +28,7 @@ def visual_prompt(action, name='Ari', people=True, thumbnail=False, animals=Fals
     if thumbnail:
         # Dedicated packaging composition, not a wide documentary background.
         return (IMAGE_PREFIX + ' ' + action + '. Tight framing, dominant subject on right, '
-                'empty dark upper-left. Realistic textures, dramatic warm light against cool shadows, sharp focal detail.')
+                'uncluttered left third. Realistic textures, scene-appropriate lighting, natural exposure, sharp focal detail.')
     framing = 'Prominent focal object, uncluttered upper area. ' if thumbnail else 'Clear environmental composition. '
     return (IMAGE_PREFIX + ' ' + action + '. ' + design + framing +
             'Realistic stone, wood and earth textures, scene-appropriate natural lighting.')
@@ -121,7 +121,7 @@ def generate(day, history, ask, pause, check_originality, schema):
     The subject must remain recognizable at phone size. No tiny distant subject, cluttered cave scenery,
     invented dangers, unsupported before/after claims, irrelevant shocked faces or guaranteed-CTR promises.
     thumbnail_prompt: MAXIMUM 24 words describing the exact subject, action, meaningful prop and emotion.
-    The renderer adds tight framing, subject on right, dark negative space upper-left and realistic lighting.
+    The renderer adds tight framing, subject on right, uncluttered space on the left and realistic lighting.
     thumbnail_text: 2–4 short curiosity words that ADD a question/stake rather than repeat the full title.
     Pair text and imagery with the title's honest promise. No generated letters, logos or copied compositions.
     Chapter summary <=18 words, continuity_note <=18 words, image_prompt <=22 words.

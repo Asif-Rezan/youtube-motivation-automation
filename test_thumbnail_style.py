@@ -19,7 +19,7 @@ class ThumbnailStyleTests(unittest.TestCase):
         prompt = visual_prompt(action, thumbnail=True)
         self.assertIn(action, prompt)
         self.assertIn('Tight framing, dominant subject on right', prompt)
-        self.assertIn('empty dark upper-left', prompt)
+        self.assertIn('uncluttered left third', prompt)
         self.assertNotIn('Clear environmental composition', prompt)
 
 

@@ -41,8 +41,8 @@ do not invent sources, quotes, studies, dates or statistics. Source review remai
 
 Thumbnails use a dedicated composition, not a reused wide scenic background: tight framing,
 one dominant narrated subject on the right, truthful visual tension, realistic textures and
-warm focal light against cool shadows. Use relevant human/animal emotion when supported.
-Reserve dark negative space upper-left for a short two-line yellow caption with a black outline.
+scene-appropriate lighting and natural exposure. Use relevant human/animal emotion when supported.
+Reserve uncluttered space on the left for a compact two-line caption: white first line, warm yellow second line, thin outline. Do not darken the image to accommodate text.
 Generated art contains no letters; caption typography is added afterward.
 The planning model receives the title and story context and writes a concise thumbnail scene
 and complementary curiosity text. These are design heuristics, not measured CTR predictions.
