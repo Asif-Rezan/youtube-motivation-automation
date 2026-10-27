@@ -35,6 +35,9 @@ def report_error(name, error):
             safe = code
             break
     result = {'check': name, 'passed': False, 'error': safe, 'http_status': status}
+    if safe == 'publish_scope_missing':
+        result['action'] = ('Reauthorize YouTube with youtube.force-ssl using authorize_youtube.py, then replace '
+            'YOUTUBE_TOKEN_JSON. Scheduling and AI disclosure updates require this permission; upload-only access is insufficient.')
     if safe == 'invalid_grant':
         result['action'] = ('Google rejected the refresh token. Reauthorize the affected service and replace its '
             'GitHub token secret. If the OAuth app is External/Testing, change it to Production before '

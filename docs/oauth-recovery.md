@@ -25,7 +25,12 @@ all image workers depend on private Drive checkpoints.
 
 The daily preflight now receives `GROQ_API_KEY` and requires it before generation.
 Previously its missing-key message only reflected an omitted environment binding.
-A missing publish scope is expected for this private-upload pipeline and is not
-this failure. The configured destination remains Rezan Relaxation.
+Scheduled publication and explicit AI-disclosure updates now require a publish scope.
+For `publish_scope_missing` or HTTP 403 insufficient authentication scopes, run
+`python authorize_youtube.py --client client_secrets.json` locally and approve
+YouTube access for the configured channel. This helper requests `youtube.upload`
+and `youtube.force-ssl`, verifies the channel, and securely replaces
+`YOUTUBE_TOKEN_JSON` in GitHub. Then retry the failed daily run using `cleanup_run`
+before requesting a fresh generation. Upload-only authorization cannot schedule videos. The configured destination remains Rezan Relaxation.
 
 Google reference: https://developers.google.com/identity/protocols/oauth2#expiration

@@ -61,13 +61,13 @@ jobs:
           pip install -r requirements-cpu.txt
       - name: Validate global timing and rendering helpers
         run: python -m unittest -v
-      - name: Verify private upload readiness before generation
+      - name: Verify upload and scheduling permissions before generation
         env:
           DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
           YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
           EXPECTED_CHANNEL_ID: UCztvMrNCT34DO3DtzLPgWaw
-          REQUIRE_PUBLIC_PUBLISH: 'false'
+          REQUIRE_PUBLIC_PUBLISH: 'true'
           REQUIRE_GROQ: 'true'
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: python oauth_check.py
