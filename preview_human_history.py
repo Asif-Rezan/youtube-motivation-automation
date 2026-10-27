@@ -47,7 +47,7 @@ def main():
         render_safe_thumbnail(prompt, source)
         with Image.open(source) as original:
             picture = ImageOps.fit(original.convert('RGB'), (1280, 720))
-        add_caption(picture, 'LAST EMBER', placement='upper-left')
+        add_caption(picture, 'NO MATCHES', placement='upper-left')
         picture.save(path)
         picture.save(args.output / 'thumbnail.jpg', quality=92)
         metadata = json.loads(metadata_path(source).read_text())
@@ -64,7 +64,7 @@ def main():
     if metadata['model'] != config.model or metadata['steps'] != config.steps or metadata['reference_mode'] != 'none':
         raise RuntimeError('Preview differs from selected model/style settings')
     report = {'title': TITLE, 'asset': args.asset, 'prompt': prompt,
-        'style': workflow.VISUAL_STYLE, 'caption': 'LAST EMBER' if args.asset == 'thumbnail' else None,
+        'style': workflow.VISUAL_STYLE, 'caption': 'NO MATCHES' if args.asset == 'thumbnail' else None,
         'production_image_metadata': metadata,
         'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
     (args.output / f'{args.asset}-review.json').write_text(json.dumps(report, indent=2))
