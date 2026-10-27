@@ -40,6 +40,28 @@ def validate_remote(video, state, channel):
         and video.get('contentDetails', {}).get('definition') == 'hd')
 
 
+def ensure_ai_disclosure(client, video, state, channel):
+    """Insert can omit the AI flag; explicitly update and read it back before publishing."""
+    if state.get('video_details_version') != 1:
+        return video
+    # Verify identity and exact story metadata before any mutation.
+    validate_remote(video, dict(state, video_details_version=None), channel)
+    status = video['status']
+    if status.get('containsSyntheticMedia') is True:
+        return video
+    if status.get('privacyStatus') != 'private':
+        raise RuntimeError('AI disclosure repair requires a private video')
+    writable = {k: status[k] for k in ('privacyStatus', 'publishAt', 'embeddable',
+        'license', 'publicStatsViewable', 'selfDeclaredMadeForKids') if k in status}
+    writable['containsSyntheticMedia'] = True
+    client.videos().update(part='status', body={'id': video['id'], 'status': writable}).execute()
+    items = client.videos().list(part='snippet,status,processingDetails,contentDetails,paidProductPlacementDetails',
+        id=video['id']).execute().get('items', [])
+    if not items:
+        raise RuntimeError('Video unavailable after AI disclosure update')
+    return items[0]
+
+
 def cleanup(store, run, state):
     if not re.fullmatch(r'daily-\d+', run):
         raise ValueError('Invalid daily run ID')
@@ -123,7 +145,7 @@ def main():
             id=state['video_id']).execute().get('items', [])
         if not items:
             raise RuntimeError('Uploaded video unavailable')
-        video = items[0]
+        video = ensure_ai_disclosure(client, items[0], state, required('EXPECTED_CHANNEL_ID'))
         if validate_remote(video, state, required('EXPECTED_CHANNEL_ID')):
             break
         if time.monotonic() >= deadline:

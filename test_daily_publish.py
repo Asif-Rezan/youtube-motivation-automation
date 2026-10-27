@@ -199,3 +199,27 @@ class VideoDetailsTests(unittest.TestCase):
         video['snippet']['defaultAudioLanguage'] = 'en'
         with self.assertRaisesRegex(RuntimeError, 'defaultAudioLanguage'):
             validate_remote(video, state, 'c')
+
+
+class DisclosureRepairTests(VideoDetailsTests):
+    def test_missing_ai_flag_is_updated_and_read_back(self):
+        from daily_publish import ensure_ai_disclosure
+        import copy
+        video, state = self.fixture()
+        video['status']['privacyStatus'] = 'private'
+        remote = copy.deepcopy(video)
+        del video['status']['containsSyntheticMedia']
+        client = MagicMock()
+        client.videos().list().execute.return_value = {'items': [remote]}
+        fixed = ensure_ai_disclosure(client, video, state, 'c')
+        self.assertTrue(validate_remote(fixed, state, 'c'))
+        self.assertEqual(client.videos().update.call_args.kwargs['body']['status'],
+            {'privacyStatus': 'private', 'containsSyntheticMedia': True})
+
+    def test_identity_mismatch_never_updates(self):
+        from daily_publish import ensure_ai_disclosure
+        video, state = self.fixture()
+        client = MagicMock()
+        with self.assertRaises(RuntimeError):
+            ensure_ai_disclosure(client, video, state, 'wrong-channel')
+        client.videos().update.assert_not_called()
