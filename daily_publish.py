@@ -54,12 +54,19 @@ def ensure_ai_disclosure(client, video, state, channel):
     writable = {k: status[k] for k in ('privacyStatus', 'publishAt', 'embeddable',
         'license', 'publicStatsViewable', 'selfDeclaredMadeForKids') if k in status}
     writable['containsSyntheticMedia'] = True
-    client.videos().update(part='status', body={'id': video['id'], 'status': writable}).execute()
-    items = client.videos().list(part='snippet,status,processingDetails,contentDetails,paidProductPlacementDetails',
-        id=video['id']).execute().get('items', [])
-    if not items:
-        raise RuntimeError('Video unavailable after AI disclosure update')
-    return items[0]
+    result = client.videos().update(part='status', body={'id': video['id'], 'status': writable}).execute()
+    print(json.dumps({'check': 'AI disclosure update', 'video_id': video['id'],
+        'returned_ai_disclosure': result.get('status', {}).get('containsSyntheticMedia')}), flush=True)
+    for attempt in range(6):
+        items = client.videos().list(part='snippet,status,processingDetails,contentDetails,paidProductPlacementDetails',
+            id=video['id']).execute().get('items', [])
+        if not items:
+            raise RuntimeError('Video unavailable after AI disclosure update')
+        if items[0]['status'].get('containsSyntheticMedia') is True:
+            return items[0]
+        if attempt < 5:
+            time.sleep(10)
+    raise RuntimeError('YouTube accepted AI disclosure update but did not confirm it after 50 seconds')
 
 
 def cleanup(store, run, state):
