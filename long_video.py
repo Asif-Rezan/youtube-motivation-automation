@@ -96,6 +96,9 @@ when the narration supplies them. Describe one drawable composition with a detai
 If the action concerns an object, name that object in the opening phrase and keep it fully visible;
 never replace the object with the person holding it or a minor component such as its chain.
 Use natural poses and facial expressions. Include other people only when narrated.
+When narration describes people or animals acting, keep those participants and their action visible;
+never replace hunting, gathering, teaching or an animal encounter with an empty place or abandoned props.
+Keep animal species, scale and habitat appropriate to the region and period. No gratuitous animals or people.
 Do not invent scenery, props, weather, clothing, or characters to add visual interest.
 Name the active character instead of using a pronoun when chapter context identifies them.
 When a window crosses events, depict the event occupying most of its spoken time; never combine different times or places.
@@ -390,7 +393,7 @@ def refine_visual_plan(root=ROOT):
     for shot in plan['shots']:
         action = shot['visual_action'].strip().rstrip('.')
         main = bool(re.search(r'\b'+re.escape(name)+r'\b', action, re.I))
-        group = bool(re.search(r'\b(workers|crew|team|locals|people|crowd|volunteers|hunters|gatherers|adults|clan)\b', action, re.I))
+        group = bool(re.search(r'\b(workers|crew|team|locals|people|crowd|volunteers|hunters|gatherers|adults|clan|humans|men|women|family|families|children|tribe)\b', action, re.I))
         group = group or bool(main and re.search(r'\b(boss|mayor|mother|father|brother|coworker)\b|\bMr\.', action, re.I))
         human = bool(re.search(
             r'\b(man|woman|worker|coworker|engineer|mayor|boss|forecaster|roommate|manager|'
@@ -412,8 +415,16 @@ def refine_visual_plan(root=ROOT):
         shot['negative_prompt'] = 'portrait, headshot, close-up face, face filling frame'
         from human_history import PROFILE as HISTORY_PROFILE, visual_prompt, image_negative
         if story.get('content_profile') == HISTORY_PROFILE:
-            shot['prompt'] = visual_prompt(action, name, people=focus != 'object')
-            shot['negative_prompt'] = image_negative(action, people=focus != 'object')
+            animal = bool(re.search(r'\b(animal|animals|wildlife|deer|antelope|gazelle|bison|mammoth|mammoths|'
+                r'wolf|wolves|lion|lions|hyena|hyenas|bear|bears|horse|horses|dog|dogs|bird|birds|fish|herd|prey|predator|predators)\b', action, re.I))
+            explicit_human = main or group or bool(re.search(
+                r'\b(human|person|man|woman|adult|hunter|gatherer|child|mother|father|boy|girl)\b', action, re.I))
+            # A capitalized animal name followed by "standing" is not a named person.
+            people = explicit_human or (human and not animal)
+            focus = 'group' if group else ('person' if people else ('animal' if animal else 'object'))
+            shot['focus'] = focus
+            shot['prompt'] = visual_prompt(action, name, people=people, animals=animal)
+            shot['negative_prompt'] = image_negative(action, people=people)
         # Heuristic focus labels must not erase a narrated person with an unfamiliar name or action.
         if focus == 'group':
             shot['negative_prompt'] += ', solo, one person alone'

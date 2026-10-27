@@ -11,6 +11,25 @@ import workflow as w
 
 
 class HumanHistoryTests(unittest.TestCase):
+    def test_narrated_humans_and_animals_are_kept_in_visual_plan(self):
+        from long_video import refine_visual_plan
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            story = dict(content_profile=h.PROFILE, protagonist_name='Ari',
+                character_description='Adult in hide clothing', scenes=[{'narration': 'Hunters follow a deer.'}])
+            actions = ['Hunters track deer across grassland', 'Wolf standing beside a woodland stream',
+                       'Children gather berries with their mother', 'Flint tools rest beside hearth ashes']
+            (root/'story.json').write_text(json.dumps(story))
+            (root/'plan.json').write_text(json.dumps({'shots': [{'visual_action': a} for a in actions]}))
+            shots = refine_visual_plan(root)['shots']
+            self.assertEqual([s['focus'] for s in shots], ['group', 'animal', 'group', 'object'])
+            for i in (0, 2):
+                self.assertNotIn('people, person, face, portrait', shots[i]['negative_prompt'])
+            for i in (0, 1):
+                self.assertIn('Natural animal anatomy and scale', shots[i]['prompt'])
+                self.assertIn(actions[i], shots[i]['prompt'])
+            self.assertNotIn('An adult', shots[1]['prompt'])
+
     def test_environmental_reconstruction_avoids_mascot_and_preserves_objects(self):
         action = 'Cold hearth ashes beside flint tools under a limestone rock shelter'
         prompt = h.visual_prompt(action, people=False)

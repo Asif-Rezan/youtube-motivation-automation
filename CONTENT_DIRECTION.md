@@ -15,7 +15,11 @@ Prioritize the narrated place and material evidence: limestone shelters, camps, 
 flint tools, tinder, firewood, grassland and woodland. Do not replace narration-specific images
 with unrelated historical buildings. Buildings, plants, tools and climate must fit the chosen
 period and region; no modern equipment or generic fantasy castles in prehistoric scenes.
-People appear only when necessary for the action, with natural proportions and unobtrusive faces.
+People and animals appear whenever they participate in the narration: hunting, gathering,
+teaching, cooperation or wildlife encounters must retain the participants and their actions.
+Use natural proportions, animal anatomy, scale and period-appropriate habitat. Do not replace
+these events with empty scenery. Object-only shots can omit people; the empty preview samples
+are not a global prohibition on humans or animals.
 No recurring cartoon mascot or demand for identical generated faces.
 
 Prompt pattern: specific subject/action + important materials + setting + short documentary style.

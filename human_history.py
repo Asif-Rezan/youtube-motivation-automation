@@ -14,7 +14,7 @@ def image_negative(action, people=True):
         'flames, burning fire, glowing fire, smoke, ' if cold else '') + IMAGE_NEGATIVE
 
 
-def visual_prompt(action, name='Ari', people=True, thumbnail=False):
+def visual_prompt(action, name='Ari', people=True, thumbnail=False, animals=False):
     """A concise environmental reconstruction, following the two reference repos."""
     action = re.split(r'\. (?:Character|Main character):', action, maxsplit=1)[0].strip().rstrip('.')
     if people:
@@ -22,6 +22,8 @@ def visual_prompt(action, name='Ari', people=True, thumbnail=False):
         design = 'Natural proportions, faces unobtrusive. '
     else:
         design = ''
+    if animals:
+        design += 'Natural animal anatomy and scale. '
     framing = 'Prominent focal object, uncluttered upper area. ' if thumbnail else 'Clear environmental composition. '
     return (IMAGE_PREFIX + ' ' + action + '. ' + design + framing +
             'Realistic stone, wood and earth textures, scene-appropriate natural lighting.')
@@ -97,7 +99,10 @@ def generate(day, history, ask, pause, check_originality, schema):
     Description must identify an educational overview with illustrative reconstructions and uncertainty.
     Visuals are realistic prehistoric documentary reconstructions, not cartoons or stick figures.
     Prioritize narrated places, shelters, landscapes, tools, hearths and material evidence.
-    Use people only when essential to the literal action; prefer small groups seen from behind or at a distance.
+    Include realistic people and animals whenever they participate in the narrated action or explanation.
+    Show hunting, gathering, teaching, cooperation and encounters through visible participants and their actions,
+    not empty scenery replacing the event. Use medium or environmental views with natural proportions.
+    Keep animal species, scale and habitat appropriate to the selected region and period.
     character_description records period-appropriate hide clothing and practical appearance, not a mascot design.
     An internal first name is for continuity only, not a claimed historical eyewitness.
     Scene image prompts: subject + action + relevant objects + setting, maximum 18 words. Two visual beats per chapter.
