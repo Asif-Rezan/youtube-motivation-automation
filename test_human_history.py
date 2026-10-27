@@ -29,6 +29,8 @@ class HumanHistoryTests(unittest.TestCase):
                 self.assertIn('Natural animal anatomy and scale', shots[i]['prompt'])
                 self.assertIn(actions[i], shots[i]['prompt'])
             self.assertNotIn('An adult', shots[1]['prompt'])
+            self.assertNotIn('person, face, portrait', shots[1]['negative_prompt'])
+            self.assertIn('human portrait', shots[1]['negative_prompt'])
 
     def test_environmental_reconstruction_avoids_mascot_and_preserves_objects(self):
         action = 'Cold hearth ashes beside flint tools under a limestone rock shelter'

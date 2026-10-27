@@ -424,7 +424,7 @@ def refine_visual_plan(root=ROOT):
             focus = 'group' if group else ('person' if people else ('animal' if animal else 'object'))
             shot['focus'] = focus
             shot['prompt'] = visual_prompt(action, name, people=people, animals=animal)
-            shot['negative_prompt'] = image_negative(action, people=people)
+            shot['negative_prompt'] = image_negative(action, people=people, animals=animal)
         # Heuristic focus labels must not erase a narrated person with an unfamiliar name or action.
         if focus == 'group':
             shot['negative_prompt'] += ', solo, one person alone'

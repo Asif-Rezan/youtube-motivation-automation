@@ -8,9 +8,10 @@ IMAGE_PREFIX = 'Historical documentary reconstruction.'
 IMAGE_NEGATIVE = 'anime, cartoon, stick figure, flat colors, line art, cel shading, modern buildings, modern equipment, plastic'
 
 
-def image_negative(action, people=True):
+def image_negative(action, people=True, animals=False):
     cold = re.search(r'\bcold\b|\bgray ashes\b|\bgrey ashes\b', action, re.I)
-    return ('' if people else 'people, person, face, portrait, ') + (
+    excluded_people = 'people, person, human face, human portrait, ' if animals else 'people, person, face, portrait, '
+    return ('' if people else excluded_people) + (
         'flames, burning fire, glowing fire, smoke, ' if cold else '') + IMAGE_NEGATIVE
 
 
