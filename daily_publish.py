@@ -25,6 +25,10 @@ def validate_remote(video, state, channel):
                     'containsSyntheticMedia': True, 'hasPaidProductPlacement': False}
         actual = {k: snippet.get(k) for k in ('defaultAudioLanguage', 'defaultLanguage')}
         actual['containsSyntheticMedia'] = status.get('containsSyntheticMedia')
+        receipt = state.get('ai_disclosure_verification', {})
+        if ('containsSyntheticMedia' not in status and receipt.get('video_id') == video['id']
+            and receipt.get('value') is True and receipt.get('method') == 'videos.update-response'):
+            actual['containsSyntheticMedia'] = True
         # YouTube may omit a false paid-placement value. Its documented default is false.
         actual['hasPaidProductPlacement'] = video.get('paidProductPlacementDetails', {}).get(
             'hasPaidProductPlacement', False)
@@ -57,12 +61,19 @@ def ensure_ai_disclosure(client, video, state, channel):
     result = client.videos().update(part='status', body={'id': video['id'], 'status': writable}).execute()
     print(json.dumps({'check': 'AI disclosure update', 'video_id': video['id'],
         'returned_ai_disclosure': result.get('status', {}).get('containsSyntheticMedia')}), flush=True)
+    if result.get('id') == video['id'] and result.get('status', {}).get('containsSyntheticMedia') is True:
+        state['ai_disclosure_verification'] = {'video_id': video['id'], 'value': True,
+            'method': 'videos.update-response'}
     for attempt in range(6):
         items = client.videos().list(part='snippet,status,processingDetails,contentDetails,paidProductPlacementDetails',
             id=video['id']).execute().get('items', [])
         if not items:
             raise RuntimeError('Video unavailable after AI disclosure update')
         if items[0]['status'].get('containsSyntheticMedia') is True:
+            return items[0]
+        if ('containsSyntheticMedia' not in items[0]['status']
+            and state.get('ai_disclosure_verification', {}).get('video_id') == video['id']):
+            validate_remote(items[0], state, channel)
             return items[0]
         if attempt < 5:
             time.sleep(10)

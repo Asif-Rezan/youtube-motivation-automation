@@ -211,6 +211,7 @@ class DisclosureRepairTests(VideoDetailsTests):
         del video['status']['containsSyntheticMedia']
         client = MagicMock()
         client.videos().list().execute.return_value = {'items': [remote]}
+        client.videos().update().execute.return_value = {'id': 'v', 'status': {'containsSyntheticMedia': True}}
         fixed = ensure_ai_disclosure(client, video, state, 'c')
         self.assertTrue(validate_remote(fixed, state, 'c'))
         self.assertEqual(client.videos().update.call_args.kwargs['body']['status'],
@@ -223,3 +224,24 @@ class DisclosureRepairTests(VideoDetailsTests):
         with self.assertRaises(RuntimeError):
             ensure_ai_disclosure(client, video, state, 'wrong-channel')
         client.videos().update.assert_not_called()
+
+
+class DisclosureReceiptTests(VideoDetailsTests):
+    def test_explicit_update_response_confirms_omitted_list_field(self):
+        from daily_publish import ensure_ai_disclosure
+        video, state = self.fixture()
+        video['status']['privacyStatus'] = 'private'
+        del video['status']['containsSyntheticMedia']
+        client = MagicMock()
+        client.videos().update().execute.return_value = {'id': 'v', 'status': {
+            'privacyStatus': 'private', 'containsSyntheticMedia': True}}
+        client.videos().list().execute.return_value = {'items': [video]}
+        fixed = ensure_ai_disclosure(client, video, state, 'c')
+        self.assertTrue(validate_remote(fixed, state, 'c'))
+        fixed['status']['containsSyntheticMedia'] = False
+        with self.assertRaisesRegex(RuntimeError, 'containsSyntheticMedia'):
+            validate_remote(fixed, state, 'c')
+        del fixed['status']['containsSyntheticMedia']
+        state['ai_disclosure_verification']['video_id'] = 'other'
+        with self.assertRaisesRegex(RuntimeError, 'containsSyntheticMedia'):
+            validate_remote(fixed, state, 'c')
