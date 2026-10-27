@@ -35,6 +35,18 @@ Ancient Humans episodes. These images are illustrative reconstructions, not hist
 
 ## Topics, narration and thumbnails
 
+Final search metadata is generated from the completed narration, not just the outline.
+The metadata prompt lives in video_metadata.py. Titles include Ancient Humans or Humans,
+prefer natural readable phrasing around 50–75 characters and are capped at 85. Descriptions
+target 180–260 useful words: keyword-bearing opening, episode-specific overview, 3–5 learning
+bullets, a brief evidence/reconstruction note, one viewer question and a short subscribe CTA.
+The final line has 3–5 relevant hashtags starting with #AncientHumans. Generate 10–18 distinct
+topic search phrases as tags, within the existing 400-character comma-joined budget.
+Do not invent keyword metrics, links, timestamps or topics absent from the script. No keyword stuffing.
+Short descriptions, invalid hashtags, duplicate tags and production/music notes trigger one
+bounded repair request, then stop if still invalid. The automatic Magenta music footer is removed;
+audio generation is unchanged. These changes apply to new scripts, not edits to existing YouTube uploads.
+
 Rotate food preservation, water, fire, learning survival skills, tools, sharing, camps and
 transmitting knowledge. Distinguish archaeological evidence, inference and reconstruction;
 do not invent sources, quotes, studies, dates or statistics. Source review remains necessary.

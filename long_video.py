@@ -731,8 +731,7 @@ def upload():
     for name in ('video.mp4', 'thumbnail.jpg', 'captions.srt', 'story.json', 'plan.json', 'music.audio', 'validation.json'):
         store.upload(ROOT/name, f'runs/{run_id()}/{name}')
     store.save(key, state)
-    w.upload_private(ROOT/'video.mp4', ROOT/'thumbnail.jpg', story, state, store, key,
-        'Background music: original Magenta MusicRNN melody with synthesized ambient piano.')
+    w.upload_private(ROOT/'video.mp4', ROOT/'thumbnail.jpg', story, state, store, key)
     history.append({'title': story['title'], 'format': story.get('format'),
         'content_pillar': story.get('content_pillar'), 'content_profile': story.get('content_profile'),
         'hash': digest, 'run': run_id(), 'video_id': state['video_id']})

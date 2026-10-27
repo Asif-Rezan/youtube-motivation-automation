@@ -101,7 +101,7 @@ def generate(day, history, ask, pause, check_originality, schema):
     Do not generalize one recent hunter-gatherer society to all prehistoric populations.
     Avoid medical advice, present-day political claims and speculative evolutionary just-so stories.
     story_bible: <=180 words defining region, broad period, mechanisms, uncertainty and visual continuity.
-    Description must identify an educational overview with illustrative reconstructions and uncertainty.
+    Description here is a working summary; final title, description and tags will be written from completed narration.
     Visuals are realistic prehistoric documentary reconstructions, not cartoons or stick figures.
     Prioritize narrated places, shelters, landscapes, tools, hearths and material evidence.
     Include realistic people and animals whenever they participate in the narrated action or explanation.
@@ -155,4 +155,8 @@ def generate(day, history, ask, pause, check_originality, schema):
             chapter['narration'] = narration
         previous = outline['scenes'][begin+4]['narration']
     outline['scenes'][-1]['narration'] += CTA
+    from video_metadata import generate_metadata
+    outline.update(generate_metadata(outline, ask, pause, schema))
+    check_originality({**outline, 'format': None}, history)
+    validate(outline)
     return outline

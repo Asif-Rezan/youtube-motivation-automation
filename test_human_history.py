@@ -86,15 +86,18 @@ class HumanHistoryTests(unittest.TestCase):
                     scenes={key: dict(summary='Explain the problem', image_prompt='Cold embers beside a shelter',
                         continuity_note='Same camp', image_prompts=['Embers cooling', 'Dry kindling'])
                         for key in props['scenes']['required']})
-            else:
+            elif 'narrations' in props:
                 result = {'narrations': {key: 'A cold camp presents a practical problem with several possible solutions. '*8
                     for key in props['narrations']['required']}}
+            else:
+                from test_video_metadata import metadata_fixture
+                result = metadata_fixture()
             return {'choices': [{'message': {'content': json.dumps(result)}, 'finish_reason': 'stop'}]}
         with patch.dict(os.environ, {}, clear=True), patch.object(w, 'request_groq', side_effect=ask), \
                 patch.object(w.time, 'sleep'):
             story = w.make_story('daily-123', [{'format': 'human_history_explainer'}])
         self.assertEqual(story['content_profile'], h.PROFILE)
-        self.assertEqual(len(calls), 5)
+        self.assertEqual(len(calls), 6)
         self.assertTrue(story['scenes'][-1]['narration'].endswith(h.CTA))
         w.validate_story(story)
         invalid = copy.deepcopy(story)

@@ -642,7 +642,7 @@ def load_music(store, root):
     if os.getenv('MUSIC_BACKEND', 'magenta') == 'magenta':
         from music_cpu import generate
         generate(root/'music.audio')
-        return 'Background music: original Magenta MusicRNN melody with synthesized ambient piano.'
+        return ''
     # Only free sources. vidIQ-generated assets are not accepted.
     manifest = store.load('music-manifest.json', None)
     if not manifest or manifest.get('source') not in ('YouTube Audio Library', 'AI-generated (free local model)'):
@@ -668,7 +668,8 @@ def upload_private(video, thumbnail, story, state, store, key, music_credit=''):
         raise RuntimeError('OAuth account is not the expected YouTube channel')
     # Persist before insert. An interrupted/ambiguous upload requires manual reconciliation.
     # Never silently retry videos.insert and risk duplicate videos.
-    state['upload_description'] = story['description'] + '\n\n' + music_credit
+    from video_metadata import public_description
+    state['upload_description'] = public_description(story['description'], music_credit)
     state['thumbnail_uploaded'] = False
     state['phase'] = 'upload_started'
     store.save(key, state)
