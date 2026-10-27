@@ -8,9 +8,10 @@ IMAGE_PREFIX = 'Historical documentary reconstruction.'
 IMAGE_NEGATIVE = 'anime, cartoon, stick figure, flat colors, line art, cel shading, modern buildings, modern equipment, plastic'
 
 
-def image_negative(action):
+def image_negative(action, people=True):
     cold = re.search(r'\bcold\b|\bgray ashes\b|\bgrey ashes\b', action, re.I)
-    return ('flames, burning fire, glowing fire, smoke, ' if cold else '') + IMAGE_NEGATIVE
+    return ('' if people else 'people, person, face, portrait, ') + (
+        'flames, burning fire, glowing fire, smoke, ' if cold else '') + IMAGE_NEGATIVE
 
 
 def visual_prompt(action, name='Ari', people=True, thumbnail=False):

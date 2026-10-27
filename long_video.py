@@ -390,11 +390,11 @@ def refine_visual_plan(root=ROOT):
     for shot in plan['shots']:
         action = shot['visual_action'].strip().rstrip('.')
         main = bool(re.search(r'\b'+re.escape(name)+r'\b', action, re.I))
-        group = bool(re.search(r'\b(workers|crew|team|locals|people|crowd|volunteers)\b', action, re.I))
+        group = bool(re.search(r'\b(workers|crew|team|locals|people|crowd|volunteers|hunters|gatherers|adults|clan)\b', action, re.I))
         group = group or bool(main and re.search(r'\b(boss|mayor|mother|father|brother|coworker)\b|\bMr\.', action, re.I))
         human = bool(re.search(
             r'\b(man|woman|worker|coworker|engineer|mayor|boss|forecaster|roommate|manager|'
-            r'humans|human|hunter|gatherer|child|children|client|friend|neighbor|colleague|mentor|partner|mother|father|brother|sister|'
+            r'humans|human|person|adult|hunter|gatherer|child|children|client|friend|neighbor|colleague|mentor|partner|mother|father|brother|sister|'
             r'son|daughter)\b|\bMr\.', action, re.I))
         # Storyboard names can differ from the outline's protagonist spelling.
         # A named person performing an action must never get a "no people" prompt.
@@ -413,7 +413,7 @@ def refine_visual_plan(root=ROOT):
         from human_history import PROFILE as HISTORY_PROFILE, visual_prompt, image_negative
         if story.get('content_profile') == HISTORY_PROFILE:
             shot['prompt'] = visual_prompt(action, name, people=focus != 'object')
-            shot['negative_prompt'] = image_negative(action)
+            shot['negative_prompt'] = image_negative(action, people=focus != 'object')
         # Heuristic focus labels must not erase a narrated person with an unfamiliar name or action.
         if focus == 'group':
             shot['negative_prompt'] += ', solo, one person alone'

@@ -44,6 +44,8 @@ class HumanHistoryTests(unittest.TestCase):
             self.assertNotIn('close-up face', person['negative_prompt'])
             self.assertNotIn('wide scene', person['prompt'])
             self.assertNotIn('caveman', objects['prompt'])
+            self.assertIn('people, person, face, portrait', objects['negative_prompt'])
+            self.assertNotIn('people, person, face, portrait', person['negative_prompt'])
             with patch('image_cpu.generate') as generate:
                 w.make_image(person['prompt'], root/'sample.png')
             self.assertEqual(generate.call_args.args[0], person['prompt'])

@@ -39,7 +39,7 @@ def main():
     config = image_config()
     os.environ['IMAGE_SEED'] = str(sample['seed'])
     prompt = visual_prompt(sample['prompt'], people=False, thumbnail=args.asset == 'thumbnail')
-    os.environ['IMAGE_NEGATIVE_PROMPT'] = 'people, person, face, portrait, ' + image_negative(sample['prompt'])
+    os.environ['IMAGE_NEGATIVE_PROMPT'] = image_negative(sample['prompt'], people=False)
     path = args.output / f'{args.asset}.png'
     if args.asset == 'thumbnail':
         source = args.output / 'thumbnail-source.png'
