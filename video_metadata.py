@@ -11,10 +11,11 @@ Include Ancient Humans (preferred) or Humans naturally, once, toward the beginni
 Combine the central searchable topic with a concrete question, constraint or consequence.
 No keyword chains, hashtags, emojis, ALL-CAPS title, invented discoveries or unsupported superlatives.
 
-DESCRIPTION: 180–260 useful words, unique to this episode. Do not return a one-sentence summary.
+DESCRIPTION: Write a detailed, unique description targeting 4000–4400 characters, including spaces and hashtags.
+The requested 1000–3000 words cannot fit YouTube's 5000-character field; prioritize useful script-grounded detail within this hard character budget. Do not return a one-sentence summary.
 Open with two strong sentences: identify the specific question and viewer payoff, naturally including
 Ancient Humans and the episode's primary topic within the first two lines.
-Then explain the actual scope in one short paragraph, integrating 6–10 genuinely relevant related
+Then explain the actual scope in several readable paragraphs, integrating 10–18 genuinely relevant related
 terms naturally; choose them from the script rather than inserting every possible history keyword.
 Add an 'In this video:' section with 3–5 short bullets describing distinct questions or mechanisms covered.
 Include one concise sentence distinguishing archaeological evidence, inference and illustrative reconstructions.
@@ -36,8 +37,8 @@ def validate_metadata(data):
     title, description, tags = (data.get(k) for k in ('title', 'description', 'tags'))
     if not isinstance(title, str) or len(title) > 85 or not re.search(r'\bHumans\b', title, re.I):
         raise ValueError('Title must contain Ancient Humans or Humans and fit 85 characters')
-    if not isinstance(description, str) or not 150 <= len(description.split()) <= 350 or len(description) > 4500:
-        raise ValueError('Description must contain 150–350 useful words and fit 4500 characters')
+    if not isinstance(description, str) or not 3500 <= len(description) <= 4500 or len(description) > 4500:
+        raise ValueError('Description must contain 3500–4500 characters of useful episode-specific detail')
     if re.search(r'background music|music credits?|magenta|musicrnn|synthesized ambient piano', description, re.I):
         raise ValueError('Description must not include background-music or production notes')
     final_line = description.strip().splitlines()[-1]
@@ -65,7 +66,7 @@ def generate_metadata(story, ask, pause, schema):
     for attempt in range(2):
         pause(60)
         result = ask(METADATA_BRIEF + '\nCompleted video context:\n' + json.dumps(context) + feedback,
-                     2600, response_schema)
+                     4000, response_schema)
         try:
             return validate_metadata(result)
         except ValueError as error:
@@ -79,4 +80,7 @@ def public_description(description, music_credit=''):
     technical = re.compile(r'background music\s*:|magenta|musicrnn|synthesized ambient piano', re.I)
     body = '\n'.join(line for line in description.splitlines() if not technical.search(line)).strip()
     credit = '\n'.join(line for line in music_credit.splitlines() if not technical.search(line)).strip()
-    return body + ('\n\n'+credit if credit else '')
+    result = body + ('\n\n'+credit if credit else '')
+    if len(result) > 5000:
+        raise ValueError('Final YouTube description exceeds 5000 characters')
+    return result

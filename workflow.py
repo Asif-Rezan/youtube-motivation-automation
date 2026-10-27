@@ -670,17 +670,22 @@ def upload_private(video, thumbnail, story, state, store, key, music_credit=''):
     # Never silently retry videos.insert and risk duplicate videos.
     from video_metadata import public_description
     state['upload_description'] = public_description(story['description'], music_credit)
+    state['video_details_version'] = 1
     state['thumbnail_uploaded'] = False
     state['phase'] = 'upload_started'
     store.save(key, state)
-    request = client.videos().insert(part='snippet,status', notifySubscribers=False,
-        body={'snippet': {'title': story['title'], 'description': state['upload_description'], 'tags': story['tags'], 'categoryId': '22',
-             'defaultLanguage': 'en'}, 'status': {'privacyStatus': 'private', 'selfDeclaredMadeForKids': False}},
+    request = client.videos().insert(part='snippet,status,paidProductPlacementDetails', notifySubscribers=False,
+        body={'snippet': {'title': story['title'], 'description': state['upload_description'], 'tags': story['tags'], 'categoryId': '27',
+             'defaultLanguage': 'en-US', 'defaultAudioLanguage': 'en-US'},
+             'paidProductPlacementDetails': {'hasPaidProductPlacement': False},
+             'status': {'privacyStatus': 'private', 'selfDeclaredMadeForKids': False, 'containsSyntheticMedia': True}},
         media_body=MediaFileUpload(str(video), chunksize=8*1024*1024, resumable=True))
     result = None
     while result is None:
         _, result = request.next_chunk(num_retries=5)
-    state.update(phase='uploaded', video_id=result['id'])
+    state.update(phase='uploaded', video_id=result['id'],
+        uploaded_at=dt.datetime.now(dt.timezone.utc).isoformat(),
+        schedule_requested=os.getenv('SCHEDULE_PUBLISH') == 'true')
     store.save(key, state)
     client.thumbnails().set(videoId=result['id'], media_body=MediaFileUpload(str(thumbnail))).execute()
     state['thumbnail_uploaded'] = True

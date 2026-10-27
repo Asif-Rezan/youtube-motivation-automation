@@ -38,7 +38,7 @@ Ancient Humans episodes. These images are illustrative reconstructions, not hist
 Final search metadata is generated from the completed narration, not just the outline.
 The metadata prompt lives in video_metadata.py. Titles include Ancient Humans or Humans,
 prefer natural readable phrasing around 50–75 characters and are capped at 85. Descriptions
-target 180–260 useful words: keyword-bearing opening, episode-specific overview, 3–5 learning
+target 4000–4400 characters within the 5000-character YouTube limit: keyword-bearing opening, episode-specific overview, 3–5 learning
 bullets, a brief evidence/reconstruction note, one viewer question and a short subscribe CTA.
 The final line has 3–5 relevant hashtags starting with #AncientHumans. Generate 10–18 distinct
 topic search phrases as tags, within the existing 400-character comma-joined budget.
@@ -65,3 +65,7 @@ Only live audience testing can establish an improvement in clicks and watch time
 SSD-1B CPU, Kokoro am_michael, Magenta music, seven-second image interval, 1080p/30fps final
 video, current schedule, credentials, safety checker, checkpoint storage and private upload flow.
 The preview action generates sample images only and never uploads a video to YouTube.
+
+Daily uploads declare synthetic media, English (United States) metadata/audio, and no paid promotion. After HD verification, schedule the first 06:00 America/New_York at least 24 elapsed hours after upload completion. Persist the UTC anchor and target across retries; follow New York daylight saving. Old runs without a scheduling request remain private.
+
+Native end screens, cards and quizzes require YouTube Studio and are not supported by the uploader API. These elements are not claimed as inserted. This change applies to future uploads.

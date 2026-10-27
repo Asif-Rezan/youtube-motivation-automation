@@ -19,6 +19,7 @@ Archaeological evidence, plausible inference and illustrative reconstructions ar
 Which challenge would you like us to explore next: finding dry fuel or choosing a sheltered camp? Share your answer in the comments and subscribe for more Ancient Humans explainers about survival, tools and everyday life.
 
 #AncientHumans #PrehistoricLife #FireMaintenance'''
+    description = description.replace('In this video:', ('Additional script-grounded detail about fuel, shelter, embers and the limits of archaeological interpretation. ' * 22) + '\n\nIn this video:')
     return {'title': 'How Ancient Humans Kept Their Fire Alive', 'description': description,
             'tags': ['ancient humans fire', 'Ancient Humans', 'prehistoric fire maintenance',
                      'prehistoric life', 'early human survival', 'ancient campfires', 'hearths',

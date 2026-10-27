@@ -20,6 +20,12 @@ def validate_remote(video, state, channel):
         or set(snippet.get('tags', [])) != set(story['tags'])
         or snippet['description'] != state.get('upload_description', story['description'])):
         raise RuntimeError('Channel or metadata mismatch')
+    if state.get('video_details_version') == 1:
+        if (snippet.get('defaultAudioLanguage') != 'en-US'
+            or snippet.get('defaultLanguage') != 'en-US'
+            or status.get('containsSyntheticMedia') is not True
+            or video.get('paidProductPlacementDetails', {}).get('hasPaidProductPlacement') is not False):
+            raise RuntimeError('Video language, AI disclosure or paid promotion mismatch')
     if (status.get('uploadStatus') in ('failed', 'rejected', 'deleted')
         or video.get('processingDetails', {}).get('processingStatus') in ('failed', 'terminated')):
         raise RuntimeError('YouTube upload failed')
@@ -107,7 +113,7 @@ def main():
         json.loads(required('YOUTUBE_TOKEN_JSON'))), cache_discovery=False)
     deadline = time.monotonic() + 1800
     while True:
-        items = client.videos().list(part='snippet,status,processingDetails,contentDetails',
+        items = client.videos().list(part='snippet,status,processingDetails,contentDetails,paidProductPlacementDetails',
             id=state['video_id']).execute().get('items', [])
         if not items:
             raise RuntimeError('Uploaded video unavailable')
@@ -126,8 +132,10 @@ def main():
     if not any(h.get('run') == run for h in history):
         history.append({'run': run, 'video_id': state['video_id'], 'title': state['story']['title'], 'format': state['story'].get('format'), 'hash': state['hash']})
     store.save('history.json', history)
+    from publish_schedule import schedule_verified
+    schedule_verified(client, state, store, key)
     cleanup(store, run, state)
-    print(json.dumps({'run': run, 'video_id': state['video_id'], 'privacy': 'private', 'verified': True, 'cleanup_complete': True}))
+    print(json.dumps({'run': run, 'video_id': state['video_id'], 'privacy': 'private', 'verified': True, 'cleanup_complete': True, 'publish_at': state.get('publish_at')}))
 
 
 if __name__ == '__main__':
