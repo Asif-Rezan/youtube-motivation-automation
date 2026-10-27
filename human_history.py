@@ -42,6 +42,29 @@ PILLARS = {
     'shelter': 'How Ancient Humans Chose Where to Build a Camp',
     'communication': 'How Ancient Humans Passed Knowledge to the Next Generation',
 }
+THUMBNAIL_FALLBACKS = {
+    'food_storage': 'KEEP FOOD SAFE', 'water': 'FINDING WATER',
+    'fire': 'FIRE GONE?', 'childhood': 'LEARNING TO SURVIVE',
+    'tools': 'WHY THIS TOOL?', 'cooperation': 'SURVIVING TOGETHER',
+    'shelter': 'WHERE TO CAMP?', 'communication': 'PASSING KNOWLEDGE ON',
+}
+THUMBNAIL_SCHEMA = {'type': 'string', 'maxLength': 45,
+                    'pattern': r'^\S+( \S+){1,4}$'}
+
+
+def repair_thumbnail_text(story):
+    """Keep valid copy; recover malformed model copy without losing the outline."""
+    value = story.get('thumbnail_text')
+    if isinstance(value, str):
+        value = ' '.join(value.split())
+        if 2 <= len(value.split()) <= 5 and len(value) <= 45:
+            story['thumbnail_text'] = value
+            return story
+    # Do not truncate a sentence into an incomplete or misleading claim.
+    story['thumbnail_text'] = THUMBNAIL_FALLBACKS[story['content_pillar']]
+    return story
+
+
 CTA = (' Which part of ancient human life would you like us to explore next? '
        'Leave a comment, like this video, and subscribe for more human history explainers.')
 
@@ -55,7 +78,9 @@ def validate(story):
         raise ValueError('Unknown human history topic pillar')
     if not story.get('story_bible', '').strip():
         raise ValueError('Human history requires an evidence and continuity brief')
-    if not 2 <= len(story['thumbnail_text'].split()) <= 5:
+    if (not isinstance(story.get('thumbnail_text'), str) or
+            not 2 <= len(story['thumbnail_text'].split()) <= 5 or
+            len(story['thumbnail_text']) > 45):
         raise ValueError('Explainer thumbnail requires 2–5 words')
 
 
@@ -83,6 +108,7 @@ def generate(day, history, ask, pause, check_originality, schema):
                     'image_prompts': {'type': 'array', 'items': text}})
     outline_schema = schema({**{k: text for k in ('title', 'description', 'thumbnail_text',
         'thumbnail_prompt', 'character_description', 'protagonist_name', 'story_bible')},
+        'thumbnail_text': THUMBNAIL_SCHEMA,
         'tags': {'type': 'array', 'items': text},
         'scenes': schema({key: scene for key in keys})})
     brief = '''Create an ORIGINAL English educational explainer about ancient human life.
@@ -130,6 +156,7 @@ def generate(day, history, ask, pause, check_originality, schema):
                   f'{json.dumps(recent)}', 5200, outline_schema)
     outline['scenes'] = [outline['scenes'][key] for key in keys]
     outline.update(content_profile=PROFILE, content_pillar=pillar, format='human_history_explainer')
+    repair_thumbnail_text(outline)
     # The old format-repeat rule belongs to rotating fictional story formats.
     check_originality({**outline, 'format': None}, history)
     validate(outline)
