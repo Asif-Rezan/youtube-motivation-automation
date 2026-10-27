@@ -21,11 +21,17 @@ def validate_remote(video, state, channel):
         or snippet['description'] != state.get('upload_description', story['description'])):
         raise RuntimeError('Channel or metadata mismatch')
     if state.get('video_details_version') == 1:
-        if (snippet.get('defaultAudioLanguage') != 'en-US'
-            or snippet.get('defaultLanguage') != 'en-US'
-            or status.get('containsSyntheticMedia') is not True
-            or video.get('paidProductPlacementDetails', {}).get('hasPaidProductPlacement') is not False):
-            raise RuntimeError('Video language, AI disclosure or paid promotion mismatch')
+        expected = {'defaultAudioLanguage': 'en-US', 'defaultLanguage': 'en-US',
+                    'containsSyntheticMedia': True, 'hasPaidProductPlacement': False}
+        actual = {k: snippet.get(k) for k in ('defaultAudioLanguage', 'defaultLanguage')}
+        actual['containsSyntheticMedia'] = status.get('containsSyntheticMedia')
+        # YouTube may omit a false paid-placement value. Its documented default is false.
+        actual['hasPaidProductPlacement'] = video.get('paidProductPlacementDetails', {}).get(
+            'hasPaidProductPlacement', False)
+        mismatches = {k: {'expected': value, 'actual': actual[k]}
+                      for k, value in expected.items() if actual[k] != value}
+        if mismatches:
+            raise RuntimeError('Video details mismatch: ' + json.dumps(mismatches, sort_keys=True))
     if (status.get('uploadStatus') in ('failed', 'rejected', 'deleted')
         or video.get('processingDetails', {}).get('processingStatus') in ('failed', 'terminated')):
         raise RuntimeError('YouTube upload failed')

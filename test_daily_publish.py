@@ -166,3 +166,36 @@ class PrivateVisibilityTests(unittest.TestCase):
     def test_public_or_unlisted_video_preserves_media(self):
         for privacy in ('public', 'unlisted'):
             self.run_private_verification(privacy)
+
+
+class VideoDetailsTests(unittest.TestCase):
+    def fixture(self):
+        state = {'video_id': 'v', 'video_details_version': 1,
+                 'story': {'title': 'T', 'tags': [], 'description': 'D'}}
+        video = {'id': 'v', 'snippet': {'title': 'T', 'tags': [], 'description': 'D',
+                 'channelId': 'c', 'defaultLanguage': 'en-US', 'defaultAudioLanguage': 'en-US'},
+                 'status': {'uploadStatus': 'processed', 'containsSyntheticMedia': True},
+                 'processingDetails': {'processingStatus': 'succeeded'},
+                 'contentDetails': {'definition': 'hd'}}
+        return video, state
+
+    def test_omitted_false_paid_placement_is_documented_default(self):
+        for paid in (None, {}, {'hasPaidProductPlacement': False}):
+            video, state = self.fixture()
+            if paid is not None:
+                video['paidProductPlacementDetails'] = paid
+            self.assertTrue(validate_remote(video, state, 'c'))
+
+    def test_real_paid_placement_and_missing_ai_or_language_still_fail(self):
+        video, state = self.fixture()
+        video['paidProductPlacementDetails'] = {'hasPaidProductPlacement': True}
+        with self.assertRaisesRegex(RuntimeError, 'hasPaidProductPlacement'):
+            validate_remote(video, state, 'c')
+        video, state = self.fixture()
+        del video['status']['containsSyntheticMedia']
+        with self.assertRaisesRegex(RuntimeError, 'containsSyntheticMedia'):
+            validate_remote(video, state, 'c')
+        video, state = self.fixture()
+        video['snippet']['defaultAudioLanguage'] = 'en'
+        with self.assertRaisesRegex(RuntimeError, 'defaultAudioLanguage'):
+            validate_remote(video, state, 'c')
