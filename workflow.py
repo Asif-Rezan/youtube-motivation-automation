@@ -17,13 +17,9 @@ FINAL_CTA = (" Which choice would you have made in that situation? "
     'Leave a comment with your answer, like this video if it inspired you, '
     'and subscribe for more stories about money, choices, and everyday life.')
 
-VISUAL_STYLE = ('hand-drawn 2D educational cartoon, expressive simple stick figures, '
-    'cream oval heads, dot eyes, thin black line limbs, bold slightly irregular black outlines, '
-    'flat colors, minimal shading, clear readable silhouettes, '
-    'scene-specific simplified environment or white explanatory background, '
-    'sky blue, grass green, ochre earth and natural brown palette with lighting matching the narrated scene, '
-    'wide landscape composition, consistent character appearance and clothing')
-VISUAL_STYLE_ID = 'hand-drawn-human-history-v2'
+VISUAL_STYLE = ('historical documentary reconstruction, realistic stone, wood and earth textures, '
+    'natural scene-appropriate lighting, period-appropriate objects, clear landscape composition')
+VISUAL_STYLE_ID = 'historical-documentary-ssd-v1'
 IMAGE_INTERVAL_SECONDS = 7
 
 

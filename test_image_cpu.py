@@ -42,7 +42,7 @@ class ImageCPUChecks(unittest.TestCase):
             workflow.make_image('Mayra reads a letter', Path('sample.png'))
         prompt = generate.call_args.args[0]
         self.assertEqual(prompt.count(workflow.VISUAL_STYLE), 1)
-        self.assertIn('hand-drawn 2D educational cartoon', prompt)
+        self.assertIn('historical documentary reconstruction', prompt)
         self.assertIn('Mayra reads a letter', prompt)
 
     def test_ssd_uses_sdxl_and_dreamshaper_uses_sd15(self):
@@ -105,6 +105,9 @@ class ImageCPUChecks(unittest.TestCase):
             safety_check.assert_called_once()
             self.assertEqual(pipe.kwargs['generator'], 1700)
             self.assertIn('deformed hands', pipe.kwargs['negative_prompt'])
+            self.assertIn('cartoon', pipe.kwargs['negative_prompt'])
+            self.assertNotIn('photorealistic', pipe.kwargs['negative_prompt'])
+            self.assertNotIn('realistic skin texture', pipe.kwargs['negative_prompt'])
             self.assertEqual(json.loads(image_cpu.metadata_path(path).read_text())['model'], image_cpu.SSD_MODEL)
         image_cpu._pipeline = None
         image_cpu._pipeline_key = None
@@ -140,9 +143,8 @@ class ImageCPUChecks(unittest.TestCase):
                     self.assertTrue(report['reference_sha256'])
             for index, call in enumerate(pipe.calls):
                 self.assertEqual(call['prompt'], prompts[index])
-                self.assertIn('flat natural colors', call['prompt_2'])
-                self.assertIn('bright whites', call['prompt_2'])
-                self.assertIn('colorful accents', call['prompt_2'])
+                self.assertIn('realistic material textures', call['prompt_2'])
+                self.assertIn('natural lighting', call['prompt_2'])
                 self.assertNotIn('slate blue', call['prompt_2'])
                 self.assertIn(prompts[index], call['prompt_2'])
                 self.assertNotIn('image', call)

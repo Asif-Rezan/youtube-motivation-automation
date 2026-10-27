@@ -11,11 +11,21 @@ import workflow as w
 
 
 class HumanHistoryTests(unittest.TestCase):
+    def test_environmental_reconstruction_avoids_mascot_and_preserves_objects(self):
+        action = 'Cold hearth ashes beside flint tools under a limestone rock shelter'
+        prompt = h.visual_prompt(action, people=False)
+        self.assertIn(action, prompt)
+        self.assertIn('Realistic stone, wood and earth textures', prompt)
+        self.assertNotIn('adult', prompt)
+        self.assertNotIn('white circle', prompt)
+        self.assertIn('cartoon', h.image_negative(action))
+
     def test_cold_ashes_suppress_flames_without_suppressing_ember_scenes(self):
         self.assertIn('flames', h.image_negative('Ari examines cold gray ashes'))
         self.assertNotIn('flames', h.image_negative('Ari blows on a red ember'))
         prompt = h.visual_prompt('Ari sits beside gray ashes')
-        self.assertIn('Simple stick figure', prompt)
+        self.assertIn('Historical documentary reconstruction', prompt)
+        self.assertNotIn('stick figure', prompt)
         self.assertNotIn('caveman', prompt)
 
     def test_scene_plan_preserves_action_and_allows_large_character(self):

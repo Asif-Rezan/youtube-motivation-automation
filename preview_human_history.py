@@ -16,15 +16,15 @@ TITLE = 'What Ancient Humans Did When Their Fire Went Out'
 SAMPLES = {
     'background-01': {
         'seed': 1700,
-        'prompt': 'Ari kneels sadly beside a small pile of cold gray ashes. Simple cave background.',
+        'prompt': 'Cold gray hearth ashes beside flint tools and dry kindling at an empty limestone rock shelter, pale dawn light.',
     },
     'background-02': {
         'seed': 1701,
-        'prompt': 'Ari crouches, blowing gently on a single glowing red ember held in dry grass. Plain tan ground.',
+        'prompt': 'A glowing red ember rests in dry tinder beside split firewood on rough stone inside a prehistoric shelter.',
     },
     'thumbnail': {
         'seed': 9931,
-        'prompt': 'Ari looks shocked at a large pile of cold gray ashes, close view. Plain blue background.',
+        'prompt': 'Close view of cold gray hearth ashes and abandoned firewood beneath a dark rock overhang, blue dusk beyond.',
     },
 }
 
@@ -38,8 +38,8 @@ def main():
     sample = SAMPLES[args.asset]
     config = image_config()
     os.environ['IMAGE_SEED'] = str(sample['seed'])
-    prompt = visual_prompt(sample['prompt'], thumbnail=args.asset == 'thumbnail')
-    os.environ['IMAGE_NEGATIVE_PROMPT'] = image_negative(sample['prompt'])
+    prompt = visual_prompt(sample['prompt'], people=False, thumbnail=args.asset == 'thumbnail')
+    os.environ['IMAGE_NEGATIVE_PROMPT'] = 'people, person, face, portrait, ' + image_negative(sample['prompt'])
     path = args.output / f'{args.asset}.png'
     if args.asset == 'thumbnail':
         source = args.output / 'thumbnail-source.png'

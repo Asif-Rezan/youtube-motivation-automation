@@ -15,10 +15,10 @@ SSD_REVISION = REVISION = '60987f37e94cd59c36b1cba832b9f97b57395a10'
 DREAMSHAPER_MODEL = 'Lykon/dreamshaper-8'
 DREAMSHAPER_REVISION = 'a7e52b98680b1ba8ff7bce97c7f9f2e2e5337917'
 SAFETY_MODEL = 'CompVis/stable-diffusion-safety-checker'
-NEGATIVE = ('watercolor, 3d render, glossy plastic, realistic skin texture, '
+NEGATIVE = ('anime, cartoon, stick figure, watercolor, flat colors, line art, cel shading, 3d render, CGI, glossy plastic, '
             'blurry, low detail, poor quality, distorted anatomy, extra arms, extra legs, '
             'deformed hands, duplicate person, watermark, lettering, text, '
-            'photorealistic, cinematic realism, heavy gradients, red color cast, sepia')
+            'red color cast, sepia')
 _pipeline = None
 _pipeline_key = None
 _safety_checker = None
@@ -44,8 +44,8 @@ class ImageConfig:
 
 
 # Reference guidance never copies scene geometry or an old cool palette.
-STYLE_DESCRIPTION = ('hand-drawn 2D educational cartoon, expressive simple stick figures, '
-                     'bold black outlines, flat natural colors, bright whites, balanced colorful accents, minimal shading')
+STYLE_DESCRIPTION = ('historical documentary reconstruction, realistic material textures, '
+                     'natural lighting, landscape composition')
 
 
 def image_config():

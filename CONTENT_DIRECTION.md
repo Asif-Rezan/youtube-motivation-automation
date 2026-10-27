@@ -1,63 +1,46 @@
-# Ancient Humans explainers
+# Ancient Humans documentary explainers
 
-Updated 2026-10-26. New runs use `CONTENT_TYPE=human-history`; existing saved scripts are not replaced.
-The legacy financial profile remains explicitly selectable for compatibility.
+Updated 2026-10-27. New runs use CONTENT_TYPE=human-history. Every new title must contain
+Ancient Humans (preferred) or Humans. Twenty chapters retain the existing measured video
+length, voice, captions, music, image interval and upload process.
 
-## Titles and topics
+## Current image direction
 
-Every new title must contain **Ancient Humans** (preferred) or **Humans**, naturally and once.
-The validator rejects titles missing Humans. Use a concrete question, problem or consequence,
-with the keyword preferably early; no keyword stuffing or guaranteed ranking claims.
+SSD-1B stays pinned at segmind/SSD-1B revision 60987f37e94cd59c36b1cba832b9f97b57395a10,
+1024×576, 16 steps, guidance 9.0. Cartoon and stick-figure styling is discontinued.
+Use historical documentary reconstructions: realistic stone, wood, hide and earth textures,
+scene-appropriate natural lighting and clear environmental compositions.
 
-Eight rotating directions: food preservation, finding water, maintaining fire, learning survival
-skills, making tools, sharing, choosing camps and transmitting knowledge. Avoid the last three
-pillars and favor less-used recent ones. Original titles and explanations; no copied reference plots.
+Prioritize the narrated place and material evidence: limestone shelters, camps, hearths,
+flint tools, tinder, firewood, grassland and woodland. Do not replace narration-specific images
+with unrelated historical buildings. Buildings, plants, tools and climate must fit the chosen
+period and region; no modern equipment or generic fantasy castles in prehistoric scenes.
+People appear only when necessary for the action, with natural proportions and unobtrusive faces.
+No recurring cartoon mascot or demand for identical generated faces.
 
-Example directions:
-- How Ancient Humans Kept Food Before Refrigerators
-- What Ancient Humans Did When Their Fire Went Out
-- How Ancient Humans Found Water in Dry Landscapes
-- Why Ancient Humans Spent So Much Time Making Tools
+Prompt pattern: specific subject/action + important materials + setting + short documentary style.
+Keep the concrete subject before the encoder limit. Isolated objects use realistic close detail,
+not a flat white diagram. Cold-ash scenes suppress flames; ember scenes can retain glow.
+Negative prompts suppress anime, cartoon, flat colors, line art, cel shading and CGI. They no
+longer suppress photorealism, cinematic realism or realistic skin texture.
 
-Twenty chapters retain the existing approximate 1,650–1,800 word target and measured 10–15 minute
-video duration. Explain one central question progressively. Historical evidence, inference and
-illustrative reconstructions must be distinguished. Do not fabricate sources, studies, statistics,
-quotes or exact dates. The prompts encourage these limits but do not fact-check model output;
-source-based editorial review remains necessary before treating a script as verified history.
+Inspired by implementation patterns in the owner's Somoy-Jatri and Rezan-After-Dark repos:
+short concrete scenes, realistic material texture, atmospheric but scene-appropriate light,
+and anti-cartoon negatives. Do not import their religious restrictions or horror tone into
+Ancient Humans episodes. These images are illustrative reconstructions, not historical evidence.
 
-## Scene images
+## Topics, narration and thumbnails
 
-Revision 2: use compact subject-first prompts for the human-history profile, suppress panoramic
-scenery and tiny characters, and allow large faces. Keep both SSD text encoders focused on the
-same subject/action; explicitly bound their token inputs. White round face, messy brown hair,
-brown tunic and thin black limbs replace the longer character description. Object-only
-shots omit the character. The new style ID invalidates old visual plans during refinement.
+Rotate food preservation, water, fire, learning survival skills, tools, sharing, camps and
+transmitting knowledge. Distinguish archaeological evidence, inference and reconstruction;
+do not invent sources, quotes, studies, dates or statistics. Source review remains necessary.
 
-Original hand-drawn 2D stick figures, white circle heads, expressive simple faces, thin limbs,
-bold irregular black contours, flat natural colors and little shading. Recurring illustration
-character: brown hair, brown tunic and thin black arms and legs. Backgrounds follow the actual
-narration: camp, grassland, woodland, dry riverbed, shelter interior, or white for explanatory objects.
-Do not force a mascot into object-only scenes or use the same camp for every explanation.
-
-Prompt pattern: active subject + concrete action + important objects + period-appropriate setting.
-Example: “Ari shields fading embers with a clay-free stone windbreak beside a grassy camp at dusk.”
-This is a visual prompt example, not an archaeological claim about a specific population.
-The renderer adds the cartoon styling. SSD's second text encoder receives compact style guidance
-first to reduce style loss from long continuity descriptions. The old financial reference palette
-is disabled for new workflow runs.
-
-## Thumbnails
-
-One expressive cartoon figure or small group, one large problem/contrast, simple colorful setting,
-clear silhouette, room in the top quarter for a caption. Generate art without letters; overlay
-2–5 uppercase yellow words with a black outline afterward for reliable readability.
-Example: fire topic → cold embers and worried figure, caption “FIRE GONE?”
-Adapt the general visual approach with original scenes and character design.
+Thumbnails use one clear object/place and visual tension, realistic textures and readable lighting.
+Reserve an uncluttered upper area for the existing 2–5 word yellow caption with a black outline.
+Generated art contains no letters; caption typography is added afterward.
 
 ## Production retained
 
-No changes to schedule, hosting, credentials, voice, music, safety checks, checkpoint storage,
-upload/publishing logic, image interval or render size/steps. Existing workflow: SSD-1B CPU,
-1024×576, 16 steps, guidance 9.0, new images every seven seconds, 1080p/30fps final video,
-Kokoro am_michael, captions and Magenta music.
-These are local source changes; no workflow was triggered, deployed or uploaded by this update.
+SSD-1B CPU, Kokoro am_michael, Magenta music, seven-second image interval, 1080p/30fps final
+video, current schedule, credentials, safety checker, checkpoint storage and private upload flow.
+The preview action generates sample images only and never uploads a video to YouTube.

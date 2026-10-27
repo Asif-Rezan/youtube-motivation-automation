@@ -101,9 +101,9 @@ Name the active character instead of using a pronoun when chapter context identi
 When a window crosses events, depict the event occupying most of its spoken time; never combine different times or places.
 Use adjacent spoken words only to resolve a cut-off sentence, pronoun or location, never to jump ahead.
 Do not put style, camera lists, narration text, typography or character design into the prompt;
-the renderer adds character design and hand-drawn cartoon styling. Do not replace specific objects with generic ones.
-For explainers, illustrate the physical mechanism rather than adding the mascot to every frame.
-Use a white background for an isolated explanatory object; use a concrete place for an environmental action.
+the renderer adds historical documentary styling. Do not replace specific objects with generic ones.
+For explainers, prioritize the narrated place, tools and physical mechanism; no mascot or cartoon character.
+Use realistic close details for objects and environmental views for places. People only when the action requires them.
 Never merge different time periods, add modern equipment to prehistoric scenes, or repeat one camp background everywhere.
 Chapter context: {json.dumps(context)}
 Exact shot windows: {json.dumps([{'key': f"shot_{shot['index']:03}", 'start_seconds': shot['start'], 'duration_seconds': shot['duration'], 'end_seconds': shot['start']+shot['duration'], 'primary_chapter': shot['chapter'], 'spoken': shot['narration'], 'previous_spoken': shots[shot['index']-1]['narration'] if shot['index'] else '', 'next_spoken': shots[shot['index']+1]['narration'] if shot['index']+1 < len(shots) else ''} for shot in batch])}
@@ -578,8 +578,8 @@ def finish(root=ROOT):
     os.environ['IMAGE_NEGATIVE_PROMPT'] = ''
     os.environ['IMAGE_SEED'] = '9931'
     thumbnail_prompt = (story['thumbnail_prompt'] + '. Main character: ' +
-        story['character_description'] + '. Make a single topic-specific hand-drawn cartoon thumbnail '
-        'with the protagonist prominent and a clear contrasting background or supporting characters. '
+        story['character_description'] + '. Make a single topic-specific historical documentary thumbnail '
+        'with the narrated object or place prominent, realistic materials and a clear composition. '
         'No title text, labels, numbers, arrows, or interface elements.')
     from human_history import PROFILE as HISTORY_PROFILE, visual_prompt, image_negative
     if story.get('content_profile') == HISTORY_PROFILE:
