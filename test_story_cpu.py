@@ -115,3 +115,49 @@ class QwenTests(unittest.TestCase):
         self.assertEqual(download.call_count, 3)
         llama.assert_not_called()
 
+
+
+class DecoderSchemaSafetyTests(unittest.TestCase):
+    def test_unsupported_patterns_fail_before_loading_or_calling_native_model(self):
+        for pattern in (r'^\S+( \S+){1,4}$', r'^\w+$', r'^\d+$', r'(?=x)x', r'^(x)\1$'):
+            with self.subTest(pattern=pattern):
+                payload = QwenTests().payload()
+                payload['response_format']['json_schema']['schema']['properties']['ready'] = {
+                    'type': 'string', 'pattern': pattern}
+                with patch.object(s, 'load_model') as load:
+                    with self.assertRaisesRegex(s.StoryGenerationError, 'explicit character classes'):
+                        s.request_story('chat/completions', payload)
+                load.assert_not_called()
+
+    def test_large_text_limits_stay_in_validator_not_nested_native_grammar(self):
+        schema = {'type': 'object', 'properties': {'description': {
+            'type': 'string', 'minLength': 3500, 'maxLength': 4500}}}
+        original = json.dumps(schema)
+        converted = s.decoder_schema(schema)
+        self.assertEqual(converted['properties']['description'], {'type': 'string'})
+        self.assertEqual(json.dumps(schema), original)
+        from jsonschema import Draft202012Validator, ValidationError
+        with self.assertRaises(ValidationError):
+            Draft202012Validator(schema).validate({'description': 'short'})
+
+    def test_production_thumbnail_pattern_preserves_word_count(self):
+        from human_history import THUMBNAIL_SCHEMA, THUMBNAIL_FALLBACKS
+        from jsonschema import Draft202012Validator, ValidationError
+        s.decoder_schema({'type': 'object', 'properties': {'thumbnail_text': THUMBNAIL_SCHEMA}})
+        validator = Draft202012Validator(THUMBNAIL_SCHEMA)
+        for text in THUMBNAIL_FALLBACKS.values():
+            validator.validate(text)
+        for text in ('FIRE', 'ONE TWO THREE FOUR FIVE SIX', 'FIRE\nGONE?', 'x' * 46):
+            with self.subTest(text=text), self.assertRaises(ValidationError):
+                validator.validate(text)
+
+    def test_original_large_description_limit_still_rejects_model_output(self):
+        payload = QwenTests().payload()
+        payload['response_format']['json_schema']['schema']['properties']['ready'] = {
+            'type': 'string', 'minLength': 3500, 'maxLength': 4500}
+        model = QwenTests().model(create_chat_completion=Mock(return_value=QwenTests().result('{"ready":"short"}')))
+        with patch.object(s, 'load_model', return_value=model):
+            with self.assertRaisesRegex(s.StoryGenerationError, 'three attempts'):
+                s.request_story('chat/completions', payload)
+        self.assertEqual(model.create_chat_completion.call_args.kwargs['response_format']['schema']
+                         ['properties']['ready'], {'type': 'string'})

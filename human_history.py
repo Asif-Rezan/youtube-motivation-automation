@@ -49,7 +49,7 @@ THUMBNAIL_FALLBACKS = {
     'shelter': 'WHERE TO CAMP?', 'communication': 'PASSING KNOWLEDGE ON',
 }
 THUMBNAIL_SCHEMA = {'type': 'string', 'maxLength': 45,
-                    'pattern': r'^\S+( \S+){1,4}$'}
+                    'pattern': r"^[A-Za-z0-9][A-Za-z0-9!?'-]*( [A-Za-z0-9][A-Za-z0-9!?'-]*){1,4}$"}
 
 
 def repair_thumbnail_text(story):
@@ -95,6 +95,18 @@ def direction(story):
             'Expand explanations with concrete examples, not invented dialogue or adventures.')
 
 
+def build_outline_schema(schema):
+    keys = [f'chapter_{i:02}' for i in range(1, 21)]
+    text = {'type': 'string'}
+    scene = schema({'summary': text, 'image_prompt': text, 'continuity_note': text,
+                    'image_prompts': {'type': 'array', 'items': text}})
+    return schema({**{k: text for k in ('title', 'description', 'thumbnail_text',
+        'thumbnail_prompt', 'character_description', 'protagonist_name', 'story_bible')},
+        'thumbnail_text': THUMBNAIL_SCHEMA,
+        'tags': {'type': 'array', 'items': text},
+        'scenes': schema({key: scene for key in keys})})
+
+
 def generate(day, history, ask, pause, check_originality, schema):
     recent = history[-30:]
     excluded = {h.get('content_pillar') for h in recent[-3:]}
@@ -104,13 +116,7 @@ def generate(day, history, ask, pause, check_originality, schema):
         hashlib.sha256(f'{day}:{k}'.encode()).hexdigest()))
     keys = [f'chapter_{i:02}' for i in range(1, 21)]
     text = {'type': 'string'}
-    scene = schema({'summary': text, 'image_prompt': text, 'continuity_note': text,
-                    'image_prompts': {'type': 'array', 'items': text}})
-    outline_schema = schema({**{k: text for k in ('title', 'description', 'thumbnail_text',
-        'thumbnail_prompt', 'character_description', 'protagonist_name', 'story_bible')},
-        'thumbnail_text': THUMBNAIL_SCHEMA,
-        'tags': {'type': 'array', 'items': text},
-        'scenes': schema({key: scene for key in keys})})
+    outline_schema = build_outline_schema(schema)
     brief = '''Create an ORIGINAL English educational explainer about ancient human life.
     Use the assigned topic as a direction, invent a fresh question and wording.
     Every title MUST contain the exact phrase Ancient Humans (preferred) or the word Humans.

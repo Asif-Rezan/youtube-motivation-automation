@@ -7,7 +7,7 @@ permissions:
   contents: read
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -17,5 +17,6 @@ jobs:
       - run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-dejavu-core
-          pip install -r requirements.txt
+          pip install -r requirements.txt -r requirements-story.txt
           python -m unittest -v
+          python qwen_check.py --schemas-only

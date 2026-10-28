@@ -3,6 +3,7 @@ import copy
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import time
 
@@ -59,6 +60,35 @@ def load_model():
     return _model
 
 
+def decoder_schema(schema):
+    """Reject regex constructs the native GBNF parser cannot represent safely.
+
+    Keep the original schema for output validation. Large character-count constraints
+    are checked there, avoiding thousands of nested optional grammar productions.
+    """
+    converted = copy.deepcopy(schema)
+    def visit(node):
+        if isinstance(node, list):
+            for value in node:
+                visit(value)
+        elif isinstance(node, dict):
+            pattern = node.get('pattern')
+            if pattern is not None:
+                # GBNF does not implement Python's shorthand classes, boundaries,
+                # backreferences or lookarounds. Never forward them into native code.
+                if (not isinstance(pattern, str) or '(?' in pattern or
+                    re.search(r'\\(?:[A-Za-z0-9])', pattern)):
+                    raise StoryGenerationError('Unsupported local decoder regex; use explicit character classes')
+                re.compile(pattern)
+            for key in ('minLength', 'maxLength'):
+                if isinstance(node.get(key), int) and node[key] > 256:
+                    del node[key]
+            for value in node.values():
+                visit(value)
+    visit(converted)
+    return converted
+
+
 def request_story(endpoint, payload):
     if endpoint != 'chat/completions':
         raise StoryGenerationError('Qwen supports script JSON generation only')
@@ -68,6 +98,7 @@ def request_story(endpoint, payload):
     if not isinstance(schema, dict):
         raise StoryGenerationError('Script generation requires an explicit JSON schema')
     Draft202012Validator.check_schema(schema)
+    safe_schema = decoder_schema(schema)
     validator = Draft202012Validator(schema)
     messages = copy.deepcopy(payload['messages'])
     messages.append({'role': 'user', 'content': 'Return only JSON matching this schema. '
@@ -85,7 +116,7 @@ def request_story(endpoint, payload):
         started = time.monotonic()
         try:
             result = model.create_chat_completion(messages=messages,
-                response_format={'type': 'json_object', 'schema': schema},
+                response_format={'type': 'json_object', 'schema': safe_schema},
                 max_tokens=limit, temperature=max(.2, float(payload.get('temperature', .7)) - .15 * attempt),
                 top_p=.8, top_k=20, repeat_penalty=1.05, seed=1700 + attempt)
         except Exception:
