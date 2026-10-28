@@ -1,6 +1,6 @@
 import copy
 import unittest
-from video_metadata import generate_metadata, validate_metadata, public_description, repair_hashtag_footer
+from video_metadata import generate_metadata, validate_metadata, public_description, repair_hashtag_footer, repair_topic_tags, build_metadata_schema
 
 
 def metadata_fixture():
@@ -104,6 +104,55 @@ class VideoMetadataTests(unittest.TestCase):
         self.assertIn('Validation issue:', requests[1])
         self.assertEqual(pauses, [60, 60])
         validate_metadata(result)
+
+    def test_malformed_tags_recover_without_another_model_call(self):
+        original = metadata_fixture()
+        story = {'title': original['title'], 'scenes': [
+            {'narration': 'Ancient Humans tended glowing embers. Fire maintenance required dry fuel and a sheltered camp.'}]}
+        cases = [[], None, ['#AncientHumans', ' ancient humans ', 'fire maintenance'] * 9,
+                 ['Ancient Humans'] * 10, original['tags'] * 4,
+                 ['A very long but grounded phrase about ancient human fire maintenance and dry fuel'] * 18,
+                 ['fire maintenance, dry fuel;glowing embers|sheltered camp'],
+                 ['  fire   maintenance ', '', '#AncientHumans', 123, None],
+                 ['#Viral', '#Trending'], 'not an array']
+        for raw in cases:
+            with self.subTest(raw=raw):
+                draft = {**original, 'tags': raw}
+                before = copy.deepcopy(draft)
+                calls = []
+                def ask(*args):
+                    calls.append(args)
+                    return draft
+                result = generate_metadata(story, ask, lambda _: None, lambda props: props)
+                validate_metadata(result)
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(result['title'], original['title'])
+                self.assertEqual(result['description'], original['description'])
+                self.assertEqual(draft, before)
+                self.assertNotIn('Viral', result['tags'])
+                self.assertIn('fire maintenance', [tag.casefold() for tag in result['tags']])
+
+    def test_valid_tag_list_keeps_order_spelling_and_long_relevant_phrases(self):
+        draft = metadata_fixture()
+        draft['tags'][0] = 'how ancient humans maintained a camp fire through a cold night'
+        validate_metadata(draft)
+        self.assertIs(repair_topic_tags(draft, {}), draft)
+
+    def test_tag_repair_never_bypasses_title_and_description_validation(self):
+        for change in ({'title': 'Unrelated keyword title'}, {'description': 'Too short.'},
+                       {'description': 'A' * 4600}):
+            draft = {**metadata_fixture(), **change, 'tags': []}
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                validate_metadata(repair_topic_tags(draft, {}))
+
+    def test_metadata_schema_bounds_tag_shape_before_long_generation(self):
+        from jsonschema import Draft202012Validator, ValidationError
+        schema = build_metadata_schema(lambda props: {'type': 'object', 'properties': props})
+        validator = Draft202012Validator(schema)
+        validator.validate(metadata_fixture())
+        for tags in ([], ['one'] * 19, [''] * 8, ['x' * 49] * 8):
+            with self.subTest(tags=tags), self.assertRaises(ValidationError):
+                validator.validate({**metadata_fixture(), 'tags': tags})
 
     def test_old_music_footer_removed_and_empty_credit_has_no_trailing_blanks(self):
         footer = 'Background music: original Magenta MusicRNN melody with synthesized ambient piano.'

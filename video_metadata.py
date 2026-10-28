@@ -106,6 +106,70 @@ def repair_hashtag_footer(data, story):
     return {**data, 'description': '\n'.join(lines).rstrip() + '\n\n' + ' '.join(hashtags)}
 
 
+def _valid_tags(tags):
+    return (isinstance(tags, list) and 8 <= len(tags) <= 18 and
+            all(isinstance(tag, str) and tag.strip() and '#' not in tag for tag in tags) and
+            len({tag.strip().casefold() for tag in tags}) == len(tags) and
+            len(','.join(tags)) <= 400)
+
+
+def repair_topic_tags(data, story):
+    """Repair recoverable model formatting without regenerating completed narration.
+
+    Preserve a valid list exactly. Otherwise keep relevant generated phrases in
+    order, remove hashtags/duplicates and bound the list and character budget.
+    Supplement sparse lists with phrases present in the script, then broad terms
+    describing this Ancient Humans channel; never invent specific episode claims.
+    """
+    raw = data.get('tags')
+    if _valid_tags(raw):
+        return data
+    candidates = []
+    for tag in raw if isinstance(raw, list) else []:
+        if isinstance(tag, str):
+            candidates.extend(re.split(r'[,;|\n]+', tag))
+    # Both titles concern the actual episode, not unrelated popular searches.
+    candidates.extend([data.get('title', ''), story.get('title', ''), 'Ancient Humans'])
+    context = ' '.join([story.get('title', '')] +
+                       [scene.get('narration', '') for scene in story.get('scenes', [])])
+    context = ' '.join(context.casefold().split())
+    for phrase in ('fire maintenance', 'camp fire', 'glowing embers', 'dry fuel',
+                   'food storage', 'preserving food', 'water sources', 'dry landscapes',
+                   'stone tools', 'making tools', 'sharing food', 'sheltered camp',
+                   'survival skills', 'passing knowledge', 'teaching children'):
+        if phrase in context:
+            candidates.append(phrase)
+    candidates.extend(['human history', 'prehistoric life', 'early humans',
+                       'ancient human survival', 'prehistoric daily life',
+                       'ancient human life', 'prehistoric humans'])
+    tags, seen = [], set()
+    for candidate in candidates:
+        if not isinstance(candidate, str):
+            continue
+        tag = ' '.join(candidate.replace('#', '').split()).strip(' ,;|.!?')
+        tag = re.sub(r'\bAncientHumans\b', 'Ancient Humans', tag, flags=re.I)
+        if len(tag) > 42:
+            # Keep complete words, leaving room for at least eight useful tags.
+            tag = tag[:43].rsplit(' ', 1)[0] if ' ' in tag[:43] else ''
+        key = tag.casefold()
+        if not tag or key in seen or key in {'viral', 'trending', 'shorts', 'youtube'}:
+            continue
+        if len(','.join([*tags, tag])) > 400:
+            continue
+        tags.append(tag)
+        seen.add(key)
+        if len(tags) == 18:
+            break
+    return {**data, 'tags': tags}
+
+
+def build_metadata_schema(schema):
+    return schema({'title': {'type': 'string', 'maxLength': 85},
+                   'description': {'type': 'string', 'minLength': 3500, 'maxLength': 4500},
+                   'tags': {'type': 'array', 'minItems': 8, 'maxItems': 18,
+                            'items': {'type': 'string', 'minLength': 1, 'maxLength': 48}}})
+
+
 def validate_metadata(data):
     title, description, tags = (data.get(k) for k in ('title', 'description', 'tags'))
     if not isinstance(title, str) or len(title) > 85 or not re.search(r'\bHumans\b', title, re.I):
@@ -117,18 +181,13 @@ def validate_metadata(data):
     final_line = description.strip().splitlines()[-1]
     if not _valid_hashtag_line(final_line):
         raise ValueError('Final line must contain 3–5 unique relevant hashtags starting with #AncientHumans')
-    if (not isinstance(tags, list) or not 8 <= len(tags) <= 18 or
-            not all(isinstance(t, str) and t.strip() and '#' not in t for t in tags) or
-            len({t.strip().lower() for t in tags}) != len(tags) or len(','.join(tags)) > 400):
+    if not _valid_tags(tags):
         raise ValueError('Use 8–18 distinct topic tags with no hashtags and total length <=400')
     return data
 
 
 def generate_metadata(story, ask, pause, schema):
-    text = {'type': 'string'}
-    response_schema = schema({'title': {'type': 'string', 'maxLength': 85},
-                              'description': {'type': 'string', 'minLength': 3500, 'maxLength': 4500},
-                              'tags': {'type': 'array', 'items': text}})
+    response_schema = build_metadata_schema(schema)
     context = {'working_title': story['title'], 'topic_pillar': story.get('content_pillar'),
                'evidence_and_continuity': story.get('story_bible'),
                'completed_narration': [s['narration'] for s in story['scenes']]}
@@ -137,6 +196,7 @@ def generate_metadata(story, ask, pause, schema):
         pause(60)
         result = ask(METADATA_BRIEF + '\nCompleted video context:\n' + json.dumps(context) + feedback,
                      4000, response_schema)
+        result = repair_topic_tags(result, story)
         result = repair_hashtag_footer(result, story)
         try:
             return validate_metadata(result)

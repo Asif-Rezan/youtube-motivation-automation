@@ -3,6 +3,7 @@ import json
 import workflow as w
 from story_cpu import MODEL_ID, decoder_schema
 from human_history import THUMBNAIL_SCHEMA, build_outline_schema
+from video_metadata import build_metadata_schema
 
 
 def check_production_grammar():
@@ -14,6 +15,8 @@ def check_production_grammar():
     schema = build_outline_schema(object_schema)
     LlamaGrammar.from_json_schema(json.dumps(decoder_schema(schema)), verbose=False)
     print(json.dumps({'check': 'Production outline grammar conversion', 'passed': True}))
+    LlamaGrammar.from_json_schema(json.dumps(decoder_schema(build_metadata_schema(object_schema))), verbose=False)
+    print(json.dumps({'check': 'Production metadata grammar conversion', 'passed': True}))
 
 
 def main():

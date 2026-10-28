@@ -109,12 +109,16 @@ class HumanHistoryTests(unittest.TestCase):
             else:
                 from test_video_metadata import metadata_fixture
                 result = metadata_fixture()
+                # Reproduce production: completed narration followed by malformed SEO tags.
+                result['tags'] = ['#AncientHumans', ' ancient humans ', 'fire maintenance'] * 9
             return {'choices': [{'message': {'content': json.dumps(result)}, 'finish_reason': 'stop'}]}
         with patch.dict(os.environ, {}, clear=True), patch.object(w, 'request_text', side_effect=ask), \
                 patch.object(w.time, 'sleep'):
             story = w.make_story('daily-123', [{'format': 'human_history_explainer'}])
         self.assertEqual(story['content_profile'], h.PROFILE)
         self.assertEqual(len(calls), 6)
+        from video_metadata import validate_metadata
+        validate_metadata(story)
         self.assertEqual(story['thumbnail_text'], h.THUMBNAIL_FALLBACKS[story['content_pillar']])
         self.assertTrue(story['scenes'][-1]['narration'].endswith(h.CTA))
         w.validate_story(story)
