@@ -61,6 +61,41 @@ class QwenTests(unittest.TestCase):
             s.request_story('chat/completions', self.payload())
         self.assertEqual(model.create_chat_completion.call_count, 2)
 
+    def test_truncation_increases_budget_and_supplies_correction(self):
+        model = self.model(create_chat_completion=Mock(side_effect=[
+            self.result('{"ready":', 'length'), self.result()]))
+        with patch.object(s, 'load_model', return_value=model):
+            s.request_story('chat/completions', self.payload())
+        first, second = [call.kwargs for call in model.create_chat_completion.call_args_list]
+        self.assertGreater(second['max_tokens'], first['max_tokens'])
+        self.assertLessEqual(second['max_tokens'], 6000)
+        self.assertIn('complete valid JSON', second['messages'][-1]['content'])
+
+    def test_length_retry_gives_measured_feedback_without_logging_private_text(self):
+        payload = self.payload()
+        payload['response_format']['json_schema']['schema']['properties']['ready'] = {
+            'type': 'string', 'minLength': 300, 'maxLength': 400}
+        model = self.model(create_chat_completion=Mock(side_effect=[
+            self.result(json.dumps({'ready': 'PRIVATE DRAFT'})),
+            self.result(json.dumps({'ready': 'x' * 350}))]))
+        with patch.object(s, 'load_model', return_value=model), patch('builtins.print') as output:
+            s.request_story('chat/completions', payload)
+        sent = model.create_chat_completion.call_args.kwargs['messages'][-1]['content']
+        self.assertIn('minLength requires 300', sent)
+        self.assertIn('length 13', sent)
+        self.assertNotIn('PRIVATE DRAFT', str(output.call_args_list))
+        self.assertIn('schema_validation', str(output.call_args_list))
+
+    def test_retry_feedback_is_included_in_context_budget(self):
+        model = self.model(create_chat_completion=Mock(return_value=self.result('{}')))
+        # Original request fits, but the extra corrective message does not.
+        model.tokenize.side_effect = lambda content, **kwargs: [1] * (
+            s.CONTEXT_TOKENS if b'previous response' in content else 1)
+        with patch.object(s, 'load_model', return_value=model):
+            with self.assertRaisesRegex(s.StoryGenerationError, 'context budget'):
+                s.request_story('chat/completions', self.payload())
+        model.create_chat_completion.assert_called_once()
+
     def test_context_overflow_stops_before_inference(self):
         model = self.model()
         model.tokenize.return_value = [1] * s.CONTEXT_TOKENS

@@ -1,12 +1,21 @@
 name: Local text grammar and inference regression
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'story_cpu.py'
+      - 'video_metadata.py'
+      - 'qwen_check.py'
+      - 'test_story_cpu.py'
+      - 'test_video_metadata.py'
+      - '.github/workflows/local-text-check.yml'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   qwen:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       TEXT_BACKEND: qwen-local
       STORY_MODEL: Qwen/Qwen3-4B-Instruct-2507
@@ -23,5 +32,5 @@ jobs:
         with:
           path: ~/.cache/huggingface/hub/models--unsloth--Qwen3-4B-Instruct-2507-GGUF
           key: qwen3-4b-instruct2507-q4km-a06e946bb6b655725eafa393f4a9745d460374c9
-      - name: Exercise actual production thumbnail grammar on real Qwen
-        run: python -u qwen_check.py
+      - name: Exercise production thumbnail and metadata generation on real Qwen
+        run: python -u qwen_check.py --metadata

@@ -170,6 +170,18 @@ def build_metadata_schema(schema):
                             'items': {'type': 'string', 'minLength': 1, 'maxLength': 48}}})
 
 
+def build_metadata_request_schema(schema):
+    """Let complete drafts reach the editorial repair loop before length validation.
+
+    The native decoder deliberately omits large string lengths. Enforcing them
+    in request_story instead would exhaust blind transport retries before the
+    metadata layer can repair a short/long description. Final validation stays strict.
+    """
+    properties = build_metadata_schema(lambda properties: properties)
+    properties['description'] = {'type': 'string'}
+    return schema(properties)
+
+
 def validate_metadata(data):
     title, description, tags = (data.get(k) for k in ('title', 'description', 'tags'))
     if not isinstance(title, str) or len(title) > 85 or not re.search(r'\bHumans\b', title, re.I):
@@ -187,7 +199,7 @@ def validate_metadata(data):
 
 
 def generate_metadata(story, ask, pause, schema):
-    response_schema = build_metadata_schema(schema)
+    response_schema = build_metadata_request_schema(schema)
     context = {'working_title': story['title'], 'topic_pillar': story.get('content_pillar'),
                'evidence_and_continuity': story.get('story_bible'),
                'completed_narration': [s['narration'] for s in story['scenes']]}
@@ -201,9 +213,18 @@ def generate_metadata(story, ask, pause, schema):
         try:
             return validate_metadata(result)
         except ValueError as error:
+            print(json.dumps({'check': 'Metadata editorial validation', 'passed': False,
+                              'attempt': attempt + 1,
+                              'description_characters': len(result['description']),
+                              'reason': str(error)}), flush=True)
             if attempt:
                 raise
-            feedback = '\nRepair this rejected draft: ' + json.dumps(result) + '\nValidation issue: ' + str(error)
+            feedback = ('\nRepair this rejected draft: ' + json.dumps(result) +
+                        '\nValidation issue: ' + str(error) +
+                        f'\nThe description currently contains {len(result["description"])} characters. '
+                        'Rewrite it to 4000–4400 characters including the hashtag footer. '
+                        'Expand with distinct mechanisms and evidence limits from the completed narration if short; '
+                        'remove repetition if long. Preserve valid title and tags. Do not pad with repeated text.')
 
 
 def public_description(description, music_credit=''):

@@ -107,30 +107,54 @@ def request_story(endpoint, payload):
     if not 1 <= limit <= 6000:
         raise StoryGenerationError('Script output token budget must be between 1 and 6000')
     model = load_model()
-    # Include chat markers and the BOS token in the conservative context allowance.
-    prompt_tokens = sum(len(model.tokenize(message['content'].encode(), add_bos=False)) + 16
-                        for message in messages) + 32
-    if prompt_tokens + limit > CONTEXT_TOKENS:
-        raise StoryGenerationError('Qwen context budget exceeded; reduce recent-story context')
+    feedback = None
     for attempt in range(3):
+        attempt_messages = messages + ([{'role': 'user', 'content': feedback}] if feedback else [])
+        # Include retry feedback, chat markers and BOS in the context allowance.
+        prompt_tokens = sum(len(model.tokenize(message['content'].encode(), add_bos=False)) + 16
+                            for message in attempt_messages) + 32
+        if prompt_tokens + limit > CONTEXT_TOKENS:
+            raise StoryGenerationError('Qwen context budget exceeded; reduce recent-story context')
         started = time.monotonic()
         try:
-            result = model.create_chat_completion(messages=messages,
+            result = model.create_chat_completion(messages=attempt_messages,
                 response_format={'type': 'json_object', 'schema': safe_schema},
                 max_tokens=limit, temperature=max(.2, float(payload.get('temperature', .7)) - .15 * attempt),
                 top_p=.8, top_k=20, repeat_penalty=1.05, seed=1700 + attempt)
         except Exception:
             # Runtime/configuration errors are not content errors; don't spin on them.
             raise StoryGenerationError('Qwen CPU generation failed; inspect runner memory and runtime compatibility') from None
+        reason = 'invalid_json'
+        keyword = None
         try:
             choice = result['choices'][0]
             if choice.get('finish_reason') != 'stop':
+                reason = 'incomplete_output'
                 raise ValueError('Incomplete output')
             validator.validate(json.loads(choice['message']['content']))
-        except (ValueError, TypeError, KeyError, IndexError, ValidationError):
-            print(json.dumps({'check': 'Qwen JSON validation retry', 'attempt': attempt + 1}), flush=True)
+        except (ValueError, TypeError, KeyError, IndexError, ValidationError) as error:
+            feedback = 'The previous response was not complete valid JSON. Return the entire JSON object, with all required fields and no extra fields or markdown.'
+            if isinstance(error, ValidationError):
+                reason = 'schema_validation'
+                # Do not log ValidationError.message: it includes rejected private text.
+                keyword = error.validator
+                # Only schema-owned field names may appear in feedback; unknown model keys
+                # and rejected values are never copied into diagnostics.
+                if keyword in {'minLength', 'maxLength', 'minItems', 'maxItems'}:
+                    path = '.'.join(str(part) for part in error.schema_path if part != 'properties')
+                    feedback += (f' Constraint {path} requires {error.validator_value}; '
+                                 f'the previous value had length {len(error.instance)}. '
+                                 'Correct that length while preserving the requested subject and every other constraint.')
+            elif reason == 'incomplete_output':
+                # A new seed alone cannot fix an exhausted output budget.
+                limit = min(6000, max(limit + 256, int(limit * 1.5)),
+                            CONTEXT_TOKENS - prompt_tokens - 256)
+                feedback += ' Keep wording concise so all fields fit the output budget.'
+            print(json.dumps({'check': 'Qwen JSON validation retry', 'attempt': attempt + 1,
+                              'reason': reason, 'constraint': keyword,
+                              'next_max_tokens': limit}), flush=True)
             if attempt == 2:
-                raise StoryGenerationError('Qwen returned incomplete or invalid script JSON after three attempts') from None
+                raise StoryGenerationError(f'Qwen returned incomplete or invalid script JSON after three attempts ({reason})') from None
             continue
         print(json.dumps({'check': 'Qwen script JSON', 'passed': True,
             'seconds': round(time.monotonic() - started, 1),

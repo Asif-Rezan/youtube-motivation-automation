@@ -1,5 +1,7 @@
 import copy
+import json
 import unittest
+from unittest.mock import Mock, patch
 from video_metadata import generate_metadata, validate_metadata, public_description, repair_hashtag_footer, repair_topic_tags, build_metadata_schema
 
 
@@ -27,6 +29,48 @@ Which challenge would you like us to explore next: finding dry fuel or choosing 
 
 
 class VideoMetadataTests(unittest.TestCase):
+    def test_short_and_long_drafts_reach_repair_through_real_schema_transport(self):
+        import story_cpu
+        from jsonschema import Draft202012Validator
+        from video_metadata import build_metadata_request_schema
+        def schema(props):
+            return {'type': 'object', 'properties': props, 'required': list(props),
+                    'additionalProperties': False}
+        for description in ('Too short.', 'Long private draft. ' * 300):
+            with self.subTest(length=len(description)):
+                draft = {**metadata_fixture(), 'description': description}
+                Draft202012Validator(build_metadata_request_schema(schema)).validate(draft)
+                outputs = [draft, metadata_fixture()]
+                model = Mock(tokenize=Mock(return_value=[1]), create_chat_completion=Mock(
+                    side_effect=[{'choices': [{'finish_reason': 'stop',
+                        'message': {'content': json.dumps(data)}}]} for data in outputs]))
+                prompts = []
+                def ask(prompt, limit, response_schema):
+                    prompts.append(prompt)
+                    response = story_cpu.request_story('chat/completions', {
+                        'messages': [{'role': 'user', 'content': prompt}],
+                        'response_format': {'json_schema': {'schema': response_schema}},
+                        'max_completion_tokens': limit})
+                    return json.loads(response['choices'][0]['message']['content'])
+                with patch.object(story_cpu, 'load_model', return_value=model):
+                    result = generate_metadata({'title': draft['title'], 'scenes': [
+                        {'narration': 'PRIVATE COMPLETED NARRATION'}]}, ask, lambda _: None, schema)
+                validate_metadata(result)
+                self.assertEqual(model.create_chat_completion.call_count, 2)
+                self.assertRegex(prompts[1], r'currently contains [0-9]+ characters')
+                self.assertIn('Validation issue:', prompts[1])
+                self.assertIn('PRIVATE COMPLETED NARRATION', prompts[1])
+
+    def test_repeated_invalid_description_still_fails_bounded_editorial_validation(self):
+        calls = []
+        def ask(*args):
+            calls.append(args)
+            return {**metadata_fixture(), 'description': 'Too short.'}
+        with self.assertRaisesRegex(ValueError, '3500'):
+            generate_metadata({'title': 'Ancient Humans', 'scenes': []}, ask,
+                              lambda _: None, lambda props: props)
+        self.assertEqual(len(calls), 2)
+
     def test_malformed_footer_is_repaired_without_another_model_call(self):
         original = metadata_fixture()
         prose = original['description'].rsplit('\n\n', 1)[0]
