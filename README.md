@@ -1,3 +1,9 @@
+## Shorts preview recovery and publication preflight
+
+Preview generation (`PUBLISH_ENABLED` unset or false) does not require YouTube credentials. Reusable Shorts workflow secrets are optional at dispatch time; enabling publication requires all four existing repository secrets, checked before model generation and before Shorts rendering. Missing values produce a diagnostic listing names only. No credentials or publication variables are changed automatically.
+
+If long video/music/portrait jobs completed but Shorts orchestration failed, run **Create and publish a rhyme Short** on the current main branch with `source_run=40902873254`, `run_id=kids-rhyme-20261029-2134`, `prepared_music=true`, `prepared_portraits=true`, start 0, duration 40. This reuses the saved music/portrait artifacts instead of running the models again. Artifacts expire after seven days. Rerunning an old workflow uses its old workflow definition, so dispatch the corrected workflow for this recovery.
+
 ## Repository account compatibility fix
 
 This repository uses its existing `DRIVE_TOKEN_JSON`, `DRIVE_FOLDER_ID`, `YOUTUBE_TOKEN_JSON` and `EXPECTED_CHANNEL_ID` secrets, not the reference project's hardcoded account/channel. The authenticated Drive user must own the configured active private folder; shared/foreign/trashed folders are rejected. A private `Kids Rhymes - YouTube Automation` child folder marked `youtube_kids_rhymes_root=v1` is created once and reused. Kids history/checkpoints and cleanup stay inside that child, leaving Ancient Humans data untouched. Connection verification may initialize this child folder; it never uploads videos. YouTube continues to require an exact match with `EXPECTED_CHANNEL_ID`. Account setup requires an explicitly supplied channel ID, without requiring the reference channel handle. Older reference-specific account/folder instructions below are superseded by this section.

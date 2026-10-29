@@ -10,6 +10,14 @@ on:
         description: Original song run ID inside that artifact
         type: string
         required: true
+      prepared_music:
+        description: Reuse independent Shorts music from source_run
+        type: boolean
+        default: false
+      prepared_portraits:
+        description: Reuse native portrait illustrations from source_run
+        type: boolean
+        default: false
       clip_start:
         description: Start in seconds (0, 10, 20, etc.)
         type: number
@@ -41,15 +49,16 @@ on:
       upload_mode:
         type: string
         default: scheduled
+    # Preview rendering needs artifacts only; publication validates secrets at runtime.
     secrets:
       YOUTUBE_TOKEN_JSON:
-        required: true
+        required: false
       EXPECTED_CHANNEL_ID:
-        required: true
+        required: false
       DRIVE_TOKEN_JSON:
-        required: true
+        required: false
       DRIVE_FOLDER_ID:
-        required: true
+        required: false
 permissions:
   contents: read
   actions: read
@@ -221,6 +230,10 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
+      - name: Validate publication credentials
+        env:
+          PUBLISH_ENABLED: ${{ vars.PUBLISH_ENABLED }}
+        run: python validate_publication_config.py
       - name: Validate source and clip identity
         run: |
           python - <<'PY'
