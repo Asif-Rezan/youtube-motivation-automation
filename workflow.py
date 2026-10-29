@@ -609,18 +609,44 @@ def upload_private(video, thumbnail, story, state, store, key, music_credit=''):
           'Known video finalization', attempts=2)
 
 
+def wait_for_upload_metadata(client, story, state, attempts=19):
+    """YouTube's first list response can lag a successful insert. Never insert again."""
+    for attempt in range(attempts):
+        items = api_execute(client.videos().list(part='snippet,status', id=state['video_id'])).get('items', [])
+        mismatches = ['availability']
+        if items:
+            video = items[0]
+            snippet, status = video.get('snippet', {}), video.get('status', {})
+            if video.get('id', state['video_id']) != state['video_id']:
+                raise RuntimeError('Known upload video identity mismatch')
+            channel = snippet.get('channelId')
+            if channel and channel != required('EXPECTED_CHANNEL_ID'):
+                raise RuntimeError('Known upload channel identity mismatch')
+            privacy = status.get('privacyStatus')
+            if privacy and privacy != 'private':
+                raise RuntimeError('Known upload must remain private; preserve all media')
+            if status.get('uploadStatus') in ('failed', 'rejected', 'deleted'):
+                raise RuntimeError('YouTube rejected the known upload')
+            expected = {'channelId': required('EXPECTED_CHANNEL_ID'), 'title': story['title'],
+                        'description': state.get('upload_description', story['description'])}
+            mismatches = [field for field, value in expected.items() if snippet.get(field) != value]
+            if set(snippet.get('tags', [])) != set(story['tags']):
+                mismatches.append('tags')
+            if privacy != 'private':
+                mismatches.append('privacyStatus')
+            if not mismatches:
+                return video
+        print(json.dumps({'check': 'YouTube metadata propagation', 'attempt': attempt + 1,
+                          'pending_fields': mismatches}), flush=True)
+        if attempt + 1 < attempts:
+            time.sleep(10)
+    raise ProcessingPending('Known upload metadata has not converged: ' + ', '.join(mismatches)
+                            + '; preserve the video and resume verification, never insert again')
+
+
 def finalize_uploaded(client, thumbnail, story, state, store, key):
     from googleapiclient.http import MediaFileUpload
-    items = api_execute(client.videos().list(part='snippet,status', id=state['video_id'])).get('items', [])
-    if not items:
-        raise RuntimeError('Known upload is unavailable; preserve assets for reconciliation')
-    snippet = items[0]['snippet']
-    if (snippet.get('channelId') != required('EXPECTED_CHANNEL_ID')
-        or snippet.get('title') != story['title']
-        or snippet.get('description') != state.get('upload_description', story['description'])
-        or set(snippet.get('tags', [])) != set(story['tags'])
-        or items[0]['status'].get('privacyStatus') != 'private'):
-        raise RuntimeError('Known upload identity, metadata or privacy mismatch')
+    wait_for_upload_metadata(client, story, state)
     if not state.get('thumbnail_uploaded'):
         api_execute(client.thumbnails().set(videoId=state['video_id'], media_body=MediaFileUpload(str(thumbnail))))
         state['thumbnail_uploaded'] = True

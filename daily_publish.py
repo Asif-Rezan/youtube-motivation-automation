@@ -168,6 +168,8 @@ def main():
             thumbnail = Path(directory)/'thumbnail.jpg'
             store.download(thumbnail_id, thumbnail)
             finalize_uploaded(client, thumbnail, state['story'], state, store, key)
+    from workflow import wait_for_upload_metadata
+    wait_for_upload_metadata(client, state['story'], state)
     deadline = time.monotonic() + 1800
     while True:
         items = api_execute(client.videos().list(part='snippet,status,processingDetails,contentDetails,paidProductPlacementDetails',

@@ -44,3 +44,6 @@ publishes failed content or runs unlimited retry loops.
 
 ### Repeated narration recovery
 Before metadata and rendering, detect duplicated chapters and repeated filler in new or resumed drafts. Rewrite only the affected chapters, checkpointing each replacement. Retain the existing model and strict final quality checks. Recovery is bounded to three passes; persistently invalid output remains saved and cannot be uploaded. Generation context contains chapter plans without embedded completed narration; repair context explicitly identifies rejected wording and other chapters to avoid.
+
+### YouTube metadata propagation after insertion
+A successful upload can precede consistent `videos.list` metadata. Finalization now reads the saved video ID up to 19 times, ten seconds apart, and logs pending field names only. A wrong nonempty channel, changed privacy, wrong video ID or rejected upload fails immediately. Persistent mismatches preserve all media and the known identity; insertion is never repeated. The publishing recovery path uses the same convergence check before disclosure, scheduling and cleanup. A read-only `Diagnose saved upload` workflow compares expected and returned fields without printing credentials or full prose.

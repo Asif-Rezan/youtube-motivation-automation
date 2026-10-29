@@ -1,6 +1,7 @@
 """Read-only diagnostics for a known private upload; no credentials or prose logged."""
 import json
 import os
+import re
 import workflow as w
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -9,6 +10,8 @@ from reliability import api_execute
 
 def main():
     run = os.environ['SAVED_RUN_ID']
+    if not re.fullmatch(r'daily-\d+', run):
+        raise ValueError('Only daily run IDs are accepted')
     state = w.Store().load(f'runs/{run}/state.json', {})
     if not state.get('video_id'):
         raise RuntimeError('No saved upload identity')
