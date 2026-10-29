@@ -1,5 +1,6 @@
 """A metadata failure must preserve narration and resume within the same run."""
 import copy
+import hashlib
 import json
 import os
 import tempfile
@@ -27,7 +28,7 @@ class StoryRecoveryTests(unittest.TestCase):
             if 'scenes' in props:
                 value = self.outline()
             else:
-                value = {'narrations': {key: 'A cold camp presents a practical problem with several possible solutions. ' * 8
+                value = {'narrations': {key: ' '.join(hashlib.sha256(f'{key}-{i}'.encode()).hexdigest()[:12] for i in range(80)) + '.'
                     for key in props['narrations']['properties']}}
             return {'choices': [{'finish_reason': 'stop', 'message': {'content': json.dumps(value)}}]}
         with patch.dict(os.environ, {}, clear=True), patch.object(w, 'request_text', side_effect=ask), \

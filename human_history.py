@@ -107,6 +107,12 @@ def build_outline_schema(schema):
         'scenes': schema({key: scene for key in keys})})
 
 
+def narration_schema():
+    word = r"[A-Za-z0-9][A-Za-z0-9,.;:!?'\-]*"
+    final_word = r"[A-Za-z0-9][A-Za-z0-9'\-]*[.!?]"
+    return {'type': 'string', 'pattern': '^' + word + '( ' + word + '){72,102} ' + final_word + '$'}
+
+
 def generate(day, history, ask, pause, check_originality, schema, *, draft=None, checkpoint=None):
     recent = [{k: item[k] for k in ('title', 'format', 'content_pillar') if k in item}
               for item in history[-30:]]
@@ -188,20 +194,17 @@ def generate(day, history, ask, pause, check_originality, schema, *, draft=None,
         pause(60)
         group_keys = keys[begin:begin+5]
         # Constrain local decoding to complete chapters near the spoken-duration target.
-        word = r"[A-Za-z0-9][A-Za-z0-9,.;:!?'\-]*"
-        final_word = r"[A-Za-z0-9][A-Za-z0-9'\-]*[.!?]"
-        narration_schema = {'type': 'string', 'pattern': '^' + word + '( ' + word + '){72,102} ' + final_word + '$'}
         group = ask(f'''Write only chapters {begin+1}–{begin+5} of this explainer.
         {direction(outline)}
         Title: {outline['title']}. Evidence and continuity brief: {outline['story_bible']}
-        Full chapter plan: {json.dumps(outline['scenes'])}
+        Full chapter plan: {json.dumps([{k: v for k, v in c.items() if k != 'narration'} for c in outline['scenes']])}
         Previous ending: {previous[-700:]}
         Each chapter targets 82–88 spoken English words (74–104 permitted). Use plain English, single spaces and ASCII punctuation; finish with a complete sentence. Explain its assigned mechanism only; do not jump ahead.
         Keep a curious, conversational, lightly humorous tone. Use everyday comparisons with clear limits.
         No fictional financial plot, filler, headings, invented dialogue or viewer calls to action.
         Open chapter 1 inside the concrete problem; conclude the answer in chapter 20.
         Return narrations with exactly these keys: {group_keys}.''', 4200,
-        schema({'narrations': schema({key: narration_schema for key in group_keys})}))
+        schema({'narrations': schema({key: narration_schema() for key in group_keys})}))
         for key, chapter in zip(group_keys, outline['scenes'][begin:begin+5]):
             narration = group['narrations'][key]
             if not isinstance(narration, str) or not narration.strip():
@@ -210,6 +213,33 @@ def generate(day, history, ask, pause, check_originality, schema, *, draft=None,
         previous = outline['scenes'][begin+4]['narration']
         if checkpoint:
             checkpoint(json.loads(json.dumps(outline)))
+    # Repair saved drafts as well as newly generated prose before expensive downstream work.
+    # A network retry must never repeatedly reload an unchanged, rejected draft.
+    from script_quality import narration_issues
+    for repair_round in range(3):
+        issues = narration_issues(outline)
+        if not issues:
+            break
+        print(json.dumps({'check': 'Narration quality repair', 'pass': repair_round + 1,
+                          'chapters': [i + 1 for i in issues]}), flush=True)
+        for index, reason in issues.items():
+            chapter = outline['scenes'][index]
+            repair_schema = schema({'narration': narration_schema()})
+            pause(60)
+            replacement = ask(f"""Rewrite chapter {index+1} only. Quality issue: {reason}
+            Title: {outline['title']}. Evidence limits: {outline['story_bible']}
+            Assigned chapter plan: {json.dumps({k: v for k, v in chapter.items() if k != 'narration'})}
+            Other chapters to avoid repeating: {json.dumps([c.get('narration', '') for i, c in enumerate(outline['scenes']) if i != index])}
+            Rejected wording: {chapter.get('narration', '')}
+            Add a distinct learning point, concrete example, mechanism and tradeoff tied to this chapter.
+            Use 74-104 spoken English words, single spaces, ASCII punctuation, complete sentences.
+            No headings, filler, invented evidence, quotations or calls to action.
+            Return one narration string.""", 1200, repair_schema)
+            chapter['narration'] = replacement['narration']
+            if checkpoint:
+                checkpoint(json.loads(json.dumps(outline)))
+    if narration_issues(outline):
+        raise ValueError('Narration repair exhausted after three passes; draft saved for targeted recovery')
     if not outline['scenes'][-1]['narration'].endswith(CTA):
         outline['scenes'][-1]['narration'] += CTA
     if checkpoint:

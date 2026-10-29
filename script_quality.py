@@ -18,6 +18,26 @@ def fingerprint(story):
                    for i in range(max(0, len(tokens)-4))})[:4096]
 
 
+def narration_issues(story):
+    """Return chapter indexes requiring revision, retaining the first useful occurrence."""
+    from human_history import CTA
+    chapters = [' '.join(words(scene.get('narration', '').replace(CTA, '')))
+                for scene in story['scenes']]
+    issues = {}
+    seen = Counter()
+    for index, chapter in enumerate(chapters):
+        for previous in chapters[:index]:
+            if min(len(chapter), len(previous)) >= 160 and SequenceMatcher(None, chapter, previous, autojunk=False).ratio() >= .92:
+                issues[index] = 'Nearly identical to an earlier chapter; explain a different assigned mechanism and example.'
+        local = Counter(' '.join(words(sentence)) for sentence in re.split(r'(?<=[.!?])\s+',
+                        story['scenes'][index].get('narration', '').replace(CTA, ''))
+                        if len(words(sentence)) >= 8)
+        if any(seen[sentence] + count >= 3 for sentence, count in local.items()):
+            issues[index] = 'Repeated filler sentence; replace it with concrete new explanatory reasoning.'
+        seen.update(local)
+    return issues
+
+
 def validate(story, history=()):
     chapters = [' '.join(words(scene.get('narration', ''))) for scene in story['scenes']]
     for index, chapter in enumerate(chapters):

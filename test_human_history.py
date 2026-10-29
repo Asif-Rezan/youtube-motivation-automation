@@ -104,7 +104,7 @@ class HumanHistoryTests(unittest.TestCase):
                         continuity_note='Same camp', image_prompts=['Embers cooling', 'Dry kindling'])
                         for key in props['scenes']['required']})
             elif 'narrations' in props:
-                result = {'narrations': {key: 'A cold camp presents a practical problem with several possible solutions. '*8
+                result = {'narrations': {key: ' '.join(__import__('hashlib').sha256(f'{key}-{i}'.encode()).hexdigest()[:12] for i in range(80)) + '.'
                     for key in props['narrations']['required']}}
             else:
                 from test_video_metadata import metadata_fixture

@@ -60,6 +60,10 @@ def check_production_grammar():
     def object_schema(properties):
         return {'type': 'object', 'properties': properties, 'required': list(properties),
                 'additionalProperties': False}
+    from human_history import narration_schema
+    LlamaGrammar.from_json_schema(json.dumps(decoder_schema(
+        object_schema({'narration': narration_schema()}))), verbose=False)
+    print(json.dumps({'check': 'Narration repair grammar conversion', 'passed': True}))
     # Same twenty-chapter outline used by stage-story, including thumbnail constraints.
     schema = build_outline_schema(object_schema)
     LlamaGrammar.from_json_schema(json.dumps(decoder_schema(schema)), verbose=False)

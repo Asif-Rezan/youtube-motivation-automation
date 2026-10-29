@@ -41,3 +41,6 @@ models, native crashes, GitHub runner limits, sustained outages, failed quality
 checks and ambiguous uploads may still require intervention. Recovery preserves
 verified work where possible; it never substitutes a different AI model, silently
 publishes failed content or runs unlimited retry loops.
+
+### Repeated narration recovery
+Before metadata and rendering, detect duplicated chapters and repeated filler in new or resumed drafts. Rewrite only the affected chapters, checkpointing each replacement. Retain the existing model and strict final quality checks. Recovery is bounded to three passes; persistently invalid output remains saved and cannot be uploaded. Generation context contains chapter plans without embedded completed narration; repair context explicitly identifies rejected wording and other chapters to avoid.
