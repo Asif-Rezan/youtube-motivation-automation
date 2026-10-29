@@ -1,0 +1,26 @@
+name: Diagnose saved upload
+on:
+  workflow_dispatch:
+    inputs:
+      run:
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: python -u diagnose_upload.py
+        env:
+          SAVED_RUN_ID: ${{ inputs.run }}
+          DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+          EXPECTED_CHANNEL_ID: UCztvMrNCT34DO3DtzLPgWaw
