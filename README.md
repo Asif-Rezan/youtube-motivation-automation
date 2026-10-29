@@ -1,214 +1,171 @@
-# Motivational financial storytelling automation
+# YouTube Motivation Automation — kids rhymes migration
 
-New financial stories use original second-person POV narration, rotating money scenarios,
-and a shared chapter continuity bible. See [content direction](CONTENT_DIRECTION.md).
+This repository now runs the kids rhymes pipeline copied from [dudi_dam_tv](https://github.com/Asif-Rezan/dudi_dam_tv/tree/6add42d9d315c4f73ec0d40c51c128fb2be76c15) at commit `6add42d9d315c4f73ec0d40c51c128fb2be76c15`.
+The active reference files are unchanged except this README and `setup_accounts.py`, whose GitHub secret destination is this repository.
 
-## Current format
+## Preserved Ancient Humans project
 
-- Original English motivational financial stories targeting 10–15 minutes (600–900 seconds).
-- 1920×1080 output at 30 fps.
-- A newly generated image at 0, 7, 14, 21 seconds and every seven seconds thereafter.
-  The final image lasts only for the remaining duration. Chapter boundaries do not reset this timeline.
-- Narration-matched cinematic 2D editorial story images with clean outlines,
-  restrained cel shading, muted natural colors and recognizable everyday settings at 1024×576, using pinned public
-  segmind/SSD-1B safetensors weights on cloud CPUs with 16 generation steps.
-- Kokoro English narration, Faster-Whisper aligned burned-in captions, zoom/fade
-  transitions, original MusicRNN background music and full-frame cinematic
-  thumbnails without the previous large text band.
-- Daily videos upload privately to Rezan Relaxation, remain private after HD/metadata verification.
-- Generation starts once daily at 01:00 Asia/Dhaka; temporary run media is cleaned after verified private upload.
+Previous main commit: `1db8f8262ff00570a4496c919511491357fbabe3` ([view original](https://github.com/Asif-Rezan/youtube-motivation-automation/tree/1db8f8262ff00570a4496c919511491357fbabe3)).
+Every tracked file from that commit is preserved byte-for-byte under `legacy/ancient-humans/`, including its README, tests, assets and workflows. This directory is an inactive archive: the former workflows are outside `.github/workflows/` and the active pipeline never imports it. The old files are preserved as working source rather than adding comment markers that would damage Python/YAML/assets. Do not run old scripts from this archive against production credentials.
 
-The previous ten-second private test passed in Actions run 38450919780.
-The current seven-second update derives each visual from actual measured word
-timestamps after speech generation, including windows crossing chapter boundaries.
-Local Qwen produces concise scene prompts using the exact words spoken in that window
-and chapter context for pronouns and continuity. Windows that cross chapter boundaries
-include both chapters as context; silent windows retain the preceding narrated event. Image generation refuses a plan
-without full narration-window coverage. Subject/action/object prompts precede style
-text so the image model prioritizes the story. The final shorter shot covers the
-remaining narration. Component tests do not replace a complete live generation/upload verification.
+To inspect the original project without changing the kids pipeline:
 
-The reviewed story has a direct opening crisis, coherent escalating setbacks,
-and a final narrator request to like, comment and subscribe. Future stories
-use Qwen3-4B-Instruct-2507 locally on CPU with strict chapter schemas;
-the final CTA is added reliably by the application. Previous story titles are
-included in local model planning to reduce repeated topics. Historical private tests
-remain manual; the new daily workflow generates a fresh story on each run.
+```sh
+git fetch origin
+git worktree add ../ancient-humans-restored 1db8f8262ff00570a4496c919511491357fbabe3
+```
 
-## Free cloud infrastructure
+To prepare a reversible restoration of the original project as a new branch:
 
-Standard GitHub Ubuntu runners perform the work even when the user's computer
-is off. The dedicated image model is downloaded as public weights; no
-paid inference provider, GPU runner, vidIQ service or paid storage is used.
-Images are generated at 1024×576 then scaled into the 1080p video; they
-are not native 1080p renders. Sixteen image workers share the work. The
-[CPU image benchmark](docs/image-cpu-benchmark.md) compares SSD-1B with the previous
-DreamShaper model. Subjective
-style quality and character continuity still require review before public release.
+```sh
+git fetch origin
+git switch -c restore-ancient-humans origin/main
+git restore --source=1db8f8262ff00570a4496c919511491357fbabe3 --staged --worktree -- .
+git commit -m "Restore Ancient Humans pipeline"
+git push -u origin restore-ancient-humans
+```
 
-Owner-only Google Drive stores the story, prepared audio, captions, images,
-clips, final video, thumbnail and checkpoints. No private media artifacts,
-unpublished story payload, signed URLs or private Drive identifiers belong in
-this public repository. Files are checked for owner-only permissions and the
-pipeline stops near the free 15 GB storage allowance. Verified daily runs
-permanently delete only tagged disposable media; no paid storage upgrade is performed.
+Run these commands from a clean checkout. Review and merge that branch through a pull request to restore the old project. This preserves the kids migration in Git history; no reset or force push is needed. Review repository Actions variables/secrets before enabling old uploads again. Uncommitted work in other local checkouts is untouched and is not part of this remote snapshot.
 
-The Drive OAuth app can only see files authorized to it. Unpublished test stories
-are transferred into an app-created private input slot. Another authorized Drive
-connection may replace that input's content in place, preserving its ID and
-access. The workflow reads the input privately and never prints story text.
+## Configure this repository
 
-## New private test
+- Run account setup in this repository: `setup_accounts.py` writes secrets to `Asif-Rezan/youtube-motivation-automation`.
+- Configure its own `YOUTUBE_TOKEN_JSON`, `EXPECTED_CHANNEL_ID`, `DRIVE_TOKEN_JSON`, and `DRIVE_FOLDER_ID` Actions secrets. Git cloning does not copy repository secrets or variables.
+- The copied setup retains the reference channel guard (`@dudi_dum_tv`), Drive account guard and `dudi_dam_tv_root=v1` folder lookup. It can reuse the reference folder for the same account. For isolated history/artifacts, configure a separate private folder with the required app property and set this repository's `DRIVE_FOLDER_ID` explicitly. Review `storage.py` and `setup_accounts.py` before using another channel/account.
+- Set `AUTOMATION_ENABLED=true` for daily generation and `PUBLISH_ENABLED=true` for uploads only when these repository credentials are ready. Existing repository variable values still apply after merging; they are not reset by this migration.
+- Use **Verify Google connections** first, then manually generate a fresh run ID and review the result. The same reference long-video/Shorts generation and publishing workflows are included. No live generation or YouTube upload is performed by this code migration.
+- Install `requirements.txt` and run `python -m unittest -v` for component verification. Full model inference additionally requires the pinned CPU dependencies, model downloads and FFmpeg documented below.
 
-Use **Ghibli long private video test** in Actions.
-Preparation generates narration and measures the real duration before generating
-images. Runs outside 600–900 seconds stop before image generation or upload.
-The global shot plan is computed from measured narration; twenty CPU workers
-generate distinct story images and exact-duration silent clips. Each worker
-stores outputs privately in Drive. Final assembly combines continuous narration,
-music, transitions and captions, validates every clip's duration and decodes the
-complete 1080p MP4 with strict FFmpeg error handling.
+The original reference README follows; its project names, channel branding and behavior are retained intentionally. Any reference to account setup targeting `Asif-Rezan/dudi_dam_tv` below is superseded by the destination above.
 
-Model generation stages have no Google credentials in their environment.
-Separate storage/upload steps receive the existing OAuth secrets.
-The upload checks the expected channel, stores an upload-started checkpoint,
-uploads privately, sets a custom thumbnail and waits for YouTube processing.
-The final readback verifies the actual video's channel, private visibility,
-HD status, title, description and tags.
+---
 
-## Configuration and daily readiness
+# Dudi Dam TV — kids rhyme video automation
 
-Set GitHub Actions secrets directly; do not commit real credentials:
-- DRIVE_TOKEN_JSON: authorized Google OAuth JSON. The owner-only workflow
-  folder is automatically discovered; DRIVE_FOLDER_ID is optional.
-- YOUTUBE_TOKEN_JSON: authorized Google OAuth JSON with upload/read access
-  for Rezan Relaxation. Private daily uploads reuse the existing upload/read OAuth permissions.
-  Scheduled publishing requires youtube.force-ssl authorization.
-  The expected channel ID is UCztvMrNCT34DO3DtzLPgWaw.
-- No external text API credentials are required. Pinned Qwen Q4_K_M weights run locally through llama.cpp.
+Copied from [Heart-and-Mind](https://github.com/Asif-Rezan/Heart-and-Mind) at `0fca9240b5edf786f09a806401a62dcc386eb0f6`. The first repository commit is the unchanged copy. The kids adaptation retains pinned CPU music/image inference, resumable artifacts, Google account setup, verified YouTube publishing and exact-file Drive cleanup.
 
-IMAGE_BACKEND=cpu, TTS_BACKEND=kokoro, CAPTION_BACKEND=cpu and
-MUSIC_BACKEND=magenta are free-model defaults. See .env.example.
+## Current behavior
 
-The daily parallel workflow has its own private-verification path. Legacy
-`workflow.py daily` retains its private-test gate. A fixed test story cannot be
-used for fresh daily generation. OAuth credentials must remain valid for
-unattended operation; resolve OAuth Testing refresh-token expiry before relying
-on long-term scheduling. The 01:00 Asia/Dhaka start corresponds to 19:00 UTC
-on the previous calendar day; GitHub can delay scheduled starts.
+- Default: 600 seconds. Set `VIDEO_DURATION_SECONDS` to 480–720 in five-second steps.
+- Sweet adult female singing voice requested, original AI-written English verses alternating with **dudi dudi dam dam dudi dudi dam**. This phrase is a sung refrain, not musical chord notation.
+- The first lyrics job runs the pinned local Qwen3-4B CPU model to write a fresh adventure outline, new English verses, and matching visual descriptions. Only the Dudi refrain is fixed. There is no template fallback. Each run ID uses a different generation seed.
+- A new SSD-1B cartoon illustration for every five seconds (96–144 images), plus a thumbnail. Sixteen image workers split generation and checkpoint each completed image.
+- ACE-Step generates separate sections up to 120 seconds, then FFmpeg joins them. Music is not looped or padded. Short or incorrectly sized sections fail. Section joins and voice/character consistency need listening/viewing review.
+- A 30-second excerpt of the user-supplied MP3 is included at `assets/reference/style-reference.mp3`; the full original is not committed. The pinned API exposes `reference_audio`. Inference receives the excerpt for style conditioning; actual influence and singing quality require a model run. Set `REFERENCE_AUDIO_PATH` to a different local file or leave unset to generate without conditioning. Use reference material you have permission to use.
+- Storyboard lyrics drive image actions and the pictures change exactly every five seconds. Singing is generative: this is planned timing, **not forced alignment or transcription**. Precise word-level synchronization is not yet implemented.
 
-The standard workflow.py test/daily commands use the same long-video renderer.
-The parallel test workflow is the recommended new-format integration test.
-Older fixture workflows are historical and do not demonstrate this format.
+## Generate before connecting Google
 
-## Reliability and verification
+Run **Dudi Dam TV kids rhyme generation** from GitHub Actions with a new `run_id`. The lyrics job checks and reserves lyric originality in private Drive history; connected Drive credentials are required for the production workflow. Local generation without history can run without Google credentials. Download `kids-video-RUN_NUMBER` for the MP4, thumbnail and song/storyboard JSON. Generation is computationally expensive and has not yet been verified end to end on Actions. Existing model revisions and CPU dependencies come from the reference; 120-second sections reload the model for bounded worker isolation. Model memory/time limits may require a larger runner.
 
-Completed or ambiguous upload checkpoints prevent duplicate insertion.
-Resumable chunks retry transient transfer failures. Ambiguous uploads require
-reconciliation instead of repeating videos.insert. The daily workflow concurrency group prevents overlapping daily runs; image
-workers use separate keys. Do not run legacy private-test workflows concurrently
-with daily runs because they share the upload history.
-Exact story hashes and history guard repeated scripts.
+Automatic scheduling is off unless repository variable `AUTOMATION_ENABLED=true`. Publishing requires `PUBLISH_ENABLED=true`. The scheduled time inherited from the reference is 03:00 Asia/Dhaka. The workflow defaults to 600 seconds; adjust `VIDEO_DURATION_SECONDS` in its workflow-level env for other durations.
 
-Component checks cover private storage/quota rules, speech chunking,
-caption bounds, story validation, real 1080p rendering, the global shot plan and
-an actual image change across a seven-second boundary. These checks run locally and in GitHub Actions. They do not replace the full private-video upload test.
+For local AI lyric writing (downloads the pinned Qwen GGUF model):
 
-## Model documentation
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+pip install -r requirements-lyrics.txt
+python prepare_music.py --run-id first-rhyme --stage lyrics
+```
 
-- https://huggingface.co/Lykon/dreamshaper-8 (CreativeML OpenRAIL-M)
-- https://huggingface.co/hexgrad/Kokoro-82M (Apache-2.0)
-- https://github.com/magenta/magenta-js (Apache-2.0)
-- https://developers.google.com/youtube/v3/guides/uploading_a_video
-- https://docs.github.com/en/billing/concepts/product-billing/github-actions
+Image preparation also requires CPU PyTorch and `requirements-images-cpu.txt`. Music preparation needs CPU torch/torchaudio, `requirements-music-cpu.txt` and ACE-Step source at revision `ca1e85fe9430179831e6bc6be790c332190a3866` in `.vendor/ace-step`. See the workflow for exact installation. Install FFmpeg for audio joining and video rendering.
 
-## Daily financial storytelling publishing
+## Connect later
 
-`.github/workflows/daily-upload.yml` starts at **01:00 Asia/Dhaka** daily
-(`0 19 * * *` UTC), and supports manual dispatch.
-GitHub may delay scheduled starts. The workflow must be on the default branch,
-with Actions and scheduled workflows enabled. Existing secrets are reused:
-`DRIVE_TOKEN_JSON`, `DRIVE_FOLDER_ID`, `YOUTUBE_TOKEN_JSON`.
-The configured destination remains channel `UCztvMrNCT34DO3DtzLPgWaw`.
+1. Configure a Google Cloud OAuth client with YouTube Data API v3 and Google Drive API enabled.
+2. Use `python setup_accounts.py --help` for the inherited account setup commands targeting `Asif-Rezan/dudi_dam_tv`. Drive remains restricted to the account in `storage.py`; update it deliberately if using another owner.
+3. Add secrets `YOUTUBE_TOKEN_JSON`, `EXPECTED_CHANNEL_ID`, `DRIVE_TOKEN_JSON`, `DRIVE_FOLDER_ID`. Create a new Dudi Dam TV Drive folder with the `dudi_dam_tv_root=v1` application property via setup; do not reuse the reference channel folder.
+4. After reviewing a downloaded preview, set `PUBLISH_ENABLED=true`. Uploads declare `selfDeclaredMadeForKids=true`; the configured channel ID must match. Drive stores the scene sources/manifests as `storyboard.tar.gz`, and cleanup removes media only after verified public HD publication.
 
-The existing twenty CPU image workers, exact seven-second narration timeline,
-10–15 minute validation, local narration, original music, captions and thumbnail
-pipeline are reused. Fresh local-model stories cover financial growth, money
-psychology, saving and investing habits, business decisions, moral parables and
-everyday money mistakes. Historical documentaries require verified source material;
-without it, generation uses clearly labelled fiction. Prior titles are included
-in planning and exact story hashes prevent duplicate uploads. The planner rotates
-financial story formats (decision drama, business postmortem, money psychology,
-family tradeoff, everyday mistake, and two-path comparison), records each format
-in upload history, and rejects a format used in either of the last two uploads or
-a near-duplicate recent title. Each script must have its own central problem,
-setting, relationships, turning points, and resolution. Review the finished private
-video before public release: automated variety checks cannot guarantee YouTube
-monetization eligibility.
+Google OAuth and the dedicated Drive folder can be checked with the **Verify Google connections** workflow. This only verifies identity, folder privacy and refresh tokens; it does not upload videos. No finished music/video is claimed until inference succeeds and the result is reviewed.
 
-Uploads remain **private**. `daily_publish.py` reads back the exact video ID,
-channel, title, tags, complete description, successful processing and HD
-definition, requires confirmed thumbnail upload, and verifies private visibility
-before deletion. It sets the AI disclosure and schedules the first 06:00 New York at least 24 hours after upload completion.
-Failed, incomplete, ambiguous, or unverified uploads retain all Drive assets.
+## Verification
 
-Disposable media created by this daily workflow receive run-specific Drive
-appProperties. Cleanup persists an ID manifest, then rechecks each file's run,
-workflow-key hash, parent folder, private ownership, and explicit disposable name
-before permanent deletion. It never deletes folders, unrelated files, older
-untagged runs, story/state records, history, hashes, configuration or credentials.
-Preparation audio, scene images/clips/QA, final music, captions, thumbnail, video
-and plan are disposable. Deletion is permanent and recovers storage space.
+`python -m unittest -v` covers duration boundaries, complete contiguous storyboards, cache/shard coverage, missing scene failures, rendering arguments and inherited guarded Drive cleanup. Original reference tests remain in `reference_tests/` as historical specifications; their adult-music assumptions do not describe this adaptation.
 
-Cleanup retries transient failures and records each completed deletion. A 404 on
-an already journaled ID is safe. If private verification or cleanup fails, rerun only the
-failed `publish-cleanup` job, or manually dispatch with `cleanup_run` set to its
-`daily-<GitHub run ID>`. That mode skips all generation/upload jobs, rechecks the
-existing video and resumes cleanup without calling `videos.insert` again.
-Never rerun all jobs to recover an ambiguous upload; reconcile its persisted
-state first. Daily uploads use the existing durable pre-insert state guard.
+## Upload details and scheduling
 
-Validation: `python -m unittest -v` includes deletion-safety, idempotency,
-missing-verification, wrong-channel and essential-data preservation tests.
+The workflow dispatch form exposes `upload_mode` (`public` or `scheduled`), `publish_at`, `video_language`, `audio_language`, and `category_id`. Scheduled times must include a timezone (for example `2026-11-01T18:00:00+06:00`) and still be in the future when the upload starts. Allow enough time for generation. With an explicit timestamp, a scheduled upload is private with `publishAt` set; it is verified as scheduled after HD processing. Reusing its run ID checks the same upload rather than creating another one.
 
-Daily readiness checks validate existing upload/read access before model generation.
-Review the **Google OAuth check** Actions run after changing credentials.
+`upload_settings.json` stores explicit defaults for English metadata/audio, Music category (10), made for kids, AI disclosure, standard YouTube license, embedding, public statistics, subscriber notifications, and no paid placement. The kids and AI disclosures are enforced for this pipeline. Title, description, tags and thumbnail come from the generated song artifact. Review/edit that artifact before publishing if needed. Comments, cards/end screens and some other Studio-only features are subject to made-for-kids restrictions and are not exposed by this uploader.
 
-## One-time private tests
-
-Use Actions > Daily financial storytelling publishing > Run workflow, leaving
-`cleanup_run` blank. Updating `.github/workflows/private-video-trigger.txt` on
-main also starts a single fresh private test. Neither method changes the daily 01:00 Asia/Dhaka schedule. The existing OAuth token supports private upload; the
-optional `authorize_youtube.py` helper is unnecessary for private-only operation.
-
-### Recovering Drive checkpoint timeouts
-
-Small JSON checkpoint saves use non-resumable uploads with bounded backoff for
-network timeouts, connection failures, rate limits and temporary server errors.
-Each write retries against a fixed file ID. New checkpoints preallocate their
-ID so an ambiguous successful create cannot create duplicates on retry. A create
-conflict is accepted only when the saved JSON matches the intended checkpoint.
-Cleanup journals checkpoint every ten deletions and once at completion, reducing
-Drive requests. If interrupted between checkpoints, already-deleted manifest IDs
-return 404 and are safely recorded on the next attempt.
-
-Use **Resume verified private video cleanup** to recover a completed run without
-any video generation or `videos.insert` call. Enter its original `daily-<run ID>`.
-The cleanup worker rechecks private visibility, successful HD processing and
-exact metadata before resuming. The daily 01:00 Asia/Dhaka schedule is unchanged.
+Scheduled media is retained on Drive. After its release, rerun the same publishing identity to verify public HD status before cleanup. OAuth Production status removes testing-mode token expiry; it does not guarantee that Google will never revoke a refresh token. Actual upload acceptance/public visibility is always checked rather than assumed from OAuth status.
 
 
-## Reference style without repeated scenes
+## Daily 6 AM New York releases
 
-The reference supplies the established 2D editorial style description without
-copying its cool palette. SSD-1B generates each narrated composition from
-fresh noise using the shot-specific prompt and seed. The reference is never
-passed as an img2img starting image, so its office layout is not reused for
-other actions and settings. This is text style guidance, not a learned style
-adapter or pixel-level style transfer; visual consistency still needs review.
-Both images and thumbnails remain 1024×576, 16 steps, guidance 9.0, with a new
-video image every seven seconds. These are now 16 full text-to-image steps,
-so a render can take longer than the old 0.35-strength composition copy.
-Old img2img checkpoints are invalidated by reference-mode metadata.
-The manual style preview renders three different narrated situations in parallel
-and saves images plus per-scene settings for visual review.
+Daily generation starts at 21:00 UTC (03:00 Asia/Dhaka). Once each video finishes uploading, it is scheduled for the first **06:00 America/New_York** slot at least **72 elapsed hours after upload completion**. New York daylight saving changes are handled by the IANA timezone database. The actual wait is 72 hours up to the next qualifying 6 AM slot (normally less than 96 hours). There is an initial three-plus-day buffer before the first release; generation failures/delays can leave gaps.
+
+The default upload is private without a publication timestamp. After YouTube returns its video ID, the pipeline records upload completion, computes and saves the target, then updates YouTube `status.publishAt`. Retry attempts reuse the saved target rather than delaying it again. This step needs `youtube.force-ssl` authorization in addition to the existing upload/read scopes. Default workflow mode is `scheduled` and `publish_at` is empty, so both daily and manual runs follow this policy unless explicitly overridden. `AUTOMATION_ENABLED=true` enables daily generation and `PUBLISH_ENABLED=true` enables uploading.
+
+
+## Animated picture treatment
+
+Every five-second lyric scene now has continuous 25 fps camera motion: gentle alternating horizontal pan, a slow push-in, a small rhythmic pulse and vertical sway. Translucent bubbles drift independently along the edges for foreground depth. A 0.28-second dissolve uses the previous scene's actual final frame, so scene changes do not add time or shift the soundtrack. The original song is muxed once after the silent clips are joined.
+
+This gives still illustrations a lively storybook presentation; it does not rig character limbs or lip-sync mouths. Motion follows the requested 100 BPM arrangement as a visual guide, not measured audio beats. Full videos remain 1920×1080 and 8–12 minutes, with a new illustration every five seconds. Rendering is split into small clips to bound memory. `render-state.json` fingerprints the renderer version and inputs so an old static video is regenerated automatically.
+
+For a local short preview without model inference or publishing, run `python preview_motion.py image1.png image2.png --audio song.wav --output output/motion-preview.mp4`. Preview images/audio are supplied locally and are never used as a production fallback.
+
+
+## Fresh AI lyrics on each new run
+
+`rhyme_writer.py` calls the pinned Qwen CPU model first for an original episode outline/title/description, then for new five-second verse lines and corresponding scene actions in chapters up to two minutes long. A 10-minute episode has 60 original lines alternating with 60 fixed Dudi refrain lines. Drafts checkpoint after the outline and each chapter; retries with the same run ID resume that story. Use a new run ID to request a new song.
+
+Normalized verse lines and four-word phrase overlap are checked against `lyrics-history.json` in the private Drive folder, excluding the shared refrain. New lyric identities are reserved before music/image jobs start, including scheduled or unfinished episodes. Repeated or overly similar verses trigger rewriting, then failure if the bounded retries cannot produce a valid result. This is a practical duplicate check, not a guarantee that every possible phrase is globally unique. The workflow installs `requirements-lyrics.txt` and allows 90 minutes for CPU writing; it never substitutes the former template verses on model failure.
+
+Overlong generated titles and descriptions are shortened at word/sentence boundaries before schema validation. Sung lyrics and scene actions are never truncated. Invalid content receives up to three attempts with the failed constraint and actual length supplied to the model. Failure artifacts include an initial draft and `failure.json` with safe error codes and diagnostics, allowing inspection or checkpoint resumption without exposing credentials.
+
+Verse validation keeps accepted lines and requests only missing replacements, with word-count and duplicate feedback. Up to six repair requests are allowed per chapter per invocation. Partial chapters checkpoint after each response; resuming the same identity preserves accepted lines and advances repair seeds. Exhaustion records `lyrics_verse_validation` with chapter, accepted/required counts and rejection reasons; lyrics are never truncated or replaced with templates.
+
+## Recover a finished upload
+
+Use **Recover finished video publication** with the original GitHub run number and song run ID. It restores music, scene sources, the finished MP4 and render fingerprints, verifies them, then resumes the original Drive/YouTube checkpoint without generating or uploading another video. Publication logs expose exact local guard failures without API bodies. If YouTube omits the synthetic-media readback, the publisher explicitly updates the existing video disclosure while preserving live visibility and schedule, and records a successful write receipt bound to that video. An explicit false readback still fails verification.
+
+## Lyric-led cartoon variety
+
+New episodes choose a story-specific cast (animals, friendly vehicles or gentle fantasy creatures), setting, props and pastel palette instead of always using a yellow duckling and white bunny. The cast description stays consistent within that episode. Each image prompt starts with the lyric-specific action, followed by the episode cast/world and the existing cute 3D storybook style. Recent visual identities are saved alongside lyric history to guide variety in future outlines. This guides the image model; exact character consistency and visual uniqueness still depend on its output.
+
+Use a new `run_id` for this writer version. Finished songs and old storyboards keep their existing lyrics and cast; old writer drafts require a fresh run ID.
+
+Visual planning prose (`characters` and `visual_world`) is normalized at word/sentence boundaries before schema validation, just like titles and descriptions. The saved normalized identity is used for every chapter; sung lyrics and scene actions are never truncated. Character/world limits are 320/240 characters, explicitly included in the outline instructions. Retryable model/schema failures receive up to three request rounds with different seeds, each retaining the existing three validation attempts. Completed chapters and accepted verse lines remain checkpointed. Permanent failures still report safe diagnostics and preserve recovery artifacts instead of publishing invalid content.
+
+## Shorts with native portrait illustrations
+
+Every new generation starts **16 landscape image shards plus 4 separate portrait image shards**, all after lyrics are ready. The portrait shards generate only the eight five-second scenes needed for the default first 40 seconds, at native 576×1024 (9:16). They use the same lyric scene actions and episode character descriptions with vertical composition instructions and separate seeds. Landscape scenes and portrait scenes have separate folders and resumable manifests.
+
+After the long-video, portrait and Shorts music jobs finish, the Shorts workflow animates those portrait images full-screen at 1080×1920 using the existing storybook motion renderer. It uses separately synthesized Shorts audio from `short-audio/clip-START-DURATION/song.wav`. No blurred landscape filler is used. Missing, corrupt or non-9:16 portrait illustrations stop export instead of silently restoring the old layout. Selected lyrics are reused; portrait images and Shorts music are generated separately.
+
+The Short follows the parent's public/scheduled mode. Scheduled remains the default: the existing first 6AM New York slot at least 72 hours after upload. `PUBLISH_ENABLED=true` is required to upload; otherwise a downloadable preview is saved. Kids/AI disclosures remain enabled. The long-video custom-thumbnail upload is skipped for Shorts.
+
+For an older finished video, run **Create and publish a rhyme Short** with its GitHub `source_run` and original song `run_id`. Its `kids-video-SOURCE_RUN` artifact must still be available (seven-day retention). This standalone workflow starts four portrait image shards and one independent music job in parallel. Choose start 0, 10, 20, etc. and duration 20, 30, 40 or 50 seconds. Automatic calls reuse the already prepared portrait shards, avoiding a second generation.
+
+Portrait publication checkpoints use `shorts/RUN_ID/music-portrait-clip-START-DURATION/state.json`, separate from the previous blurred-layout Short. Existing scheduled/uploaded Shorts are not replaced or deleted by this change. Repeating a portrait request with the same inputs resumes its upload; a changed source is refused under that same identity. Unknown upload outcomes require reconciliation rather than risking a duplicate. Private Drive checkpoints remain outside long-video media cleanup.
+
+For a local export, supply `output/RUN_ID/song.json`, `short-audio/clip-START-DURATION/song.wav` and `portrait/scene-NNN-source.png` for the selected range, then run `python shorts.py --run-id RUN_ID --start 0 --seconds 40`. Source/output hashes and a full video/audio decode validate the export before upload. `rhyme-short-*` artifacts contain the finished Short; `short-publication-*` contain publication checkpoints; `short-artwork-*` contain native portrait images and generation manifests.
+
+## Fixed public title, description and blank tags
+
+All new YouTube uploads, including Shorts, use the exact owner-supplied title and description in `upload_metadata.json`. Tags are always `[]`. The description is sent verbatim: no automatic credit line, extra hashtags, or `#Shorts` suffix is added. The fixed title is 97 characters and the description is 3213 characters. Internal story titles/descriptions remain available for lyric planning, novelty checks, and source identification; they are not selected as public metadata. This avoids breaking saved storyboards or treating every song as a duplicate because the public title is shared.
+
+The previous metadata selection is commented out in `pipeline.publish` and `shorts.short_metadata`. To restore story-based metadata, restore the two commented assignment lines in `pipeline.publish` instead of the fixed metadata assignments; in `shorts.short_metadata`, restore the commented return block instead of `fixed_metadata()`. Keep the existing settings, upload checkpointing, disclosures, and verification intact. The original `kids_rhymes.upload_description` and `metadata_tags` helpers remain available.
+
+This selection applies when starting a new upload. Existing uploaded/scheduled video IDs keep their checkpointed metadata, so resuming an upload does not silently change a live video's title or description. Updating existing YouTube videos requires a separate explicit metadata update. No existing video is edited by this code change.
+
+Shorts title override: new Shorts use `shorts_title` in `upload_metadata.json`: `Dudi dudi dum dum 🍼😻#shorts #shortsfeed #dudidudidam`. Long videos retain the fixed `title`. Both formats keep the same fixed description and empty tags. The Shorts publisher explicitly selects the Shorts metadata variant before upload.
+
+## Independent Shorts music
+
+The `short_music` job starts immediately after lyrics, alongside long-form music, the 16 landscape image shards and the 4 portrait image shards. It uses the pinned ACE-Step CPU runtime to synthesize a fresh 40-second female-vocal dance arrangement using the selected eight storyboard lines; no audio is cut from the long video. The audio reference continues to provide the existing channel style. New instrumentation/melody is model-generated and not guaranteed to differ in every detail. The renderer uses that new audio starting at its beginning; `clip_start` selects lyrics/images, not an offset inside the new music.
+
+Music requests and progress are checkpointed separately under `output/RUN_ID/short-audio/clip-START-DURATION/`. Saved outputs are fingerprinted and duration-checked. Too-short results get up to three attempts; no looping/padding is used. `short-music-*` artifacts carry the new audio and checkpoints. Automatic Shorts reuse the prepared music; manual Shorts requests launch their own music job in parallel with portrait generation. New portrait/music uploads use a separate checkpoint namespace so existing uploaded Shorts are not overwritten.
+
+Parallel jobs reduce serial waiting, but runner limits can queue jobs and synthesis time still varies. Workflows already started use their original commit; this change applies to newly started workflows.
+
+## Recover a Shorts scheduling failure
+
+New uploads wait for YouTube processing readiness before automatic scheduling, then confirm the exact frozen timestamp by readback. Temporary server/rate errors and a recent, owned private upload's generic 403 receive bounded readiness retries. Named permission/quota failures, wrong ownership, rejected processing, and changed visibility stop with the original video ID retained. Retries never insert another video or report an unconfirmed schedule as complete.
+
+For an already uploaded Short whose schedule/verification failed, run **Recover existing Shorts publication** with the failed workflow's `source_run` and original song `run_id`. It loads `short-publication-SOURCE_RUN`, requires the same uploaded video ID and source fingerprint in private Drive, and resumes only that existing video. It does not generate images, audio or video. Checkpoints are saved even if recovery fails. YouTube permission changes or service failures cannot be guaranteed away; permanent failures require resolving the reported account/service condition.
