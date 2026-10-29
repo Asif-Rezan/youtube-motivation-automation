@@ -1,3 +1,7 @@
+## Facebook Page cross-posting
+
+Facebook integration setup and recovery: [docs/facebook-publishing.md](docs/facebook-publishing.md). The destination is Rezan Relaxation (`297892583408910`). Existing YouTube generation/upload remains active; Facebook requires its own Page authorization and `FACEBOOK_PAGE_ACCESS_TOKEN` secret. Facebook is enabled independently with `FACEBOOK_PUBLISH_ENABLED=true` after the authorized live test. Do not treat the code installation as a completed Meta connection.
+
 ## Automatic upload restored for the existing channel
 
 The existing destination is `UCztvMrNCT34DO3DtzLPgWaw`, preserved from the archived Ancient Humans workflow. All active workflows resolve `EXPECTED_CHANNEL_ID` from an existing secret, then an optional repository variable, then that original channel ID. The uploader still verifies that OAuth belongs to this exact destination. No new OAuth token is required for this migration.

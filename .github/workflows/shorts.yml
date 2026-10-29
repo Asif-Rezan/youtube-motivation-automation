@@ -51,6 +51,8 @@ on:
         default: scheduled
     # Preview rendering needs artifacts only; publication validates secrets at runtime.
     secrets:
+      FACEBOOK_PAGE_ACCESS_TOKEN:
+        required: false
       YOUTUBE_TOKEN_JSON:
         required: false
       EXPECTED_CHANNEL_ID:
@@ -232,6 +234,8 @@ jobs:
           cache: pip
       - name: Validate publication credentials
         env:
+          FACEBOOK_PUBLISH_ENABLED: ${{ vars.FACEBOOK_PUBLISH_ENABLED }}
+          FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
           PUBLISH_ENABLED: ${{ vars.PUBLISH_ENABLED }}
         run: python validate_publication_config.py
       - name: Validate source and clip identity
@@ -281,6 +285,11 @@ jobs:
       - name: Publish or verify the same Short
         if: vars.PUBLISH_ENABLED == 'true'
         run: python -u shorts.py --run-id "$SONG_RUN_ID" --start "$CLIP_START" --seconds "$CLIP_SECONDS" --publish
+      - name: Schedule the same episode on Rezan Relaxation
+        if: vars.FACEBOOK_PUBLISH_ENABLED == 'true'
+        env:
+          FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+        run: python -u facebook_publish.py --run-id "$SONG_RUN_ID" --kind short
       - uses: actions/upload-artifact@v4
         if: always()
         with:
