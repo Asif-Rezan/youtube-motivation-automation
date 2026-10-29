@@ -11,13 +11,18 @@ on:
         description: 'Optional completed daily run ID: retry private verification and cleanup only'
         type: string
         default: ''
+      resume_run:
+        description: 'Optional unuploaded daily run ID: resume its saved story checkpoints and matching clips'
+        type: string
+        default: ''
 permissions:
   contents: read
 concurrency:
   group: youtube-daily-financial
   cancel-in-progress: false
 env:
-  SAVED_RUN_ID: ${{ inputs.cleanup_run || format('daily-{0}', github.run_id) }}
+  SAVED_RUN_ID: ${{ inputs.cleanup_run || inputs.resume_run || format('daily-{0}', github.run_id) }}
+  RESUME_DAILY_RUN: ${{ inputs.resume_run || '' }}
   RUN_SCOPED_CLEANUP: 'true'
   CONTENT_TYPE: human-history
   OUTPUT_DIR: output/ghibli-long-test

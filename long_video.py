@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 import os
+import re
 from pathlib import Path
 import sys
 from zoneinfo import ZoneInfo
@@ -21,6 +22,9 @@ MAX_NATURAL_TEMPO = 1.04
 
 
 def run_id():
+    resume = os.getenv('RESUME_DAILY_RUN')
+    if resume and (not re.fullmatch(r'daily-\d+', resume) or os.getenv('SAVED_RUN_ID') != resume):
+        raise ValueError('Resume requires the exact original daily run ID')
     return os.getenv('SAVED_RUN_ID') or (dt.datetime.now(ZoneInfo('Asia/Dhaka')).strftime('%Y-%m-%d-%H%M%S')+'-improved-story')
 
 

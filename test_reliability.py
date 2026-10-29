@@ -243,3 +243,14 @@ class CleanupFinalizationRecoveryTests(unittest.TestCase):
         finalizer.assert_called_once()
         cleanup.assert_called_once()
         client.videos().insert.assert_not_called()
+
+
+class ResumeIdentityTests(unittest.TestCase):
+    def test_resume_rejects_wrong_or_mismatched_run_identity(self):
+        import long_video
+        for requested, saved in [('daily-123', 'daily-456'), ('not-a-daily-run', 'not-a-daily-run')]:
+            with patch.dict('os.environ', {'RESUME_DAILY_RUN': requested, 'SAVED_RUN_ID': saved}):
+                with self.assertRaisesRegex(ValueError, 'exact original'):
+                    long_video.run_id()
+        with patch.dict('os.environ', {'RESUME_DAILY_RUN': 'daily-123', 'SAVED_RUN_ID': 'daily-123'}):
+            self.assertEqual(long_video.run_id(), 'daily-123')

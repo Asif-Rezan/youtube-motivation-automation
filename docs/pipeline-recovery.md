@@ -6,6 +6,10 @@ updates, AI disclosure, scheduling and processing checks use this handling.
 Permission denial, expired/revoked credentials, exhausted daily quota, disk-full,
 unsafe content and invalid metadata are not treated as transient network faults.
 
+The daily workflow supports `resume_run=daily-NUMBER` for an unuploaded run, using
+its exact checkpoint identity with the latest code. Use `cleanup_run` for a known
+uploaded video instead. Published/ambiguous upload states are never regenerated.
+
 Script generation saves the outline and each completed narration batch privately
 under its original run. Metadata formatting and length recovery stays within the
 1000–2000-character description contract. A transient stage retry resumes valid

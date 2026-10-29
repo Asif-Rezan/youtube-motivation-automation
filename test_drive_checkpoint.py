@@ -78,3 +78,19 @@ class CheckpointTests(unittest.TestCase):
             'appProperties': {'workflow_key': workflow.hashlib.sha256(b'asset').hexdigest()}}
         self.store.put('asset', object(), 123)
         self.assertEqual(self.store.client.files().create().execute.call_count, 1)
+
+
+class SSLCheckpointRecoveryTests(unittest.TestCase):
+    def setUp(self):
+        CheckpointTests.setUp(self)
+
+    def test_ssl_eof_retries_checkpoint_update_with_same_id(self):
+        import ssl
+        execute = self.store.client.files().update().execute
+        execute.side_effect = [ssl.SSLEOFError('temporary TLS interruption'), {}]
+        self.store.client.files().update.reset_mock()
+        self.store.save('runs/daily-123/story-draft.json', {'chapters_complete': 5})
+        self.assertEqual(execute.call_count, 2)
+        for call in self.store.client.files().update.call_args_list:
+            self.assertEqual(call.kwargs['fileId'], 'existing-id')
+        self.store.client.files().create.assert_not_called()

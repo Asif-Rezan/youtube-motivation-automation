@@ -1,5 +1,5 @@
 """Cloud rendering and private upload helpers; daily_publish verifies and publishes daily runs."""
-from reliability import api_execute, retry, ProcessingPending
+from reliability import api_execute, retry, ProcessingPending, transient as is_transient
 import argparse
 import datetime as dt
 import hashlib
@@ -469,7 +469,7 @@ class Store:
                 return self.client.files().update(fileId=file_id, media_body=media, fields='id').execute(num_retries=3)
             except Exception as error:
                 status = getattr(getattr(error, 'resp', None), 'status', None)
-                if creating and (status == 409 or isinstance(error, (TimeoutError, ConnectionError))):
+                if creating and (status == 409 or is_transient(error)):
                     # A timed-out create may already have completed. Never allocate a second ID.
                     try:
                         info = self.client.files().get(fileId=file_id, fields='id,size,parents,appProperties').execute(num_retries=3)
@@ -482,8 +482,7 @@ class Store:
                             raise RuntimeError('Media upload conflict requires reconciliation') from error
                     if status == 409:
                         raise RuntimeError('Media upload conflict requires reconciliation') from error
-                transient = isinstance(error, (TimeoutError, ConnectionError)) or status in (408, 429, 500, 502, 503, 504)
-                if not transient or attempt == 4:
+                if not is_transient(error) or attempt == 4:
                     raise
                 print(json.dumps({'check': 'Drive media upload', 'retry': attempt + 1,
                     'error_type': type(error).__name__}), flush=True)
@@ -519,8 +518,7 @@ class Store:
                     if json.loads(api_execute(self.client.files().get_media(fileId=file_id))) == value:
                         return
                     raise RuntimeError('Checkpoint creation conflict; refusing to overwrite') from None
-                transient = isinstance(error, (TimeoutError, ConnectionError)) or status in (408, 429, 500, 502, 503, 504)
-                if not transient or attempt == 4:
+                if not is_transient(error) or attempt == 4:
                     raise
                 print(json.dumps({'check': 'Drive checkpoint save', 'retry': attempt+1,
                     'error_type': type(error).__name__}), flush=True)
