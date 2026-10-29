@@ -1,3 +1,5 @@
+> Current policy: descriptions are now 1000–2000 characters including hashtags (target 1400–1800). The older 3500–4500 bounds below describe the original failure, not current settings. Completed narration is checkpointed privately per run.
+
 # Metadata JSON recovery — run 40640621158
 
 The run completed one outline request and all four narration batches, then failed

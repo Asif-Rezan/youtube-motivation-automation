@@ -2,6 +2,10 @@
 import json
 import re
 
+DESCRIPTION_MIN = 1000
+DESCRIPTION_MAX = 2000
+DESCRIPTION_TARGET = 1800
+
 METADATA_BRIEF = '''Write English YouTube metadata for the COMPLETED Ancient Humans explainer below.
 Use only topics, mechanisms and claims actually covered in its narration. This is editorial SEO,
 not verified search-volume research: never claim a keyword is trending, low competition or guaranteed to rank.
@@ -11,11 +15,11 @@ Include Ancient Humans (preferred) or Humans naturally, once, toward the beginni
 Combine the central searchable topic with a concrete question, constraint or consequence.
 No keyword chains, hashtags, emojis, ALL-CAPS title, invented discoveries or unsupported superlatives.
 
-DESCRIPTION: Write a detailed, unique description targeting 4000–4400 characters, including spaces and hashtags.
-The requested 1000–3000 words cannot fit YouTube's 5000-character field; prioritize useful script-grounded detail within this hard character budget. Do not return a one-sentence summary.
+DESCRIPTION: Write a detailed, unique description targeting 1400–1800 characters, strictly within 1000–2000 characters, including spaces and hashtags.
+Do not return a one-sentence summary.
 Open with two strong sentences: identify the specific question and viewer payoff, naturally including
 Ancient Humans and the episode's primary topic within the first two lines.
-Then explain the actual scope in several readable paragraphs, integrating 10–18 genuinely relevant related
+Then explain the actual scope in one concise paragraph, integrating 3–6 genuinely relevant related
 terms naturally; choose them from the script rather than inserting every possible history keyword.
 Add an 'In this video:' section with 3–5 short bullets describing distinct questions or mechanisms covered.
 Include one concise sentence distinguishing archaeological evidence, inference and illustrative reconstructions.
@@ -165,7 +169,7 @@ def repair_topic_tags(data, story):
 
 def build_metadata_schema(schema):
     return schema({'title': {'type': 'string', 'maxLength': 85},
-                   'description': {'type': 'string', 'minLength': 3500, 'maxLength': 4500},
+                   'description': {'type': 'string', 'minLength': DESCRIPTION_MIN, 'maxLength': DESCRIPTION_MAX},
                    'tags': {'type': 'array', 'minItems': 8, 'maxItems': 18,
                             'items': {'type': 'string', 'minLength': 1, 'maxLength': 48}}})
 
@@ -182,12 +186,54 @@ def build_metadata_request_schema(schema):
     return schema(properties)
 
 
+def repair_description_length(data, story):
+    """Fit useful episode copy to its budget without inventing or repeating facts."""
+    description = data.get('description')
+    if not isinstance(description, str) or not description.strip():
+        return data
+    if DESCRIPTION_MIN <= len(description) <= DESCRIPTION_MAX:
+        return data
+    lines = description.strip().splitlines()
+    if not _valid_hashtag_line(lines[-1]):
+        return data  # Footer repair precedes length repair.
+    footer = lines.pop()
+    body = '\n'.join(lines).strip()
+    budget = DESCRIPTION_TARGET - len(footer) - 2
+    if len(description) > DESCRIPTION_MAX:
+        endings = [match.end() for match in re.finditer(r'[.!?](?=\s|$)', body[:budget+1])
+                   if match.end() + len(footer) + 2 >= DESCRIPTION_MIN]
+        if not endings:
+            return data  # Ask for a bounded editorial rewrite rather than cut a sentence.
+        body = body[:endings[-1]].rstrip()
+    else:
+        # Only use complete statements from this episode's already-written narration.
+        additions = []
+        seen = set()
+        for scene in story.get('scenes', []):
+            for sentence in re.split(r'(?<=[.!?])\s+', scene.get('narration', '')):
+                sentence = ' '.join(sentence.split())
+                key = sentence.casefold()
+                if (not 40 <= len(sentence) <= 350 or not sentence.endswith(('.', '!', '?'))
+                    or key in seen or key in body.casefold()
+                    or re.search(r'\b(subscribe|leave a comment|like this video)\b', sentence, re.I)):
+                    continue
+                candidate = body + '\n\nMore explored in this episode:\n' + '\n'.join(additions + ['- ' + sentence])
+                if len(candidate) + len(footer) + 2 > DESCRIPTION_MAX:
+                    continue
+                additions.append('- ' + sentence)
+                seen.add(key)
+                if len(candidate) + len(footer) + 2 >= DESCRIPTION_MIN:
+                    return {**data, 'description': candidate + '\n\n' + footer}
+        return data
+    return {**data, 'description': body + '\n\n' + footer}
+
+
 def validate_metadata(data):
     title, description, tags = (data.get(k) for k in ('title', 'description', 'tags'))
     if not isinstance(title, str) or len(title) > 85 or not re.search(r'\bHumans\b', title, re.I):
         raise ValueError('Title must contain Ancient Humans or Humans and fit 85 characters')
-    if not isinstance(description, str) or not 3500 <= len(description) <= 4500 or len(description) > 4500:
-        raise ValueError('Description must contain 3500–4500 characters of useful episode-specific detail')
+    if not isinstance(description, str) or not DESCRIPTION_MIN <= len(description) <= DESCRIPTION_MAX:
+        raise ValueError(f'Description must contain {DESCRIPTION_MIN}–{DESCRIPTION_MAX} characters of useful episode-specific detail')
     if re.search(r'background music|music credits?|magenta|musicrnn|synthesized ambient piano', description, re.I):
         raise ValueError('Description must not include background-music or production notes')
     final_line = description.strip().splitlines()[-1]
@@ -207,22 +253,23 @@ def generate_metadata(story, ask, pause, schema):
     for attempt in range(2):
         pause(60)
         result = ask(METADATA_BRIEF + '\nCompleted video context:\n' + json.dumps(context) + feedback,
-                     4000, response_schema)
+                     1800, response_schema)
         result = repair_topic_tags(result, story)
         result = repair_hashtag_footer(result, story)
+        result = repair_description_length(result, story)
         try:
             return validate_metadata(result)
         except ValueError as error:
             print(json.dumps({'check': 'Metadata editorial validation', 'passed': False,
                               'attempt': attempt + 1,
-                              'description_characters': len(result['description']),
+                              'description_characters': len(result.get('description', '')) if isinstance(result.get('description'), str) else None,
                               'reason': str(error)}), flush=True)
             if attempt:
                 raise
             feedback = ('\nRepair this rejected draft: ' + json.dumps(result) +
                         '\nValidation issue: ' + str(error) +
                         f'\nThe description currently contains {len(result["description"])} characters. '
-                        'Rewrite it to 4000–4400 characters including the hashtag footer. '
+                        'Rewrite it to 1400–1800 characters, strictly within 1000–2000 characters including the hashtag footer. '
                         'Expand with distinct mechanisms and evidence limits from the completed narration if short; '
                         'remove repetition if long. Preserve valid title and tags. Do not pad with repeated text.')
 

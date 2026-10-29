@@ -102,7 +102,7 @@ def text_batch_pause(seconds=60):
     return None
 
 
-def make_story(day, previous):
+def make_story(day, previous, *, draft=None, checkpoint=None):
     if os.getenv('STORY_FILE'):
         # Explicit original test story only; daily jobs must generate fresh stories.
         return validate_story(json.loads(Path(os.environ['STORY_FILE']).read_text()))
@@ -134,7 +134,8 @@ def make_story(day, previous):
         return json.loads(choice['message']['content'])
     if os.getenv('CONTENT_TYPE', 'human-history') == 'human-history':
         from human_history import generate
-        outline = generate(day, previous, ask, text_batch_pause, check_recent_originality, object_schema)
+        outline = generate(day, previous, ask, text_batch_pause, check_recent_originality, object_schema,
+                           draft=draft, checkpoint=checkpoint)
         from long_video import validate_engagement
         validate_engagement(outline)
         return validate_story(outline)

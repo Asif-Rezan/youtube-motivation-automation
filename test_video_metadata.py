@@ -21,7 +21,6 @@ Archaeological evidence, plausible inference and illustrative reconstructions ar
 Which challenge would you like us to explore next: finding dry fuel or choosing a sheltered camp? Share your answer in the comments and subscribe for more Ancient Humans explainers about survival, tools and everyday life.
 
 #AncientHumans #PrehistoricLife #FireMaintenance'''
-    description = description.replace('In this video:', ('Additional script-grounded detail about fuel, shelter, embers and the limits of archaeological interpretation. ' * 22) + '\n\nIn this video:')
     return {'title': 'How Ancient Humans Kept Their Fire Alive', 'description': description,
             'tags': ['ancient humans fire', 'Ancient Humans', 'prehistoric fire maintenance',
                      'prehistoric life', 'early human survival', 'ancient campfires', 'hearths',
@@ -36,7 +35,7 @@ class VideoMetadataTests(unittest.TestCase):
         def schema(props):
             return {'type': 'object', 'properties': props, 'required': list(props),
                     'additionalProperties': False}
-        for description in ('Too short.', 'Long private draft. ' * 300):
+        for description in ('Too short.', 'X' * 5000):
             with self.subTest(length=len(description)):
                 draft = {**metadata_fixture(), 'description': description}
                 Draft202012Validator(build_metadata_request_schema(schema)).validate(draft)
@@ -66,7 +65,7 @@ class VideoMetadataTests(unittest.TestCase):
         def ask(*args):
             calls.append(args)
             return {**metadata_fixture(), 'description': 'Too short.'}
-        with self.assertRaisesRegex(ValueError, '3500'):
+        with self.assertRaisesRegex(ValueError, '1000'):
             generate_metadata({'title': 'Ancient Humans', 'scenes': []}, ask,
                               lambda _: None, lambda props: props)
         self.assertEqual(len(calls), 2)
@@ -209,3 +208,58 @@ class VideoMetadataTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ShortDescriptionRecoveryTests(unittest.TestCase):
+    def test_previous_failure_lengths_are_shortened_without_another_model_call(self):
+        from video_metadata import repair_description_length
+        fixture = metadata_fixture()
+        prose, footer = fixture['description'].rsplit('\n\n', 1)
+        for length in (2352, 3163):
+            body = prose + '\n\n' + ('The episode connects fuel, shelter and the work of maintaining a hearth. ' * 40)
+            body = body[:length - len(footer) - 2 - 1].rstrip() + '.'
+            draft = {**fixture, 'description': body + '\n\n' + footer}
+            calls = []
+            def ask(*args):
+                calls.append(args)
+                return copy.deepcopy(draft)
+            result = generate_metadata({'title': fixture['title'], 'scenes': []}, ask,
+                                       lambda _: None, lambda props: props)
+            self.assertEqual(len(calls), 1)
+            self.assertTrue(1000 <= len(result['description']) <= 2000)
+            self.assertTrue(result['description'].startswith('How did Ancient Humans'))
+            self.assertEqual(result['description'].splitlines()[-1], footer)
+            validate_metadata(result)
+
+    def test_short_copy_can_use_distinct_completed_narration_only(self):
+        from video_metadata import repair_description_length
+        fixture = metadata_fixture()
+        sentences = [
+            'A sheltered hearth changes the physical conditions around the fire and the work needed to maintain useful heat.',
+            'Fuel gathering requires effort, so the available materials influence the choices that people face at a camp.',
+            'An ember and an open flame present different immediate conditions when people return to a fading hearth.',
+            'Archaeological remains need interpretation because one surviving trace cannot record every action at a camp.',
+            'The account distinguishes physical mechanisms from claims about one universal prehistoric daily routine.',
+            'The explanation connects the location of a shelter with the resources available in the surrounding landscape.',
+            'Shared effort offers one possible relationship between attending a hearth and meeting other daily needs.',
+            'Questions about preservation remind viewers that the surviving evidence is an incomplete record of human activity.',
+            'Every example remains an illustrative reconstruction rather than archival footage of a particular community.',
+            'The video explores how materials, changing conditions and human attention combine around an ordinary survival problem.',
+        ]
+        draft = {**fixture, 'description': 'How did Ancient Humans maintain fire? This video explores the practical problem.\n\n#AncientHumans #HumanHistory #Prehistory'}
+        story = {'scenes': [{'narration': sentence} for sentence in sentences + sentences]}
+        result = repair_description_length(draft, story)
+        validate_metadata(result)
+        for line in result['description'].splitlines():
+            if line.startswith('- '):
+                self.assertIn(line[2:], sentences)
+                self.assertEqual(result['description'].count(line), 1)
+
+    def test_unrepairable_copy_is_rejected_instead_of_padded_or_mid_sentence_cut(self):
+        from video_metadata import repair_description_length
+        fixture = metadata_fixture()
+        for body in ('A' * 2400, 'Too short.'):
+            draft = {**fixture, 'description': body + '\n\n#AncientHumans #HumanHistory #Prehistory'}
+            result = repair_description_length(draft, {'scenes': []})
+            with self.assertRaises(ValueError):
+                validate_metadata(result)

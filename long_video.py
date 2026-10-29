@@ -648,7 +648,17 @@ def stage_story():
         if store.load(f'runs/{run_id()}/state.json', {}).get('phase') in ('upload_started', 'uploaded', 'complete', 'published', 'verified_private'):
             raise RuntimeError('Run already uploaded; use cleanup-only recovery')
         history = store.load('history.json', [])
-        story = w.make_story(run_id(), history[-20:])
+        draft_key = f'runs/{run_id()}/story-draft.json'
+        saved = store.load(draft_key, None)
+        if saved is not None and (saved.get('run') != run_id() or saved.get('model') != os.getenv('STORY_MODEL', 'Qwen/Qwen3-4B-Instruct-2507')):
+            raise RuntimeError('Story checkpoint identity or model mismatch')
+        def checkpoint(draft):
+            store.save(draft_key, {'run': run_id(), 'model': os.getenv('STORY_MODEL', 'Qwen/Qwen3-4B-Instruct-2507'),
+                                  'story': draft})
+            print(json.dumps({'check': 'Private story checkpoint',
+                'chapters_complete': sum(bool(s.get('narration')) for s in draft['scenes'])}), flush=True)
+        story = w.make_story(run_id(), history[-20:], draft=saved['story'] if saved else None,
+                             checkpoint=checkpoint)
         validate_engagement(story)
         (ROOT/'story.json').write_text(json.dumps(story, indent=2))
         print(json.dumps({'fresh_story_ready': True, 'title': story['title'],

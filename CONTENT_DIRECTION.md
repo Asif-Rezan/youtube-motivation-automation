@@ -38,7 +38,7 @@ Ancient Humans episodes. These images are illustrative reconstructions, not hist
 Final search metadata is generated from the completed narration, not just the outline.
 The metadata prompt lives in video_metadata.py. Titles include Ancient Humans or Humans,
 prefer natural readable phrasing around 50–75 characters and are capped at 85. Descriptions
-target 4000–4400 characters within the 5000-character YouTube limit: keyword-bearing opening, episode-specific overview, 3–5 learning
+target 1400–1800 characters, strictly 1000–2000 characters including hashtags within the 5000-character YouTube limit: keyword-bearing opening, episode-specific overview, 3–5 learning
 bullets, a brief evidence/reconstruction note, one viewer question and a short subscribe CTA.
 The final line has 3–5 relevant hashtags starting with #AncientHumans. Generate 10–18 distinct
 topic search phrases as tags, within the existing 400-character comma-joined budget.
@@ -72,3 +72,5 @@ Native end screens, cards and quizzes require YouTube Studio and are not support
 
 All text generation (outline, narration, metadata, measured-shot prompts and duration rewrites) uses local Qwen/Qwen3-4B-Instruct-2507, Q4_K_M, with pinned public weights and checksum verification. No hosted text service, external text key or fallback is used. Kokoro, local Whisper and SSD-1B remain unchanged. Reference implementation: Asif-Rezan/youtube-dark-psychology-automation story_cpu.py.
 Reference snapshot: d5dd9c6c755be7a3118d48282358a09ed78bffe1. The daily prepare job allows up to 300 minutes for CPU text generation; image jobs retain their existing SSD-1B settings.
+
+Metadata recovery normalizes tags and hashtags, shortens overlong prose at complete sentence boundaries, and extends short copy only with distinct completed-narration statements. If editorial validation still fails after bounded retries, run-scoped private story checkpoints preserve every completed narration batch for the same run.

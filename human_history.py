@@ -107,7 +107,7 @@ def build_outline_schema(schema):
         'scenes': schema({key: scene for key in keys})})
 
 
-def generate(day, history, ask, pause, check_originality, schema):
+def generate(day, history, ask, pause, check_originality, schema, *, draft=None, checkpoint=None):
     recent = history[-30:]
     excluded = {h.get('content_pillar') for h in recent[-3:]}
     candidates = [key for key in PILLARS if key not in excluded]
@@ -158,16 +158,28 @@ def generate(day, history, ask, pause, check_originality, schema):
     Pair text and imagery with the title's honest promise. No generated letters, logos or copied compositions.
     Chapter summary <=18 words, continuity_note <=18 words, image_prompt <=22 words.
     No chapter headings or calls to action in the plan. No reference-channel titles or scripts to copy.'''
-    outline = ask(f'{brief}\nTopic direction: {PILLARS[pillar]}\nAvoid recent concepts: '
-                  f'{json.dumps(recent)}', 5200, outline_schema)
-    outline['scenes'] = [outline['scenes'][key] for key in keys]
-    outline.update(content_profile=PROFILE, content_pillar=pillar, format='human_history_explainer')
+    if draft is not None:
+        outline = json.loads(json.dumps(draft))
+        if (outline.get('content_profile') != PROFILE or outline.get('content_pillar') not in PILLARS
+            or not isinstance(outline.get('scenes'), list) or len(outline['scenes']) != 20):
+            raise ValueError('Invalid run-scoped story checkpoint')
+    else:
+        outline = ask(f'{brief}\nTopic direction: {PILLARS[pillar]}\nAvoid recent concepts: '
+                      f'{json.dumps(recent)}', 5200, outline_schema)
+        outline['scenes'] = [outline['scenes'][key] for key in keys]
+        outline.update(content_profile=PROFILE, content_pillar=pillar, format='human_history_explainer')
     repair_thumbnail_text(outline)
     # The old format-repeat rule belongs to rotating fictional story formats.
     check_originality({**outline, 'format': None}, history)
     validate(outline)
+    if checkpoint:
+        checkpoint(json.loads(json.dumps(outline)))
     previous = ''
     for begin in (0, 5, 10, 15):
+        chapters = outline['scenes'][begin:begin+5]
+        if all(isinstance(chapter.get('narration'), str) and chapter['narration'].strip() for chapter in chapters):
+            previous = chapters[-1]['narration']
+            continue
         pause(60)
         group_keys = keys[begin:begin+5]
         # Constrain local decoding to complete chapters near the spoken-duration target.
@@ -191,7 +203,12 @@ def generate(day, history, ask, pause, check_originality, schema):
                 raise ValueError('Missing explainer narration')
             chapter['narration'] = narration
         previous = outline['scenes'][begin+4]['narration']
-    outline['scenes'][-1]['narration'] += CTA
+        if checkpoint:
+            checkpoint(json.loads(json.dumps(outline)))
+    if not outline['scenes'][-1]['narration'].endswith(CTA):
+        outline['scenes'][-1]['narration'] += CTA
+    if checkpoint:
+        checkpoint(json.loads(json.dumps(outline)))
     from video_metadata import generate_metadata
     outline.update(generate_metadata(outline, ask, pause, schema))
     check_originality({**outline, 'format': None}, history)
