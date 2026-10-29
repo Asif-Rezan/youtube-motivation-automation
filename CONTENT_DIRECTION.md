@@ -74,3 +74,6 @@ All text generation (outline, narration, metadata, measured-shot prompts and dur
 Reference snapshot: d5dd9c6c755be7a3118d48282358a09ed78bffe1. The daily prepare job allows up to 300 minutes for CPU text generation; image jobs retain their existing SSD-1B settings.
 
 Metadata recovery normalizes tags and hashtags, shortens overlong prose at complete sentence boundaries, and extends short copy only with distinct completed-narration statements. If editorial validation still fails after bounded retries, run-scoped private story checkpoints preserve every completed narration batch for the same run.
+
+Monetization safeguards: keep Ancient Humans branding, but require episode-specific questions, mechanisms, comparative reasoning and evidence limits. Reject nearly identical chapters, substantial repeated sentences and high phrase overlap against fingerprints of future uploads. History fingerprints are private and excluded from model prompts. Existing historical entries without fingerprints cannot be fully compared. These are repetition heuristics, not fact-checking or a YouTube eligibility guarantee. AI disclosure remains enabled. Channel-wide inauthentic/reused-content review also considers finished visuals, narrative value and the creator's editorial contribution.
+Official policy: https://support.google.com/youtube/answer/1311392

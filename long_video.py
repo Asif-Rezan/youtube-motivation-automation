@@ -660,6 +660,8 @@ def stage_story():
         story = w.make_story(run_id(), history[-20:], draft=saved['story'] if saved else None,
                              checkpoint=checkpoint)
         validate_engagement(story)
+        from script_quality import validate as validate_quality
+        story['quality_review'] = validate_quality(story, history)
         (ROOT/'story.json').write_text(json.dumps(story, indent=2))
         print(json.dumps({'fresh_story_ready': True, 'title': story['title'],
             'words': sum(len(s['narration'].split()) for s in story['scenes'])}), flush=True)
@@ -737,12 +739,17 @@ def upload():
     history = store.load('history.json', [])
     if any(h.get('hash') == digest for h in history):
         raise RuntimeError('Story was already uploaded')
+    from script_quality import validate as validate_quality
+    from human_history import PROFILE as HUMAN_PROFILE
+    if story.get('content_profile') == HUMAN_PROFILE:
+        story['quality_review'] = validate_quality(story, history)
     state = {'phase': 'rendered', 'story': story, 'hash': digest, 'validation': report}
     for name in ('video.mp4', 'thumbnail.jpg', 'captions.srt', 'story.json', 'plan.json', 'music.audio', 'validation.json'):
         store.upload(ROOT/name, f'runs/{run_id()}/{name}')
     store.save(key, state)
     w.upload_private(ROOT/'video.mp4', ROOT/'thumbnail.jpg', story, state, store, key)
-    history.append({'title': story['title'], 'format': story.get('format'),
+    from script_quality import fingerprint
+    history.append({'content_fingerprint_v1': fingerprint(story), 'title': story['title'], 'format': story.get('format'),
         'content_pillar': story.get('content_pillar'), 'content_profile': story.get('content_profile'),
         'hash': digest, 'run': run_id(), 'video_id': state['video_id']})
     store.save('history.json', history)

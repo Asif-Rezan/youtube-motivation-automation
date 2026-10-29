@@ -108,7 +108,8 @@ def build_outline_schema(schema):
 
 
 def generate(day, history, ask, pause, check_originality, schema, *, draft=None, checkpoint=None):
-    recent = history[-30:]
+    recent = [{k: item[k] for k in ('title', 'format', 'content_pillar') if k in item}
+              for item in history[-30:]]
     excluded = {h.get('content_pillar') for h in recent[-3:]}
     candidates = [key for key in PILLARS if key not in excluded]
     pillar = min(candidates, key=lambda k: (
@@ -123,10 +124,14 @@ def generate(day, history, ask, pause, check_originality, schema, *, draft=None,
     Use it once, naturally, preferably early. Max 85 characters. Never use POV: You titles.
     Do not promise ranking, certainty, a secret discovery or a proven answer where evidence is limited.
     Focus on ordinary survival problems, practical mechanisms and surprising tradeoffs.
-    Open with a specific physical problem; explain the answer progressively over twenty chapters.
-    Chapters 1–3: question and immediate stakes. 4–8: mechanisms and concrete examples.
-    9–14: complications, regional differences and alternative explanations.
-    15–18: connect the evidence and clarify what remains unknown. 19–20: answer the opening question.
+    Use twenty chapters, each adding a distinct substantive learning point. Choose a narrative order
+    specific to this question instead of recycling the same storyline, hook, examples and conclusion.
+    Explain WHY each mechanism works, compare plausible alternatives, show concrete consequences,
+    and identify evidence limits. Summarize only when it adds a new connection, not to fill runtime.
+    Supply original explanatory reasoning; do not merely list facts over interchangeable pictures.
+    Never copy a reference channel, article or previous script. Do not fabricate personal experience,
+    archaeological fieldwork, quotations, sources or an expert endorsement. Shared channel branding
+    is fine, but the substance, central question and illustrative examples must differ between episodes.
     This is not a fictional biography or motivational lesson. No invented named historical witnesses.
     Archaeological evidence is incomplete: distinguish known evidence, plausible inference and
     illustrative reconstruction. No invented sources, precise dates, statistics, quotes or studies.
