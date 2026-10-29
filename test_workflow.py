@@ -91,6 +91,9 @@ class Checks(unittest.TestCase):
             self.assertTrue(aligned['storyboard_verified'])
             self.assertIn('red suitcase', aligned['shots'][0]['prompt'])
             self.assertIn('blue coat', aligned['shots'][0]['prompt'])
+            # A changed character invalidates the completed storyboard cache.
+            story['character_description'] = 'Maya, black hair, green coat'
+            (root/'story.json').write_text(json.dumps(story))
             def incomplete(endpoint, payload):
                 return {'choices': [{'message': {'content': '{}'}}]}
             with self.assertRaisesRegex(ValueError, 'every narration window'):

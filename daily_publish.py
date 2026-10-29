@@ -1,4 +1,5 @@
 """Verify an existing private upload; permanently clean only tagged run media."""
+from reliability import api_execute
 import hashlib
 import json
 import re
@@ -58,15 +59,15 @@ def ensure_ai_disclosure(client, video, state, channel):
     writable = {k: status[k] for k in ('privacyStatus', 'publishAt', 'embeddable',
         'license', 'publicStatsViewable', 'selfDeclaredMadeForKids') if k in status}
     writable['containsSyntheticMedia'] = True
-    result = client.videos().update(part='status', body={'id': video['id'], 'status': writable}).execute()
+    result = api_execute(client.videos().update(part='status', body={'id': video['id'], 'status': writable}))
     print(json.dumps({'check': 'AI disclosure update', 'video_id': video['id'],
         'returned_ai_disclosure': result.get('status', {}).get('containsSyntheticMedia')}), flush=True)
     if result.get('id') == video['id'] and result.get('status', {}).get('containsSyntheticMedia') is True:
         state['ai_disclosure_verification'] = {'video_id': video['id'], 'value': True,
             'method': 'videos.update-response'}
     for attempt in range(6):
-        items = client.videos().list(part='snippet,status,processingDetails,contentDetails,paidProductPlacementDetails',
-            id=video['id']).execute().get('items', [])
+        items = api_execute(client.videos().list(part='snippet,status,processingDetails,contentDetails,paidProductPlacementDetails',
+            id=video['id'])).get('items', [])
         if not items:
             raise RuntimeError('Video unavailable after AI disclosure update')
         if items[0]['status'].get('containsSyntheticMedia') is True:
@@ -92,11 +93,11 @@ def cleanup(store, run, state):
     if journal is None:
         files, token = [], None
         while True:
-            result = store.client.files().list(q=f"'{store.folder}' in parents and trashed = false and "
+            result = api_execute(store.client.files().list(q=f"'{store.folder}' in parents and trashed = false and "
                 f"appProperties has {{ key='automation_run' and value='{run}' }} and "
                 "appProperties has { key='disposable' and value='v1' }",
                 fields='nextPageToken,files(id,name,appProperties,parents,mimeType)',
-                pageSize=1000, pageToken=token).execute()
+                pageSize=1000, pageToken=token))
             files.extend(result.get('files', []))
             token = result.get('nextPageToken')
             if not token:
@@ -111,8 +112,8 @@ def cleanup(store, run, state):
             continue
         for attempt in range(4):
             try:
-                remote = store.client.files().get(fileId=fid,
-                    fields='id,name,parents,appProperties,mimeType').execute()
+                remote = api_execute(store.client.files().get(fileId=fid,
+                    fields='id,name,parents,appProperties,mimeType'))
                 name = remote['name'].removeprefix(f'runs__{run}__')
                 props = remote.get('appProperties', {})
                 if (remote['name'] != f'runs__{run}__{name}' or not disposable(name)
@@ -153,14 +154,24 @@ def main():
     state = store.load(key, {})
     if state.get('phase') not in ('uploaded', 'complete', 'verified_private') or not state.get('video_id'):
         raise RuntimeError('No successful upload to verify; no cleanup allowed')
-    if state.get('thumbnail_uploaded') is not True:
-        raise RuntimeError('Thumbnail upload unconfirmed; preserve all media')
     client = build('youtube', 'v3', credentials=Credentials.from_authorized_user_info(
         json.loads(required('YOUTUBE_TOKEN_JSON'))), cache_discovery=False)
+    if state.get('thumbnail_uploaded') is not True:
+        # The insert already succeeded: recover its thumbnail without inserting again.
+        import tempfile
+        from pathlib import Path
+        from workflow import finalize_uploaded
+        thumbnail_id = store.find(f'runs/{run}/thumbnail.jpg')
+        if not thumbnail_id:
+            raise RuntimeError('Saved thumbnail unavailable; preserve uploaded video and media')
+        with tempfile.TemporaryDirectory(prefix='known-upload-') as directory:
+            thumbnail = Path(directory)/'thumbnail.jpg'
+            store.download(thumbnail_id, thumbnail)
+            finalize_uploaded(client, thumbnail, state['story'], state, store, key)
     deadline = time.monotonic() + 1800
     while True:
-        items = client.videos().list(part='snippet,status,processingDetails,contentDetails,paidProductPlacementDetails',
-            id=state['video_id']).execute().get('items', [])
+        items = api_execute(client.videos().list(part='snippet,status,processingDetails,contentDetails,paidProductPlacementDetails',
+            id=state['video_id'])).get('items', [])
         if not items:
             raise RuntimeError('Uploaded video unavailable')
         video = ensure_ai_disclosure(client, items[0], state, required('EXPECTED_CHANNEL_ID'))

@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 from zoneinfo import ZoneInfo
 import workflow as w
+from reliability import atomic_text
 
 ROOT = Path(os.getenv('OUTPUT_DIR', 'output/ghibli-long-test'))
 INTERVAL = w.IMAGE_INTERVAL_SECONDS
@@ -69,10 +70,22 @@ def storyboard(root=ROOT, ask=None, pause=None):
         raise ValueError('Visual synchronization needs a character description')
     character = ' '.join(character.split()[:24])
     shots = plan['shots']
+    signature = hashlib.sha256(json.dumps({'story': story, 'model': os.getenv('STORY_MODEL', 'Qwen/Qwen3-4B-Instruct-2507'),
+        'shots': [{k: shot.get(k) for k in ('index', 'start', 'duration', 'chapter', 'chapters', 'narration')}
+                  for shot in shots]}, sort_keys=True).encode()).hexdigest()
+    can_resume = plan.get('storyboard_source_signature') == signature
+    plan['storyboard_source_signature'] = signature
+    if not can_resume:
+        plan['storyboard_verified'] = False
+        for shot in shots:
+            shot.pop('visual_action', None)
+            shot.pop('prompt', None)
     for begin in range(0, len(shots), 8):
         if begin:
             pause(60)
         batch = shots[begin:begin+8]
+        if can_resume and all(shot.get('visual_action') and shot.get('prompt') for shot in batch):
+            continue
         properties = {f"shot_{shot['index']:03}": {'type': 'string'} for shot in batch}
         schema = {'type': 'object', 'properties': properties,
                   'required': list(properties), 'additionalProperties': False}
@@ -129,10 +142,10 @@ Exact shot windows: {json.dumps([{'key': f"shot_{shot['index']:03}", 'start_seco
             shot['visual_action'] = visual
             shot['prompt'] = visual + '. Character: ' + character
         # Private local checkpoint; do not log unpublished narration or prompts.
-        (root/'plan.json').write_text(json.dumps(plan, indent=2))
+        atomic_text(root/'plan.json', json.dumps(plan, indent=2))
         print(json.dumps({'aligned_shots': min(begin+8, len(shots)), 'total': len(shots)}), flush=True)
     plan['storyboard_verified'] = True
-    (root/'plan.json').write_text(json.dumps(plan, indent=2))
+    atomic_text(root/'plan.json', json.dumps(plan, indent=2))
     return plan
 
 
@@ -223,12 +236,22 @@ def measure_chapters(story, root):
             words_path.unlink(missing_ok=True)
         if not audio.exists():
             w.make_narration(scene['narration'], audio)
-            digest_path.write_text(digest)
+            atomic_text(digest_path, digest)
         length = w.duration(audio)
-        if not words_path.exists():
-            words_path.write_text(json.dumps(w.transcribe(audio)))
-        words = json.loads(words_path.read_text())
-        w.aligned_subtitles([words], [length], root/'chapter-check.srt')
+        words = None
+        if words_path.exists():
+            try:
+                candidate = json.loads(words_path.read_text())
+                if not isinstance(candidate, list) or not candidate:
+                    raise ValueError('Invalid word cache')
+                w.aligned_subtitles([candidate], [length], root/'chapter-check.srt')
+                words = candidate
+            except (json.JSONDecodeError, ValueError, KeyError, TypeError):
+                words_path.unlink(missing_ok=True)
+        if words is None:
+            words = w.transcribe(audio)
+            w.aligned_subtitles([words], [length], root/'chapter-check.srt')
+            atomic_text(words_path, json.dumps(words))
         lengths.append(length)
         word_lists.append(words)
         audios.append(audio)
@@ -253,7 +276,7 @@ def adjust_tempo(root, audios, lengths, word_lists, total):
                    'end': min(float(word['end'])*scale, new_length)} for word in words]
         w.aligned_subtitles([scaled], [new_length], root/'chapter-check.srt')
         adjusted.replace(audio)
-        (root/f'words-{index:02}.json').write_text(json.dumps(scaled))
+        atomic_text(root/f'words-{index:02}.json', json.dumps(scaled))
         changed_lengths.append(new_length)
         changed_words.append(scaled)
     return changed_lengths, changed_words, factor
@@ -264,7 +287,7 @@ def prepare(story=None, root=ROOT):
     story = story or json.loads(Path(os.getenv('STORY_FILE', str(root/'story.json'))).read_text())
     w.validate_story(story)
     print(json.dumps({'story_words': sum(len(s['narration'].split()) for s in story['scenes'])}), flush=True)
-    (root/'story.json').write_text(json.dumps(story, indent=2))
+    atomic_text(root/'story.json', json.dumps(story, indent=2))
     original = None
     for attempt in range(MAX_CORRECTIONS + 1):
         lengths, word_lists, audios = measure_chapters(story, root)
@@ -293,17 +316,17 @@ def prepare(story=None, root=ROOT):
                                   'error_type': type(error).__name__, 'reason': str(error)}), flush=True)
                 continue
             story = revised
-            (root/'story.json').write_text(json.dumps(story, indent=2))
+            atomic_text(root/'story.json', json.dumps(story, indent=2))
             print(json.dumps({'rewritten_chapters': [i+1 for i in changed],
                               'story_words': sum(len(s['narration'].split()) for s in story['scenes'])}), flush=True)
     print(json.dumps({'final_narration_seconds': round(total, 3),
                       'preferred_range': PREFERRED_MIN <= total <= PREFERRED_MAX}), flush=True)
     w.aligned_subtitles(word_lists, lengths, root/'captions.srt')
-    (root/'audio-list.txt').write_text(''.join(f"file '{p.name}'\n" for p in audios))
+    atomic_text(root/'audio-list.txt', ''.join(f"file '{p.name}'\n" for p in audios))
     w.shell('ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', str(root/'audio-list.txt'),
         '-ar', '48000', '-ac', '2', '-c:a', 'pcm_s16le', str(root/'narration.wav'))
     plan = shot_plan(story, lengths, word_lists)
-    (root/'plan.json').write_text(json.dumps(plan, indent=2))
+    atomic_text(root/'plan.json', json.dumps(plan, indent=2))
     print(json.dumps({'audio_ready': True, 'seconds': total, 'images': len(plan['shots'])}), flush=True)
     return plan
 
@@ -437,7 +460,7 @@ def refine_visual_plan(root=ROOT):
     plan['style'] = w.VISUAL_STYLE_ID
     plan['visual_review'] = {'passed': False, 'phase': 'corrected-object-and-group-render-required'}
     plan['scene_composition_version'] = 2
-    (root/'plan.json').write_text(json.dumps(plan, indent=2))
+    atomic_text(root/'plan.json', json.dumps(plan, indent=2))
     print(json.dumps({'scene_plan_refined': True, 'shots': len(plan['shots'])}), flush=True)
     return plan
 
@@ -495,7 +518,7 @@ def generate_shard(shard, root=ROOT, count=SHARDS):
                 report['source_signature'] = signature
                 if expected:
                     report['image_generation'] = json.loads(image_meta.read_text())
-                check.write_text(json.dumps(report))
+                atomic_text(check, json.dumps(report))
                 if report.get('semantic_match') is False:
                     print(json.dumps({'shot': index, 'semantic_review': 'mismatch',
                                       'scene_score': report['scene_score'],
@@ -575,7 +598,7 @@ def finish(root=ROOT):
     for shot, clip in zip(plan['shots'], clips):
         if abs(w.duration(clip)-shot['duration']) > .04:
             raise RuntimeError('Shot timing differs from the global seven-second plan')
-    (root/'clips.txt').write_text(''.join(f"file '{p.name}'\n" for p in clips))
+    atomic_text(root/'clips.txt', ''.join(f"file '{p.name}'\n" for p in clips))
     w.shell('ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', str(root/'clips.txt'), '-c', 'copy', str(root/'joined.mp4'))
     if not (root/'music.audio').exists():
         generate(root/'music.audio')
@@ -617,7 +640,7 @@ def finish(root=ROOT):
         'semantic_checked_images': sum(r.get('required', False) for r in scene_reports),
         'semantic_review_mismatches': sum(r.get('semantic_match') is False for r in scene_reports),
         'semantic_review_unavailable': sum(bool(r.get('semantic_review_error')) for r in scene_reports)}
-    (root/'validation.json').write_text(json.dumps(report))
+    atomic_text(root/'validation.json', json.dumps(report))
     print(json.dumps(report), flush=True)
     return report
 
@@ -662,7 +685,7 @@ def stage_story():
         validate_engagement(story)
         from script_quality import validate as validate_quality
         story['quality_review'] = validate_quality(story, history)
-        (ROOT/'story.json').write_text(json.dumps(story, indent=2))
+        atomic_text(ROOT/'story.json', json.dumps(story, indent=2))
         print(json.dumps({'fresh_story_ready': True, 'title': story['title'],
             'words': sum(len(s['narration'].split()) for s in story['scenes'])}), flush=True)
         return
@@ -693,21 +716,69 @@ def restore_preparation(images_only=False):
         if not file_id:
             raise RuntimeError('Saved preparation asset missing')
         store.download(file_id, ROOT/name)
+    if images_only and os.getenv('RESTORE_IMAGE_SHARD') is not None:
+        restore_cached_shots(store, ROOT, json.loads((ROOT/'plan.json').read_text()), int(os.environ['RESTORE_IMAGE_SHARD']))
 
 
 def save_shard(shard):
+    """Preserve complete, QA-passed shots even if a later shot failed."""
+    from scene_check import scene_signature
     store = w.Store()
     plan = json.loads((ROOT/'plan.json').read_text())
     if plan.get('image_interval_seconds') != INTERVAL:
         raise RuntimeError('Saved visual plan uses a different image interval; prepare a new run')
     if not 0 <= shard < SHARDS:
-        raise ValueError(f'Image shard must be between 0 and {SHARDS-1}')
+        raise ValueError('Invalid image shard')
+    saved = 0
     for shot in plan['shots']:
-        if shot['index']%SHARDS == shard:
-            for ext in ('png', 'mp4', 'qa.json'):
-                name = f"shot-{shot['index']:03}.{ext}"
-                store.upload(ROOT/name, f'runs/{run_id()}/{name}')
-    print(json.dumps({'shard': shard, 'saved_privately': True}), flush=True)
+        if shot['index'] % SHARDS != shard:
+            continue
+        names = [f"shot-{shot['index']:03}.{ext}" for ext in ('png', 'mp4', 'qa.json')]
+        if not all((ROOT/name).is_file() for name in names):
+            continue
+        try:
+            proof = json.loads((ROOT/names[-1]).read_text())
+        except (json.JSONDecodeError, FileNotFoundError):
+            print(json.dumps({'shard': shard, 'shot': shot['index'], 'skipped_invalid_qa': True}), flush=True)
+            continue
+        if not isinstance(proof, dict) or proof.get('passed') is not True or proof.get('source_signature') != scene_signature(shot):
+            continue
+        for name in names:
+            store.upload(ROOT/name, f'runs/{run_id()}/{name}')
+        saved += 1
+    print(json.dumps({'shard': shard, 'saved_shots': saved, 'saved_privately': True}), flush=True)
+
+
+def restore_cached_shots(store, root, plan, shard):
+    from scene_check import scene_signature
+    from image_cpu import metadata_path
+    if not 0 <= shard < SHARDS:
+        raise ValueError('Invalid image shard')
+    restored = 0
+    for shot in plan['shots']:
+        if shot['index'] % SHARDS != shard:
+            continue
+        prefix = f"shot-{shot['index']:03}"
+        proof_id = store.find(f'runs/{run_id()}/{prefix}.qa.json')
+        if not proof_id:
+            continue
+        proof_path = root/f'{prefix}.qa.json'
+        store.download(proof_id, proof_path)
+        try:
+            proof = json.loads(proof_path.read_text())
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(proof, dict) or proof.get('passed') is not True or proof.get('source_signature') != scene_signature(shot):
+            continue
+        assets = {ext: store.find(f'runs/{run_id()}/{prefix}.{ext}') for ext in ('png', 'mp4')}
+        if not all(assets.values()):
+            continue
+        for ext, fid in assets.items():
+            store.download(fid, root/f'{prefix}.{ext}')
+        if proof.get('image_generation'):
+            atomic_text(metadata_path(root/f'{prefix}.png'), json.dumps(proof['image_generation']))
+        restored += 1
+    print(json.dumps({'shard': shard, 'restored_shots': restored}), flush=True)
 
 
 def restore_clips():
@@ -732,26 +803,39 @@ def upload():
         raise RuntimeError('New-format render has not passed validation')
     w.check_video(ROOT/'video.mp4')
     store, key = w.Store(), f'runs/{run_id()}/state.json'
-    if store.load(key, {}).get('phase') in ('upload_started', 'uploaded', 'complete', 'published', 'verified_private'):
+    existing = store.load(key, {})
+    if existing.get('phase') in ('upload_started', 'published', 'verified_private'):
         raise RuntimeError('Existing upload requires reconciliation; refusing duplicate insertion')
     story = json.loads((ROOT/'story.json').read_text())
     digest = hashlib.sha256(' '.join(s['narration'] for s in story['scenes']).encode()).hexdigest()
     history = store.load('history.json', [])
-    if any(h.get('hash') == digest for h in history):
+    resuming = existing.get('phase') in ('uploaded', 'complete') and bool(existing.get('video_id'))
+    if resuming and existing.get('hash') != digest:
+        raise RuntimeError('Existing upload story hash mismatch')
+    if not resuming and any(h.get('hash') == digest for h in history):
         raise RuntimeError('Story was already uploaded')
-    from script_quality import validate as validate_quality
-    from human_history import PROFILE as HUMAN_PROFILE
-    if story.get('content_profile') == HUMAN_PROFILE:
-        story['quality_review'] = validate_quality(story, history)
-    state = {'phase': 'rendered', 'story': story, 'hash': digest, 'validation': report}
-    for name in ('video.mp4', 'thumbnail.jpg', 'captions.srt', 'story.json', 'plan.json', 'music.audio', 'validation.json'):
-        store.upload(ROOT/name, f'runs/{run_id()}/{name}')
-    store.save(key, state)
-    w.upload_private(ROOT/'video.mp4', ROOT/'thumbnail.jpg', story, state, store, key)
+    if existing.get('phase') in ('uploaded', 'complete') and not resuming:
+        raise RuntimeError('Incomplete upload identity; reconciliation required')
+    if existing.get('video_id') and not resuming:
+        raise RuntimeError('Existing video requires reconciliation')
+    if resuming:
+        state = existing
+        w.upload_private(ROOT/'video.mp4', ROOT/'thumbnail.jpg', story, state, store, key)
+    else:
+        from script_quality import validate as validate_quality
+        from human_history import PROFILE as HUMAN_PROFILE
+        if story.get('content_profile') == HUMAN_PROFILE:
+            story['quality_review'] = validate_quality(story, history)
+        state = {'phase': 'rendered', 'story': story, 'hash': digest, 'validation': report}
+        for name in ('video.mp4', 'thumbnail.jpg', 'captions.srt', 'story.json', 'plan.json', 'music.audio', 'validation.json'):
+            store.upload(ROOT/name, f'runs/{run_id()}/{name}')
+        store.save(key, state)
+        w.upload_private(ROOT/'video.mp4', ROOT/'thumbnail.jpg', story, state, store, key)
     from script_quality import fingerprint
-    history.append({'content_fingerprint_v1': fingerprint(story), 'title': story['title'], 'format': story.get('format'),
-        'content_pillar': story.get('content_pillar'), 'content_profile': story.get('content_profile'),
-        'hash': digest, 'run': run_id(), 'video_id': state['video_id']})
+    if not any(item.get('run') == run_id() for item in history):
+        history.append({'content_fingerprint_v1': fingerprint(story), 'title': story['title'], 'format': story.get('format'),
+            'content_pillar': story.get('content_pillar'), 'content_profile': story.get('content_profile'),
+            'hash': digest, 'run': run_id(), 'video_id': state['video_id']})
     store.save('history.json', history)
     store.save('last-private-test.json', {'passed': True, 'run': run_id(),
         'video_id': state['video_id'], 'validation': report, 'processing_status': state['processing_status']})
@@ -766,7 +850,11 @@ if __name__ == '__main__':
         'save-shard': lambda: save_shard(shard), 'restore-clips': restore_clips,
         'finish': finish, 'upload': upload}
     try:
-        actions[command]()
+        from reliability import retry
+        if command == 'upload':
+            actions[command]()
+        else:
+            retry(actions[command], 'Pipeline stage ' + command, attempts=3)
     except Exception as error:
         print(json.dumps({'command': command, 'passed': False, 'error_type': type(error).__name__,
             'http_status': getattr(getattr(error, 'resp', None), 'status', None),

@@ -85,13 +85,16 @@ jobs:
           pip install 'torch==2.7.1' --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements-cpu.txt
       - name: Restore saved visual plan
+        id: restore_plan
         env:
           DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          RESTORE_IMAGE_SHARD: ${{ matrix.shard }}
         run: python -u long_video.py restore-images
       - name: Regenerate only selected failed shard
         run: python -u long_video.py generate-shard ${{ matrix.shard }}
       - name: Save repaired clips privately
+        if: ${{ always() && steps.restore_plan.outcome == 'success' }}
         env:
           DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}

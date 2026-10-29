@@ -18,7 +18,14 @@ def generate(text, path):
         voice=os.getenv('CPU_TTS_VOICE', 'am_michael'), speed=.9, split_pattern=r'\n+')]
     if not parts:
         raise RuntimeError('Kokoro returned no narration')
-    sf.write(str(path), np.concatenate(parts), 24000)
+    from pathlib import Path
+    path = Path(path)
+    temporary = path.with_name(path.name + '.partial')
+    try:
+        sf.write(str(temporary), np.concatenate(parts), 24000, format='WAV')
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def transcribe_audio(path):

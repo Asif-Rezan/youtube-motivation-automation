@@ -1,4 +1,5 @@
 """Cloud rendering and private upload helpers; daily_publish verifies and publishes daily runs."""
+from reliability import api_execute, retry, ProcessingPending
 import argparse
 import datetime as dt
 import hashlib
@@ -396,7 +397,7 @@ class Store:
         if not self.folder:
             query = ("trashed = false and mimeType = 'application/vnd.google-apps.folder' and "
                      "appProperties has { key='youtube_automation_root' and value='v1' }")
-            roots = self.client.files().list(q=query, fields='files(id)', pageSize=100).execute()['files']
+            roots = api_execute(self.client.files().list(q=query, fields='files(id)', pageSize=100))['files']
             if len(roots) > 1:
                 raise RuntimeError('Multiple workflow folders require reconciliation')
             if roots:
@@ -407,14 +408,14 @@ class Store:
                     'mimeType': 'application/vnd.google-apps.folder',
                     'appProperties': {'youtube_automation_root': 'v1'}
                 }, fields='id').execute()['id']
-        info = self.client.files().get(fileId=self.folder, fields='mimeType,trashed').execute()
+        info = api_execute(self.client.files().get(fileId=self.folder, fields='mimeType,trashed'))
         if info.get('trashed') or info['mimeType'] != 'application/vnd.google-apps.folder':
             raise RuntimeError('DRIVE_FOLDER_ID must identify an accessible active folder')
         self.check_private(self.folder)
 
     def check_private(self, file_id):
-        permissions = self.client.permissions().list(fileId=file_id,
-            fields='permissions(type,role)', pageSize=100).execute().get('permissions', [])
+        permissions = api_execute(self.client.permissions().list(fileId=file_id,
+            fields='permissions(type,role)', pageSize=100)).get('permissions', [])
         if any(p.get('role') != 'owner' for p in permissions):
             raise RuntimeError('Workflow storage must be private to its owner')
 
@@ -423,7 +424,7 @@ class Store:
         digest = hashlib.sha256(key.encode()).hexdigest()
         q = (f"'{self.folder}' in parents and trashed = false and "
              f"appProperties has {{ key='workflow_key' and value='{digest}' }}")
-        items = self.client.files().list(q=q, fields='files(id)', pageSize=100).execute()['files']
+        items = api_execute(self.client.files().list(q=q, fields='files(id)', pageSize=100))['files']
         if len(items) > 1:
             raise RuntimeError('Duplicate checkpoint files require reconciliation')
         if items:
@@ -435,10 +436,10 @@ class Store:
         file_id = self.find(key)
         if not file_id:
             return default
-        return json.loads(self.client.files().get_media(fileId=file_id).execute())
+        return json.loads(api_execute(self.client.files().get_media(fileId=file_id)))
 
     def check_quota(self, size):
-        quota = self.client.about().get(fields='storageQuota').execute()['storageQuota']
+        quota = api_execute(self.client.about().get(fields='storageQuota'))['storageQuota']
         if 'limit' not in quota:
             raise RuntimeError('Cannot verify free storage allowance; stop before upload')
         limit = min(int(quota['limit']), 15 * 1024**3)
@@ -515,7 +516,7 @@ class Store:
                 if creating and status == 409:
                     # The previous request may have succeeded before its response timed out.
                     self.check_private(file_id)
-                    if json.loads(self.client.files().get_media(fileId=file_id).execute()) == value:
+                    if json.loads(api_execute(self.client.files().get_media(fileId=file_id))) == value:
                         return
                     raise RuntimeError('Checkpoint creation conflict; refusing to overwrite') from None
                 transient = isinstance(error, (TimeoutError, ConnectionError)) or status in (408, 429, 500, 502, 503, 504)
@@ -530,14 +531,22 @@ class Store:
         self.put(key, MediaFileUpload(str(path), resumable=True), path.stat().st_size)
 
     def download(self, file_id, path):
-        import io
         from googleapiclient.http import MediaIoBaseDownload
+        from reliability import retry
         self.check_private(file_id)
-        with path.open('wb') as output:
-            request = MediaIoBaseDownload(output, self.client.files().get_media(fileId=file_id))
-            done = False
-            while not done:
-                _, done = request.next_chunk(num_retries=3)
+        path = Path(path)
+        temporary = path.with_name(path.name + '.partial')
+        def transfer():
+            try:
+                with temporary.open('wb') as output:
+                    request = MediaIoBaseDownload(output, self.client.files().get_media(fileId=file_id))
+                    done = False
+                    while not done:
+                        _, done = request.next_chunk(num_retries=3)
+                temporary.replace(path)
+            finally:
+                temporary.unlink(missing_ok=True)
+        retry(transfer, 'Drive download recovery')
 
 
 def load_music(store, root):
@@ -566,9 +575,17 @@ def upload_private(video, thumbnail, story, state, store, key, music_credit=''):
     from googleapiclient.http import MediaFileUpload
     client = build('youtube', 'v3', credentials=Credentials.from_authorized_user_info(
         json.loads(required('YOUTUBE_TOKEN_JSON'))), cache_discovery=False)
-    channels = client.channels().list(part='id', mine=True).execute()['items']
+    channels = api_execute(client.channels().list(part='id', mine=True))['items']
     if required('EXPECTED_CHANNEL_ID') not in [c['id'] for c in channels]:
         raise RuntimeError('OAuth account is not the expected YouTube channel')
+    if state.get('video_id'):
+        if state.get('phase') not in ('uploaded', 'complete'):
+            raise RuntimeError('Existing video requires reconciliation; refusing another insertion')
+        retry(lambda: finalize_uploaded(client, thumbnail, story, state, store, key),
+              'Known video finalization', attempts=2)
+        return
+    if state.get('phase') == 'upload_started':
+        raise RuntimeError('Ambiguous upload requires reconciliation; refusing another insertion')
     # Persist before insert. An interrupted/ambiguous upload requires manual reconciliation.
     # Never silently retry videos.insert and risk duplicate videos.
     from video_metadata import public_description
@@ -590,12 +607,29 @@ def upload_private(video, thumbnail, story, state, store, key, music_credit=''):
         uploaded_at=dt.datetime.now(dt.timezone.utc).isoformat(),
         schedule_requested=os.getenv('SCHEDULE_PUBLISH') == 'true')
     store.save(key, state)
-    client.thumbnails().set(videoId=result['id'], media_body=MediaFileUpload(str(thumbnail))).execute()
-    state['thumbnail_uploaded'] = True
-    store.save(key, state)
+    retry(lambda: finalize_uploaded(client, thumbnail, story, state, store, key),
+          'Known video finalization', attempts=2)
+
+
+def finalize_uploaded(client, thumbnail, story, state, store, key):
+    from googleapiclient.http import MediaFileUpload
+    items = api_execute(client.videos().list(part='snippet,status', id=state['video_id'])).get('items', [])
+    if not items:
+        raise RuntimeError('Known upload is unavailable; preserve assets for reconciliation')
+    snippet = items[0]['snippet']
+    if (snippet.get('channelId') != required('EXPECTED_CHANNEL_ID')
+        or snippet.get('title') != story['title']
+        or snippet.get('description') != state.get('upload_description', story['description'])
+        or set(snippet.get('tags', [])) != set(story['tags'])
+        or items[0]['status'].get('privacyStatus') != 'private'):
+        raise RuntimeError('Known upload identity, metadata or privacy mismatch')
+    if not state.get('thumbnail_uploaded'):
+        api_execute(client.thumbnails().set(videoId=state['video_id'], media_body=MediaFileUpload(str(thumbnail))))
+        state['thumbnail_uploaded'] = True
+        store.save(key, state)
     deadline = time.monotonic() + 1200
     while True:
-        items = client.videos().list(part='status,processingDetails', id=result['id']).execute().get('items', [])
+        items = api_execute(client.videos().list(part='status,processingDetails', id=state['video_id'])).get('items', [])
         if not items:
             raise RuntimeError('Uploaded video is not accessible for verification')
         remote = items[0]
@@ -607,7 +641,7 @@ def upload_private(video, thumbnail, story, state, store, key, music_credit=''):
         if processing == 'succeeded' and upload_status == 'processed':
             break
         if time.monotonic() >= deadline:
-            raise RuntimeError('YouTube processing is still pending; private test is not passed')
+            raise ProcessingPending('YouTube processing is pending; preserve the known video and resume finalization')
         print(json.dumps({'check': 'YouTube processing', 'status': processing}), flush=True)
         time.sleep(20)
     state['processing_status'] = 'succeeded'

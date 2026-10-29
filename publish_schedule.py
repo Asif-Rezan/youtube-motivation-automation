@@ -1,4 +1,5 @@
 """Schedule verified daily uploads using a durable upload-completion timestamp."""
+from reliability import api_execute
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -27,7 +28,7 @@ def schedule_verified(client, state, store, key):
     target = state.get('publish_at') or first_publish_time(state['uploaded_at'])
     state['publish_at'] = target
     store.save(key, state)  # Keep the same target on retries, including ambiguous responses.
-    items = client.videos().list(part='status', id=state['video_id']).execute().get('items', [])
+    items = api_execute(client.videos().list(part='status', id=state['video_id'])).get('items', [])
     if not items or items[0]['status']['privacyStatus'] != 'private':
         raise RuntimeError('Only a verified private video can be scheduled')
     status = items[0]['status']
@@ -41,14 +42,14 @@ def schedule_verified(client, state, store, key):
                     'selfDeclaredMadeForKids', 'containsSyntheticMedia') if k in status}
         writable.update(privacyStatus='private', publishAt=target)
         writable['containsSyntheticMedia'] = True
-        result = client.videos().update(part='status', body={'id': state['video_id'], 'status': writable}).execute()
+        result = api_execute(client.videos().update(part='status', body={'id': state['video_id'], 'status': writable}))
         confirmed = result.get('status', {})
         if (result.get('id') == state['video_id'] and confirmed.get('privacyStatus') == 'private'
             and same_instant(confirmed.get('publishAt'), target)):
             state['schedule_update_receipt'] = {'video_id': state['video_id'],
                 'publish_at': confirmed['publishAt'], 'privacy': 'private'}
             store.save(key, state)
-    remote = client.videos().list(part='status', id=state['video_id']).execute()['items'][0]['status']
+    remote = api_execute(client.videos().list(part='status', id=state['video_id']))['items'][0]['status']
     receipt = state.get('schedule_update_receipt', {})
     confirmed_by_update = (receipt.get('video_id') == state['video_id']
         and same_instant(receipt.get('publish_at'), target) and receipt.get('privacy') == 'private')
