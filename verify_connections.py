@@ -1,4 +1,4 @@
-"""Read-only verification of account identity, private folder, and refresh tokens."""
+"""Verification of account identity, private folder, and refresh tokens."""
 import json
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -17,13 +17,11 @@ def verify():
         credentials.refresh(Request())
     client = youtube_client()
     channel = client.channels().list(part='id,snippet',mine=True).execute()['items'][0]
-    if channel['id'] != 'UCXAEF686i_BRS12HkR1PqoA' or channel['snippet'].get('customUrl','').lower() != '@dudi_dum_tv':
-        raise RuntimeError('Dudi Dum TV identity mismatch')
     store = Store()
     folder = store.client.files().get(fileId=store.folder,fields='id,name,trashed').execute()
     if folder.get('trashed'):
         raise RuntimeError('Drive folder is trashed')
-    print(json.dumps({'channel':channel['snippet']['title'],'handle':channel['snippet']['customUrl'],
+    print(json.dumps({'channel':channel['snippet']['title'],'handle':channel['snippet'].get('customUrl', ''),
         'channel_id':channel['id'],'drive_folder':folder['name'],'private_folder_verified':True,
         'both_refresh_tokens_verified':True,'uploads_performed':False}))
 

@@ -36,16 +36,34 @@ class Store:
         self.client = build('drive', 'v3', credentials=Credentials.from_authorized_user_info(
             json.loads(required('DRIVE_TOKEN_JSON'))), cache_discovery=False)
         user = self.client.about().get(fields='user(emailAddress)').execute()['user']
-        if user['emailAddress'].lower() != 'asifrezanit@gmail.com':
-            raise RuntimeError('Wrong Drive account')
-        self.folder = os.getenv('DRIVE_FOLDER_ID')
-        if not self.folder:
-            raise RuntimeError('DRIVE_FOLDER_ID is required for this separate channel')
-        info = drive_retry(lambda: self.client.files().get(fileId=self.folder, fields='mimeType,trashed,appProperties').execute())
-        if (info.get('trashed') or info['mimeType'] != 'application/vnd.google-apps.folder'
-                or info.get('appProperties', {}).get('dudi_dam_tv_root') != 'v1'):
-            raise RuntimeError('DRIVE_FOLDER_ID must identify the dedicated Dudi Dam TV folder')
-        self.check_private(self.folder)
+        root = required('DRIVE_FOLDER_ID')
+        self.check_owned_folder(root, user['emailAddress'])
+        # Isolate kids checkpoints from the archived pipeline's history and runs.
+        query = (f"'{root}' in parents and trashed=false and "
+                 "mimeType='application/vnd.google-apps.folder' and "
+                 "appProperties has { key='youtube_kids_rhymes_root' and value='v1' }")
+        result = drive_retry(lambda: self.client.files().list(
+            q=query, fields='nextPageToken,files(id)', pageSize=100).execute())
+        folders = result.get('files', [])
+        if result.get('nextPageToken') or len(folders) > 1:
+            raise RuntimeError('Multiple kids rhyme folders require reconciliation')
+        if folders:
+            self.folder = folders[0]['id']
+        else:
+            self.folder = self.client.files().create(body={
+                'name': 'Kids Rhymes - YouTube Automation', 'parents': [root],
+                'mimeType': 'application/vnd.google-apps.folder',
+                'appProperties': {'youtube_kids_rhymes_root': 'v1'}}, fields='id').execute()['id']
+        self.check_owned_folder(self.folder, user['emailAddress'])
+
+    def check_owned_folder(self, folder, email):
+        info = drive_retry(lambda: self.client.files().get(fileId=folder,
+            fields='mimeType,trashed,owners(emailAddress)').execute())
+        if info.get('trashed') or info.get('mimeType') != 'application/vnd.google-apps.folder':
+            raise RuntimeError('DRIVE_FOLDER_ID must identify an accessible active folder')
+        if {owner.get('emailAddress', '').lower() for owner in info.get('owners', [])} != {email.lower()}:
+            raise RuntimeError('Configured Drive folder must belong to the authenticated account')
+        self.check_private(folder)
 
     def check_private(self, file_id):
         permissions = drive_retry(lambda: self.client.permissions().list(fileId=file_id,
