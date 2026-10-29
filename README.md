@@ -1,3 +1,9 @@
+## Automatic upload restored for the existing channel
+
+The existing destination is `UCztvMrNCT34DO3DtzLPgWaw`, preserved from the archived Ancient Humans workflow. All active workflows resolve `EXPECTED_CHANNEL_ID` from an existing secret, then an optional repository variable, then that original channel ID. The uploader still verifies that OAuth belongs to this exact destination. No new OAuth token is required for this migration.
+
+`PUBLISH_ENABLED=true` enables long/Short uploads, and `AUTOMATION_ENABLED=true` enables daily generation at 03:00 Asia/Dhaka. Uploaded videos use the reference automatic scheduling policy: first 06:00 America/New_York slot at least 72 hours after upload completion. These are repository Actions variables, not secrets. Explicit false disables the corresponding behavior. Existing token and Drive secrets are reused.
+
 ## Shorts preview recovery and publication preflight
 
 Preview generation (`PUBLISH_ENABLED` unset or false) does not require YouTube credentials. Reusable Shorts workflow secrets are optional at dispatch time; enabling publication requires all four existing repository secrets, checked before model generation and before Shorts rendering. Missing values produce a diagnostic listing names only. No credentials or publication variables are changed automatically.
