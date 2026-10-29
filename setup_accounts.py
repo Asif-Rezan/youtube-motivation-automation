@@ -57,22 +57,18 @@ def main():
         channels = api.channels().list(part='id,snippet', mine=True).execute().get('items', [])
         if len(channels) != 1 or channels[0]['id'] != args.channel_id:
             raise RuntimeError('Wrong channel selected; no secrets changed')
-        if channels[0].get('snippet', {}).get('customUrl', '').lower() != '@dudi_dum_tv':
-            raise RuntimeError('Channel handle mismatch; no secrets changed')
         secret('YOUTUBE_TOKEN_JSON', credentials.to_json())
         secret('EXPECTED_CHANNEL_ID', args.channel_id)
         print('Verified channel: ' + channels[0]['snippet']['title'])
     else:
         api = build('drive', 'v3', credentials=credentials, cache_discovery=False)
-        if api.about().get(fields='user(emailAddress)').execute()['user']['emailAddress'].lower() != email:
-            raise RuntimeError('Wrong Drive account; no folder created')
-        folders = api.files().list(q="trashed=false and mimeType='application/vnd.google-apps.folder' and appProperties has { key='dudi_dam_tv_root' and value='v1' }", fields='files(id)').execute()['files']
+        folders = api.files().list(q="trashed=false and mimeType='application/vnd.google-apps.folder' and appProperties has { key='youtube_automation_root' and value='v1' }", fields='files(id)').execute()['files']
         if len(folders) > 1:
             raise RuntimeError('Multiple project folders; reconcile manually')
         folder = folders[0] if folders else api.files().create(body={
-            'name': 'Dudi Dum TV - Kids Rhyme Automation',
+            'name': 'YouTubeAutomation',
             'mimeType': 'application/vnd.google-apps.folder',
-            'appProperties': {'dudi_dam_tv_root': 'v1'}}, fields='id').execute()
+            'appProperties': {'youtube_automation_root': 'v1'}}, fields='id').execute()
         secret('DRIVE_TOKEN_JSON', credentials.to_json())
         secret('DRIVE_FOLDER_ID', folder['id'])
         print('Dedicated Drive folder configured for ' + email)

@@ -1,3 +1,7 @@
+## Repository account compatibility fix
+
+This repository uses its existing `DRIVE_TOKEN_JSON`, `DRIVE_FOLDER_ID`, `YOUTUBE_TOKEN_JSON` and `EXPECTED_CHANNEL_ID` secrets, not the reference project's hardcoded account/channel. The authenticated Drive user must own the configured active private folder; shared/foreign/trashed folders are rejected. A private `Kids Rhymes - YouTube Automation` child folder marked `youtube_kids_rhymes_root=v1` is created once and reused. Kids history/checkpoints and cleanup stay inside that child, leaving Ancient Humans data untouched. Connection verification may initialize this child folder; it never uploads videos. YouTube continues to require an exact match with `EXPECTED_CHANNEL_ID`. Account setup requires an explicitly supplied channel ID, without requiring the reference channel handle. Older reference-specific account/folder instructions below are superseded by this section.
+
 # YouTube Motivation Automation — kids rhymes migration
 
 This repository now runs the kids rhymes pipeline copied from [dudi_dam_tv](https://github.com/Asif-Rezan/dudi_dam_tv/tree/6add42d9d315c4f73ec0d40c51c128fb2be76c15) at commit `6add42d9d315c4f73ec0d40c51c128fb2be76c15`.
