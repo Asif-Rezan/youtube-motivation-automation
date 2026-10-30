@@ -1,10 +1,10 @@
 # Facebook Page publishing
 
-Destination: [Rezan Relaxation](https://www.facebook.com/rezan.relaxation/), Page ID `297892583408910` (confirmed in the Page's management links). Existing YouTube and Drive credentials remain unchanged.
+Destination: [Rezan Relaxation](https://www.facebook.com/rezan.relaxation/), Page ID `297892583408910` (confirmed in the Page's management links). Meta app: `Rezan Video Automation`, App ID `1768108484480464`, connected to business portfolio `747381864278018`. Existing YouTube and Drive credentials remain unchanged.
 
 ## One-time authorization
 
-1. Register for Meta for Developers using the Page administrator's personal account. The user must accept Meta's terms and complete any account/email/phone verification themselves when required.
+1. Register for Meta for Developers using the Page administrator's personal account. The user must explicitly approve Meta terms acceptance and complete authentication/account verification themselves when required.
 2. Create `Rezan Video Automation` with the **Manage everything on your Page** use case and the matching `rezan_relaxation` business portfolio.
 3. Authorize only the required Page with `pages_show_list`, `pages_read_engagement`, and `pages_manage_posts`. The authorizing person must be able to perform CREATE_CONTENT. Confirm current standard/advanced access and review requirements in the dashboard for the actual app/account; app creation alone is not publication authorization.
 4. Obtain a Page access token, not a personal profile token. Validate `/me?fields=id,name` returns `297892583408910`. Store it only as repository Actions secret `FACEBOOK_PAGE_ACCESS_TOKEN`. Never commit it, put it in a variable, paste it into chat, or print it in logs. Record any token expiry/data-access expiry and renew authorization before expiry. Do not assume a token is permanent.
