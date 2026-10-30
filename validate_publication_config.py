@@ -7,7 +7,7 @@ REQUIRED = ('YOUTUBE_TOKEN_JSON', 'EXPECTED_CHANNEL_ID', 'DRIVE_TOKEN_JSON', 'DR
 def validate(environment=None):
     environment = os.environ if environment is None else environment
     if environment.get('FACEBOOK_PUBLISH_ENABLED') == 'true' and not environment.get('FACEBOOK_PAGE_ACCESS_TOKEN', '').strip():
-        raise ValueError('Facebook publishing is enabled but FACEBOOK_PAGE_ACCESS_TOKEN is missing')
+        print('::warning::Facebook token is missing; optional Facebook publication may fail. YouTube generation and publication will continue.')
     if environment.get('PUBLISH_ENABLED') != 'true':
         return
     missing = [name for name in REQUIRED if not environment.get(name, '').strip()]

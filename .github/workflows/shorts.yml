@@ -285,14 +285,20 @@ jobs:
       - name: Publish or verify the same Short
         if: vars.PUBLISH_ENABLED == 'true'
         run: python -u shorts.py --run-id "$SONG_RUN_ID" --start "$CLIP_START" --seconds "$CLIP_SECONDS" --publish
-      - name: Schedule the same episode on Rezan Relaxation
-        if: vars.FACEBOOK_PUBLISH_ENABLED == 'true'
-        env:
-          FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
-        run: python -u facebook_publish.py --run-id "$SONG_RUN_ID" --kind short
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: short-publication-${{ github.run_id }}
           path: output/shorts/**/*.json
           retention-days: 7
+  facebook:
+    name: Optional Facebook Reel publication
+    needs: short
+    if: vars.FACEBOOK_PUBLISH_ENABLED == 'true' && vars.PUBLISH_ENABLED == 'true'
+    uses: ./.github/workflows/facebook.yml
+    with:
+      source_run: ${{ format('{0}', github.run_id) }}
+      run_id: ${{ inputs.run_id }}
+      kind: short
+      non_blocking: true
+    secrets: inherit
