@@ -30,7 +30,13 @@ The Facebook jobs use the existing private Drive store for `facebook/SONG_RUN_ID
 
 A publishing failure can be resumed through **Publish existing episode to Facebook** without restarting models or writing to YouTube. Select `kind=video` and the original generation `source_run`, or `kind=short` and the run containing its `rhyme-short` artifact. The original song `run_id` must match. This recovery currently supports the default 0–40 second Short. Artifacts expire after seven days. Preserve or restore artifacts before retrying older episodes.
 
-Facebook scheduling is constrained to over ten minutes and under 29 days in this integration (the stricter Reel window). Expired schedules require deliberate reconciliation; retries never silently publish early or postpone an existing scheduled item. Automatic long-video cleanup waits for long/Short jobs, including enabled Facebook steps. Scheduled media is retained by the existing cleanup rules. Facebook is disabled independently of YouTube until `FACEBOOK_PUBLISH_ENABLED=true`.
+Facebook scheduling is constrained to over ten minutes and under 29 days in this integration (the stricter Reel window). Expired schedules require deliberate reconciliation; retries never silently publish early or postpone an existing scheduled item. Scheduled media is retained by the existing cleanup rules. Facebook is disabled independently of YouTube until `FACEBOOK_PUBLISH_ENABLED=true`.
+
+## Facebook failures do not block YouTube
+
+Automatic landscape and Reel uploads run in separate, optional jobs **after** their respective YouTube jobs succeed. The YouTube Short depends on the landscape YouTube job, never on its Facebook job. Missing Facebook tokens produce a preflight warning instead of stopping generation. Expired/revoked tokens, Facebook API errors, upload failures and Facebook job timeouts cannot fail the YouTube publication jobs. Automatic Facebook jobs tolerate failure, show a warning/job summary where possible and preserve checkpoint artifacts (`facebook-publication-GITHUB_RUN_ID-video` or `-short`) and private Drive state for recovery. Shared Drive or YouTube credential errors still fail the affected YouTube jobs normally.
+
+The Facebook-only manual recovery workflow intentionally reports failures normally. Retry that workflow after renewing Facebook authorization; it does not regenerate media or write to YouTube. Automatic and manual Facebook jobs share a lock per media kind, separate from YouTube locks, so a slow Facebook request does not hold up the next YouTube publication. Facebook reads its own copy of the original workflow artifact, so Drive media cleanup does not remove its upload source.
 
 ## Verification and limits
 

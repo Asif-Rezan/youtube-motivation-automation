@@ -1,5 +1,26 @@
 name: Publish existing episode to Facebook
 on:
+  workflow_call:
+    inputs:
+      source_run:
+        required: true
+        type: string
+      run_id:
+        required: true
+        type: string
+      kind:
+        required: true
+        type: string
+      non_blocking:
+        type: boolean
+        default: true
+    secrets:
+      FACEBOOK_PAGE_ACCESS_TOKEN:
+        required: false
+      DRIVE_TOKEN_JSON:
+        required: false
+      DRIVE_FOLDER_ID:
+        required: false
   workflow_dispatch:
     inputs:
       source_run:
@@ -19,11 +40,12 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: ${{ inputs.kind == 'short' && 'dudi-dam-tv-shorts' || 'dudi-dam-tv-publish' }}
+  group: facebook-publication-${{ inputs.kind }}
   cancel-in-progress: false
 jobs:
   facebook:
     if: vars.FACEBOOK_PUBLISH_ENABLED == 'true'
+    continue-on-error: ${{ inputs.non_blocking == true }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -48,11 +70,18 @@ jobs:
           run-id: ${{ inputs.source_run }}
           github-token: ${{ github.token }}
           path: ${{ inputs.kind == 'short' && 'output/shorts/' || 'output/' }}
-      - name: Publish without regenerating media or touching YouTube
+      - id: publication
+        name: Publish without regenerating media or touching YouTube
         run: python -u facebook_publish.py --run-id "$SONG_RUN_ID" --kind "$MEDIA_KIND"
+      - name: Report optional Facebook failure
+        if: failure() && inputs.non_blocking == true
+        run: |
+          echo "::warning::Facebook publication failed. YouTube publication is independent; retry using Publish existing episode to Facebook."
+          echo "### Facebook publication needs retry" >> "$GITHUB_STEP_SUMMARY"
+          echo "YouTube publication is unaffected. Inspect this job and retry the existing episode through the Facebook-only recovery workflow." >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: facebook-publication-${{ github.run_id }}
+          name: facebook-publication-${{ github.run_id }}-${{ inputs.kind }}
           path: output/**/facebook-state.json
           retention-days: 7
