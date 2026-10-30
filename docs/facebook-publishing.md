@@ -18,6 +18,10 @@ Only Rezan Relaxation was authorized. The derived Page token was verified in Met
 
 The first live Reel test [run 41004538486](https://github.com/Asif-Rezan/youtube-motivation-automation/actions/runs/41004538486) uploaded existing episode `kids-rhyme-20261029-2134`, verified processing ready, exact Page/video identity and scheduled timestamp `1793617200` (November 2, 2026, 17:00 Asia/Dhaka). Facebook video ID: `1443974681239622`. A successful schedule is not proof of eventual public release; Meta processing, policy and account restrictions can still affect publication.
 
+The landscape upload [run 41004686341](https://github.com/Asif-Rezan/youtube-motivation-automation/actions/runs/41004686341) also succeeded, verifying Facebook video ID `2584572045350123` and the same scheduled timestamp. Both items were confirmed as Public and scheduled for November 2 at 17:00 in Meta Business Suite. Meta currently labels both items as Reels in its content table, although the landscape file uses the Page `/videos` upload endpoint. Existing media was reused; these recovery runs made no YouTube writes.
+
+The existing private storage account is `asifrezan.office@gmail.com`. Both Facebook checkpoint files were verified in its `Kids Rhymes - YouTube Automation` folder. Use this account when manually inspecting Drive, rather than the browser's default Google account. Keep the existing `DRIVE_TOKEN_JSON` and `DRIVE_FOLDER_ID` secrets.
+
 ## Behavior
 
 The original landscape MP4 is a Page video; the 40-second portrait Short is a Facebook Reel. No new models or media generation. Facebook uses the same frozen publication target saved in the YouTube checkpoint. Scheduled Page content becomes public at release; this is not personal-profile posting. The Reel is explicitly disclosed as AI-generated; Page video descriptions disclose AI-generated music and illustrations.
