@@ -6,6 +6,8 @@ import re
 
 from storage import Store, drive_retry, required
 
+STORY_MEDIA = ('narration.wav', 'background.wav', 'song.wav', 'video.mp4', 'thumbnail.jpg')
+
 MEDIA = ('storyboard.tar.gz', 'song.wav', 'video.mp4', 'thumbnail.jpg', 'background-source.png',
          'thumbnail-source.png', 'cover.png')
 
@@ -14,13 +16,19 @@ def verify_public(client, state):
     from pipeline import metadata_tags, upload_description
     if state.get('phase') != 'published' or not state.get('video_id') or state.get('thumbnail_uploaded') is not True:
         raise RuntimeError('Published video and uploaded thumbnail required before cleanup')
-    items = client.videos().list(part='snippet,status,processingDetails,contentDetails',
+    items = client.videos().list(part='snippet,status,processingDetails,contentDetails,paidProductPlacementDetails',
                                 id=state['video_id']).execute().get('items', [])
     if len(items) != 1:
         raise RuntimeError('Published video unavailable; preserve Drive media')
     video = items[0]
     snippet, status = video.get('snippet', {}), video.get('status', {})
     song = state['song']
+    if song.get('content_type') == 'hindi_story':
+        from upload_settings import verified_phase
+        if video.get('id') != state['video_id'] or verified_phase(video, state['upload_body'],
+                required('EXPECTED_CHANNEL_ID'), state.get('synthetic_disclosure_receipt')) != 'published':
+            raise RuntimeError('Public HD story verification failed; preserve Drive media')
+        return
     description = state.get('upload_description', upload_description(song))
     if (video.get('id') != state['video_id'] or snippet.get('channelId') != required('EXPECTED_CHANNEL_ID')
             or snippet.get('title') != song['title'] or snippet.get('description') != description
@@ -35,12 +43,15 @@ def cleanup(store, client, run_id, state):
     if not re.fullmatch(r'[a-zA-Z0-9_-]{1,80}', run_id):
         raise ValueError('Invalid run ID')
     verify_public(client, state)  # Fresh YouTube proof, including on cleanup-only retries.
-    key = f'runs/{run_id}/cleanup.json'
+    is_story = state.get('song', {}).get('content_type') == 'hindi_story'
+    prefix = 'stories/runs' if is_story else 'runs'
+    media = STORY_MEDIA if is_story else MEDIA
+    key = f'{prefix}/{run_id}/cleanup.json'
     journal = store.load(key, None)
     if journal is None:
         files = []
-        for name in MEDIA:
-            media_key = f'runs/{run_id}/{name}'
+        for name in media:
+            media_key = f'{prefix}/{run_id}/{name}'
             file_id = store.find(media_key)
             if file_id:
                 files.append({'id': file_id, 'name': name})
@@ -50,11 +61,11 @@ def cleanup(store, client, run_id, state):
         raise RuntimeError('Cleanup journal identity mismatch')
     for entry in journal['files']:
         file_id, name = entry['id'], entry['name']
-        if name not in MEDIA:
+        if name not in media:
             raise RuntimeError('Unsafe cleanup manifest entry')
         if file_id in journal['deleted']:
             continue
-        media_key = f'runs/{run_id}/{name}'
+        media_key = f'{prefix}/{run_id}/{name}'
         try:
             remote = drive_retry(lambda: store.client.files().get(fileId=file_id,
                 fields='id,name,parents,appProperties,mimeType,trashed').execute())

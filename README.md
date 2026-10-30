@@ -1,3 +1,106 @@
+# Daily Hindi emotional motivational stories
+
+The active pipeline now creates a **new original Hindi story every day**, rather than a three-video batch. Every finished video must measure **480–720 seconds (8–12 minutes)**. The former kids-rhyme pipeline is inactive and preserved below and in `legacy/kids-rhymes/`.
+
+## Production behavior
+
+- Qwen3-4B CPU writes an original six-chapter Hindi Devanagari story, about 1,100–1,500 words across 48 scenes. Approximately 75% is narration with short male/female character dialogue. The ending demonstrates the lesson through a decision rather than a long speech. Generation has no fixed-script fallback.
+- Kokoro-82M (`kokoro==0.9.4`, `lang_code='h'`) speaks the complete story on CPU: narrator `hm_omega`, male character `hm_psi`, female character `hf_alpha`. `espeak-ng` provides Hindi phonemization. Actual audio samples determine every scene boundary. Native speech speed may be adjusted within 0.80–1.15 and re-synthesized to meet the duration range; the story is never cut short, looped or filled with minutes of silence. Out-of-range output fails before publication. Hindi pronunciation/emotion still require listening review; no voice-quality guarantee is made.
+- **Reference image style retained:** the same pinned `segmind/SSD-1B`, 1024×576 sources, 20 steps and core prompts from the current kids-rhyme version: cute colorful 3D storybook cartoon, rounded soft shapes, expressive faces, bright pastels, detailed environments and soft lighting. Actions and human characters follow the Hindi story; fixed appearance/clothing/world descriptions are repeated within the episode. This is text-guided consistency, not reference-image conditioning, face locking or full character animation. Exact faces cannot be guaranteed. Eight image shards generate 48 scenes, with gentle camera pan/zoom in a 1920×1080 video.
+- ACE-Step 1.5 `acestep-v15-turbo` produces **instrumental background music**, in independent parts no longer than 120 seconds. Nursery-rhyme reference audio is not used for stories. Parts cover the complete measured narration; no background looping or padding. Music is mixed quietly, ducked under speech and faded at the start/end.
+- Titles/descriptions/tags belong to the individual Hindi story, replacing the kids pipeline's fixed rhyme metadata. Hindi audio/metadata, Education category (27), general audience (`made_for_kids=false`) and AI disclosure are used. Existing kids upload settings remain available for rollback and manual kids recovery.
+- Private Drive story reservations/history use `stories/` keys inside the existing owned private automation folder, separate from rhyme history and publication state. Exact script/title, close summary similarity and repeated scene checks reject duplicates against reserved, scheduled and published stories. This practical check cannot prove global originality. The same run ID resumes the saved story; a new ID requests a new story.
+- Uploads keep the existing exact channel guard and resumable publication checks. A saved YouTube ID is reused after scheduling/processing errors; ambiguous uploads stop instead of creating duplicates. Final audio/video duration and render fingerprints are checked before a new upload. Scheduled story backups remain on Drive for recovery; each daily run cleans only exact media files of older freshly verified public HD stories. Scripts, history and publication journals remain saved.
+
+## Daily schedule and operation
+
+Active workflow: [Daily Hindi emotional motivational story](.github/workflows/stories.yml).
+
+- Daily generation starts at **03:00 Asia/Dhaka** (`0 21 * * *` UTC), gated by the existing `AUTOMATION_ENABLED=true` repository variable.
+- `PUBLISH_ENABLED=true` keeps automatic YouTube upload on. Both switches were verified as true on 2026-10-30; this migration reuses the existing credentials and channel.
+- Release remains the **first 06:00 America/New_York slot at least 72 elapsed hours after upload completion**. Therefore the first new story has the same three-plus-day release buffer. CPU time, queued runners and failed generation can leave gaps; cron is not a guarantee of daily completion.
+- Run **Daily Hindi emotional motivational story** manually for an immediate generation. Leave `run_id` empty for `story-YYYY-MM-DD` in Dhaka time, or supply a stable identity. Resume an interrupted story using its original `run_id` plus its numeric previous STORY workflow run as `prepared_run`; do not use a kids-rhyme run. Available checkpoints expire after seven days; the reserved script remains in Drive.
+- To resume only scheduling/verification of an existing uploaded story, use **Recover existing Hindi story publication**, with the original story run ID. It never generates or inserts another video.
+- The old automatic rhyme Shorts and Facebook cross-post jobs are not invoked by the story workflow. Their manual/recovery tools and original settings are preserved. This migration schedules one new long-form Hindi story per day.
+- Story backups stay in private Drive until a later daily run verifies public HD publication and cleans their temporary audio/video/thumbnail files. Cleanup errors retain media and retry later without blocking new generation. The existing guarded free-storage check stops rather than purchasing storage if quota still fills. No claim of a completed full model run or actual scheduled story should be inferred from component tests; inspect the live Actions run.
+
+Local stage commands (CPU dependencies and model downloads required):
+
+```sh
+python daily_story.py --run-id story-example --stage plan --check-history
+python daily_story.py --run-id story-example --stage voice
+python daily_story.py --run-id story-example --stage images
+python daily_story.py --run-id story-example --stage music
+python daily_story.py --run-id story-example --stage render
+python daily_story.py --run-id story-example --stage publish
+```
+
+For a local script preview without Drive, omit `--check-history`; production always checks and reserves private history. Model/runtime references: [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M), [Hindi voices](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md), and the pinned ACE-Step runtime already recorded in `music_cpu.py`.
+
+## Validation
+
+- Python 3.12: 98 component tests passed, including Hindi script/length checks, saved-story resumption, duplicate checks, timeline continuity, story upload metadata, public-HD cleanup isolation and all existing kids/publication tests.
+- All active workflows passed actionlint 1.7.12.
+- An actual FFmpeg render with synthetic test inputs measured exactly 480.0 seconds and produced a thumbnail/render fingerprint. This checks rendering, not generated story/image/music quality.
+- Live model generation/publication status is recorded separately after dispatch.
+
+## Saved kids-rhyme version and exact rollback
+
+Saved immediately before this migration on **2026-10-30**:
+
+- Full commit: `40e20e938eca937344570f0231a01777c17638f7`
+- Commit: `Merge pull request #22 from Asif-Rezan/fix-youtube-processing-wait`
+- Backup branch: `codex/archive-kids-rhymes-20261030`
+- Exact tracked pre-migration source snapshot: [`legacy/kids-rhymes/`](legacy/kids-rhymes/), including its original README, tests and workflows. Existing Ancient Humans archive is retained separately in `legacy/ancient-humans/`.
+- The previous daily workflow is also retained **commented out** at [`.github/music-kids-rhymes.yml.commented`](.github/music-kids-rhymes.yml.commented), outside `.github/workflows/`, so it cannot trigger alongside stories. Old Python is archived intact instead of commenting every line and damaging its executable rollback copy. Root kids modules remain for shared infrastructure/manual recovery; `daily_story.py` is the new production entry point.
+- [Full saved 40-commit log](docs/kids-rhymes-commit-log.txt).
+
+To inspect or run the exact saved code in a separate checkout:
+
+```sh
+git fetch origin
+git worktree add ../kids-rhymes-saved origin/codex/archive-kids-rhymes-20261030
+```
+
+To restore the exact kids version as a new reversible commit (from a clean checkout):
+
+```sh
+git fetch origin
+git switch -c codex/restore-kids-rhymes origin/main
+git restore --source=40e20e938eca937344570f0231a01777c17638f7 --staged --worktree -- .
+git commit -m "Restore saved kids-rhyme automation"
+git push -u origin codex/restore-kids-rhymes
+# Review and merge this branch into main to activate the old daily workflow.
+```
+
+This restores tracked files and removes the story workflow through normal Git history, without reset or force push. Repository variables/secrets, existing uploads and Drive data are external to Git: review them separately. Old already-started Actions runs execute their original commit. The original YouTube channel and release policy are unchanged by rollback.
+
+Recent commits at the saved point:
+
+```text
+40e20e9 | 2026-10-30 | Merge pull request #22 from Asif-Rezan/fix-youtube-processing-wait
+b9405bd | 2026-10-30 | Wait through normal YouTube processing before scheduling existing uploads
+fa525d7 | 2026-10-30 | Merge pull request #21 from Asif-Rezan/isolate-facebook-failures
+d8d84fa | 2026-10-30 | Isolate optional Facebook failures from YouTube publishing
+4aa25c1 | 2026-10-30 | Merge pull request #20 from Asif-Rezan/facebook-landscape-validation
+30d0e28 | 2026-10-30 | Record successful landscape upload and correct Drive account
+ee414ad | 2026-10-30 | Merge pull request #19 from Asif-Rezan/facebook-live-validation
+14a21be | 2026-10-30 | Record production app and live Facebook Reel validation
+a256a39 | 2026-10-30 | Merge pull request #18 from Asif-Rezan/facebook-production-policy
+52fc6fa | 2026-10-30 | Publish privacy and deletion policy for Meta app
+c555883 | 2026-10-30 | Merge pull request #17 from Asif-Rezan/facebook-page-integration
+b118d01 | 2026-10-30 | Document confirmed Meta app and business identity
+26a9f1b | 2026-10-30 | Add scheduled Facebook Page videos and Reels with durable recovery
+7201136 | 2026-10-29 | Merge pull request #16 from Asif-Rezan/restore-automatic-publication
+9db2c34 | 2026-10-29 | Restore original YouTube channel identity across publishing workflows
+```
+
+## Historical kids-rhyme README (superseded for daily generation)
+
+The following is preserved as historical documentation. Use the story instructions above for new daily videos; kids/recovery notes below refer to the saved version.
+
+---
+
 ## Facebook Page cross-posting
 
 Facebook integration setup and recovery: [docs/facebook-publishing.md](docs/facebook-publishing.md). The destination is Rezan Relaxation (`297892583408910`). Existing YouTube generation/upload remains active; Facebook requires its own Page authorization and `FACEBOOK_PAGE_ACCESS_TOKEN` secret. Facebook is enabled independently with `FACEBOOK_PUBLISH_ENABLED=true` after the authorized live test. Do not treat the code installation as a completed Meta connection.

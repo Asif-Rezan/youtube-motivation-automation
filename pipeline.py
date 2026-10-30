@@ -156,9 +156,9 @@ def publish(client, root, song, state, save, upload_thumbnail=True, metadata_kin
         if state.get('upload_started'):
             raise RuntimeError('Ambiguous upload; reconcile YouTube before retry to avoid duplicates')
         from upload_settings import load_settings, upload_body
-        settings = load_settings()
+        settings = load_settings(profile="story" if song.get("content_type") == "hindi_story" else "kids")
         from upload_metadata import fixed_metadata
-        metadata = fixed_metadata(metadata_kind)
+        metadata = (song if song.get('content_type') == 'hindi_story' else fixed_metadata(metadata_kind))
         # Previous AI/story-based upload metadata (restore both lines to revert):
         # state['upload_description'] = upload_description(song)
         # state['upload_body'] = upload_body(song, state['upload_description'], metadata_tags(song), settings)
