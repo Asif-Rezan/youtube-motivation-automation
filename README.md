@@ -42,7 +42,8 @@ For a local script preview without Drive, omit `--check-history`; production alw
 - Python 3.12: 98 component tests passed, including Hindi script/length checks, saved-story resumption, duplicate checks, timeline continuity, story upload metadata, public-HD cleanup isolation and all existing kids/publication tests.
 - All active workflows passed actionlint 1.7.12.
 - An actual FFmpeg render with synthetic test inputs measured exactly 480.0 seconds and produced a thumbnail/render fingerprint. This checks rendering, not generated story/image/music quality.
-- Live model generation/publication status is recorded separately after dispatch.
+- Actual Kokoro CPU Hindi synthesis succeeded for all three configured voices: `hm_omega` (11.12 s), `hm_psi` (11.22 s), `hf_alpha` (10.47 s) on the same sample sentence. This verifies runtime output, not subjective pronunciation quality.
+- First production story run: [41048162989](https://github.com/Asif-Rezan/youtube-motivation-automation/actions/runs/41048162989), dispatched on main at migration commit `f30ff85` on 2026-10-30 with automatic scheduled publishing. At this documentation checkpoint it is running; a finished generated video or successful publication has not yet been established.
 
 ## Saved kids-rhyme version and exact rollback
 
@@ -74,7 +75,7 @@ git push -u origin codex/restore-kids-rhymes
 # Review and merge this branch into main to activate the old daily workflow.
 ```
 
-This restores tracked files and removes the story workflow through normal Git history, without reset or force push. Repository variables/secrets, existing uploads and Drive data are external to Git: review them separately. Old already-started Actions runs execute their original commit. The original YouTube channel and release policy are unchanged by rollback.
+This restores tracked files and removes the story workflow through normal Git history, without reset or force push. Repository variables/secrets, existing uploads and Drive data are external to Git: review them separately. Old already-started Actions runs execute their original commit. The in-progress kids run `41036770322` was canceled during the switch to prevent another rhyme upload. The original YouTube channel and release policy are unchanged by rollback.
 
 Recent commits at the saved point:
 
