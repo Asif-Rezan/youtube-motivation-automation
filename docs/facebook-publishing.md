@@ -10,7 +10,13 @@ Destination: [Rezan Relaxation](https://www.facebook.com/rezan.relaxation/), Pag
 4. Obtain a Page access token, not a personal profile token. Validate `/me?fields=id,name` returns `297892583408910`. Store it only as repository Actions secret `FACEBOOK_PAGE_ACCESS_TOKEN`. Never commit it, put it in a variable, paste it into chat, or print it in logs. Record any token expiry/data-access expiry and renew authorization before expiry. Do not assume a token is permanent.
 5. Run a controlled publication using existing episode artifacts and inspect Page identity, processing and the scheduled release. Set repository variable `FACEBOOK_PUBLISH_ENABLED=true` only after authorization is ready.
 
-Meta registration and authorization are interactive prerequisites. Until they finish, Facebook live publishing is not configured. The code must not report successful cross-posting merely because YouTube succeeded.
+## Account setup verified October 30, 2026
+
+The Meta app is **Published**. Its public [privacy and data deletion policy](https://asif-rezan.github.io/youtube-motivation-automation/privacy.html) is hosted from `docs/privacy.html` by the repository's existing GitHub Pages deployment.
+
+Only Rezan Relaxation was authorized. The derived Page token was verified in Meta's debugger as Type Page, Valid True, **Expires Never**, with `pages_show_list`, `pages_read_engagement`, and `pages_manage_posts` limited to Page `297892583408910`. It is stored in `FACEBOOK_PAGE_ACCESS_TOKEN`; `FACEBOOK_PUBLISH_ENABLED=true` is enabled. Publishing the app does not itself remove token expiry: the non-expiring Page token was derived after extending authorization. Meta still displayed a separate **Data Access Expires** timestamp `1801076531` (January 27, 2027 UTC). Recheck authorization before that date and if publishing reports an authorization error. Password/security changes, permission revocation or losing Page access can invalidate the token; never promise uninterrupted permanent access.
+
+The first live Reel test [run 41004538486](https://github.com/Asif-Rezan/youtube-motivation-automation/actions/runs/41004538486) uploaded existing episode `kids-rhyme-20261029-2134`, verified processing ready, exact Page/video identity and scheduled timestamp `1793617200` (November 2, 2026, 17:00 Asia/Dhaka). Facebook video ID: `1443974681239622`. A successful schedule is not proof of eventual public release; Meta processing, policy and account restrictions can still affect publication.
 
 ## Behavior
 

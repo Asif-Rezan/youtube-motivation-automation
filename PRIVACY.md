@@ -1,5 +1,7 @@
 # Dudi Dam TV privacy information
 
+For the current Rezan Video Automation application, including Facebook Page publishing and data deletion requests, see the [public privacy policy](https://asif-rezan.github.io/youtube-motivation-automation/privacy.html). The Google-specific production details below remain applicable.
+
 Dudi Dam TV is the channel owner's personal kids rhyme production automation. It is not a public sign-in service.
 
 The automation uses Google authorization to identify the selected YouTube channel, upload and inspect its music videos, set thumbnails, and create and manage its own media/checkpoint files in Google Drive. Separate authorizations are used for YouTube and Drive. It does not request access to Gmail, contacts, or unrelated Drive files.
