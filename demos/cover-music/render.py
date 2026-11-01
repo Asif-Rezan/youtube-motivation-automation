@@ -58,7 +58,8 @@ def render():
     settings={'task_type':params.task_type,'audio_cover_strength':params.audio_cover_strength,
         'cover_noise_strength':params.cover_noise_strength,'seconds':seconds,'lyrics':LYRICS,
         'reference_sha256':hashlib.sha256(reference.read_bytes()).hexdigest(),
-        'preview_only':True,'seed':params.seed,'inference_steps':params.inference_steps}
+        'preview_only':True,'seed':params.seed,'inference_steps':params.inference_steps,
+        'volume_gain':2.0,'volume_gain_db':6.0206,'limiter_peak':0.98}
     (root/'settings.json').write_text(json.dumps(settings,indent=2))
     print(json.dumps({'phase':'generating cover preview',**settings}),flush=True)
     with torch.inference_mode(),generation_progress():
@@ -71,7 +72,7 @@ def render():
     if abs(measured-seconds)>2 or not any(s['codec_type']=='audio' for s in info['streams']):
         raise RuntimeError('Cover preview duration/audio validation failed')
     preview=root/'cover-strength-50.mp3'
-    subprocess.run(['ffmpeg','-y','-v','error','-i',str(audio),'-c:a','libmp3lame','-b:a','192k',str(preview)],check=True)
+    subprocess.run(['ffmpeg','-y','-v','error','-i',str(audio),'-af','volume=2.0,alimiter=limit=0.98:level=false:latency=true','-c:a','libmp3lame','-b:a','192k',str(preview)],check=True)
     subprocess.run(['ffmpeg','-v','error','-xerror','-i',str(preview),'-f','null','-'],check=True)
     settings.update(passed=True,actual_seconds=measured,
         preview_sha256=hashlib.sha256(preview.read_bytes()).hexdigest())
