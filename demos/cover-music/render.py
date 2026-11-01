@@ -49,7 +49,7 @@ def render():
     if not ready or handler.device!='cpu':
         raise RuntimeError('ACE-Step CPU initialization failed')
     params=Params(task_type='cover',src_audio=str(source_audio.resolve()),
-        reference_audio=str(reference),audio_cover_strength=1.0,cover_noise_strength=0.0,
+        reference_audio=str(reference),audio_cover_strength=0.5,cover_noise_strength=0.0,
         caption='Joyful nursery rhyme, sweet adult female singing voice, clear English diction, playful dudi dudi dam dam refrain, warm child-friendly mix. Follow the source musical style and arrangement.',
         lyrics=LYRICS,vocal_language='en',instrumental=False,duration=seconds,
         seed=20261101,inference_steps=8,thinking=False,use_cot_metas=False,
@@ -70,13 +70,13 @@ def render():
     measured=float(info['format']['duration'])
     if abs(measured-seconds)>2 or not any(s['codec_type']=='audio' for s in info['streams']):
         raise RuntimeError('Cover preview duration/audio validation failed')
-    preview=root/'cover-strength-100.mp3'
+    preview=root/'cover-strength-50.mp3'
     subprocess.run(['ffmpeg','-y','-v','error','-i',str(audio),'-c:a','libmp3lame','-b:a','192k',str(preview)],check=True)
     subprocess.run(['ffmpeg','-v','error','-xerror','-i',str(preview),'-f','null','-'],check=True)
     settings.update(passed=True,actual_seconds=measured,
         preview_sha256=hashlib.sha256(preview.read_bytes()).hexdigest())
     (root/'settings.json').write_text(json.dumps(settings,indent=2))
-    print(json.dumps({'phase':'cover preview ready','seconds':measured,'strength':1.0}),flush=True)
+    print(json.dumps({'phase':'cover preview ready','seconds':measured,'strength':0.5}),flush=True)
 
 
 if __name__=='__main__':

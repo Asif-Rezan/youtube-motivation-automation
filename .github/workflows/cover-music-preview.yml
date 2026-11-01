@@ -50,14 +50,14 @@ jobs:
         run: |
           pip install --no-cache-dir torch==2.10.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cpu
           pip install --no-cache-dir -r requirements.txt -r requirements-music-cpu.txt
-      - name: Generate 30-second cover with source audio and maximum strength
+      - name: Generate 30-second cover with source audio and 50 percent strength
         run: python -u demos/cover-music/render.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cover-music-strength-100-${{ github.run_id }}
+          name: cover-music-strength-50-${{ github.run_id }}
           path: |
-            output/cover-music-preview/cover-strength-100.mp3
+            output/cover-music-preview/cover-strength-50.mp3
             output/cover-music-preview/settings.json
             output/cover-music-preview/generated/*.wav
           retention-days: 7
