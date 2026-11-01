@@ -14,7 +14,7 @@ import subprocess
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps
 
-VERSION = 'dudi-layered-characters-v1'
+VERSION = 'dudi-layered-characters-v2-isnet'
 FPS, SECONDS = 25, 5
 _SESSION = None
 _LAMA = None
@@ -35,8 +35,9 @@ def mask_for(image):
     global _SESSION
     from rembg import new_session, remove
     if _SESSION is None:
-        _SESSION=new_session('u2net',providers=['CPUExecutionProvider'])
+        _SESSION=new_session('isnet-general-use',providers=['CPUExecutionProvider'])
     mask=remove(image,session=_SESSION,only_mask=True).convert('L')
+    mask=mask.point(lambda value:0 if value<12 else value)
     # Reject implausible extraction instead of publishing a moving rectangle.
     coverage=float((np.asarray(mask)>128).mean())
     if not .025 <= coverage <= .72:
@@ -76,7 +77,7 @@ def clean_plate(image,mask):
 
 def prepare_layers(source,folder,extract=mask_for,inpaint=clean_plate):
     folder.mkdir(parents=True,exist_ok=True)
-    identity={'version':VERSION,'source_sha256':digest(source),'mask_model':'u2net','inpaint':'big-lama-v0.1.0'}
+    identity={'version':VERSION,'source_sha256':digest(source),'mask_model':'isnet-general-use','inpaint':'big-lama-v0.1.0'}
     record=folder/'layers.json'
     if record.exists():
         saved=json.loads(record.read_text())
