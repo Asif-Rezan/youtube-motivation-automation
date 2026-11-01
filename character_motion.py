@@ -1,6 +1,6 @@
 """Automatic CPU character cutouts, clean plates and layered storybook motion.
 
-No image API or inference credits. IS-Net isolates the foreground, LaMa fills
+No image API or inference credits. BiRefNet isolates the foreground, LaMa fills
 its original location, and Pillow animates the extracted original artwork.
 """
 import argparse
@@ -14,7 +14,7 @@ import subprocess
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps
 
-VERSION = 'dudi-layered-characters-v2-isnet'
+VERSION = 'dudi-layered-characters-v3-birefnet'
 FPS, SECONDS = 25, 5
 _SESSION = None
 _LAMA = None
@@ -35,9 +35,18 @@ def mask_for(image):
     global _SESSION
     from rembg import new_session, remove
     if _SESSION is None:
-        _SESSION=new_session('isnet-general-use',providers=['CPUExecutionProvider'])
+        _SESSION=new_session('birefnet-general-lite',providers=['CPUExecutionProvider'])
     mask=remove(image,session=_SESSION,only_mask=True).convert('L')
     mask=mask.point(lambda value:0 if value<12 else value)
+    # Animate the main character/group, not unrelated distant butterflies or stars.
+    # Keep antialiased fur edges surrounding the dominant connected silhouette.
+    from scipy import ndimage
+    labels,count=ndimage.label(np.asarray(mask)>64)
+    if count:
+        areas=np.bincount(labels.ravel())
+        areas[0]=0
+        principal=ndimage.binary_dilation(labels==areas.argmax(),iterations=3)
+        mask=Image.fromarray(np.where(principal,np.asarray(mask),0).astype('uint8'))
     # Reject implausible extraction instead of publishing a moving rectangle.
     coverage=float((np.asarray(mask)>128).mean())
     if not .025 <= coverage <= .72:
@@ -77,7 +86,7 @@ def clean_plate(image,mask):
 
 def prepare_layers(source,folder,extract=mask_for,inpaint=clean_plate):
     folder.mkdir(parents=True,exist_ok=True)
-    identity={'version':VERSION,'source_sha256':digest(source),'mask_model':'isnet-general-use','inpaint':'big-lama-v0.1.0'}
+    identity={'version':VERSION,'source_sha256':digest(source),'mask_model':'birefnet-general-lite','inpaint':'big-lama-v0.1.0'}
     record=folder/'layers.json'
     if record.exists():
         try:
@@ -168,13 +177,15 @@ def render_clip(source,target,width=1920,height=1080,index=0,prompt=''):
             hop=max(0,math.sin(math.pi*(cycle-.65)/1.1)) if .65<cycle<1.75 else 0
             landing=math.exp(-((cycle-1.85)/.13)**2)
             stretch=1+.012*math.sin(t*3+index)+.035*hop-.025*landing
+            lift=hop*min(22,native[1]*.035,max(0,bbox[1]*.45))
+            stretch=min(stretch,max(.9,(bbox[3]-lift-2)/subject.height))
             actor=deform(subject,t,index,rabbit)
             actor=actor.resize((max(1,round(subject.width/stretch**.4)),max(1,round(subject.height*stretch))),Image.Resampling.BICUBIC)
             center=(bbox[0]+bbox[2])/2
             # Limit travel to safe margins so bodies never leave the image.
             travel=min(native[0]*.015,max(0,bbox[0]-3),max(0,native[0]-bbox[2]-3))
             x=round(center-actor.width/2+math.sin(t*2+index)*travel)
-            y=round(bbox[3]-actor.height-hop*min(22,native[1]*.035))
+            y=round(bbox[3]-actor.height-lift)
             canvas=bg.copy()
             canvas.alpha_composite(actor,(x,y))
             proc.stdin.write(canvas.convert('RGB').tobytes())
