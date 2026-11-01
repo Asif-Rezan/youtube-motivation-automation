@@ -78,7 +78,11 @@ def render():
         audio=Path(result.audios[0]['path'])
         if recognizer is None:
             recognizer=WhisperModel('base.en',device='cpu',compute_type='int8',cpu_threads=4)
-        segments,_=recognizer.transcribe(str(audio),language='en',beam_size=5,
+        import numpy as np
+        pcm=subprocess.check_output(['ffmpeg','-v','error','-i',str(audio),
+            '-ar','16000','-ac','1','-f','f32le','pipe:1'])
+        samples=np.frombuffer(pcm,dtype=np.float32).copy()
+        segments,_=recognizer.transcribe(samples,language='en',beam_size=5,
             vad_filter=False,condition_on_previous_text=False)
         segments=list(segments)
         heard=' '.join(seg.text.strip() for seg in segments)
