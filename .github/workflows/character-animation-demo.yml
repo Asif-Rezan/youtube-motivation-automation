@@ -1,0 +1,32 @@
+name: CPU character animation demo
+on:
+  push:
+    branches: [demo/character-animation]
+    paths:
+      - demos/character_animation.py
+      - .github/workflows/character-animation-demo.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  render-demo:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install CPU rendering tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg espeak-ng fonts-dejavu-core
+          pip install pillow==11.3.0 numpy==2.2.6
+      - name: Render and decode-check character animation
+        run: python demos/character_animation.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: character-animation-demo
+          path: output/character-animation-demo/
+          retention-days: 7
+          if-no-files-found: error
