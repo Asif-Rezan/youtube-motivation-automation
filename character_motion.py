@@ -14,7 +14,7 @@ import subprocess
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps
 
-VERSION = 'dudi-layered-characters-v5-scene-stories'
+VERSION = 'dudi-layered-characters-v6-environment-cast'
 FPS, SECONDS = 25, 5
 _SESSION = None
 _LAMA = None
@@ -49,7 +49,7 @@ def mask_for(image):
     if count:
         areas=np.bincount(labels.ravel())
         areas[0]=0
-        principal=ndimage.binary_dilation(np.isin(labels,np.flatnonzero(areas >= areas.max()*.12)),iterations=3)
+        principal=ndimage.binary_dilation(np.isin(labels,np.flatnonzero(areas >= max(areas.max()*.06,mask.width*mask.height*.0008))),iterations=3)
         mask=Image.fromarray(np.where(principal,np.asarray(mask),0).astype('uint8'))
     # Reject implausible extraction instead of publishing a moving rectangle.
     coverage=float((np.asarray(mask)>128).mean())
@@ -171,7 +171,7 @@ def render_clip(source,target,width=1920,height=1080,index=0,prompt=''):
     # Compose at native generation resolution, then upscale once in FFmpeg.
     # This bounds CPU work and preserves the same 1080p output as production.
     native=bg.size
-    from scene_actions import plan_scene, actor_parts, compose_scene
+    from scene_actions import plan_scene, actor_parts, compose_scene, actor_profile
     plan=plan_scene(prompt,index)
     parts=actor_parts(fg)
     rig=parts[0][2] if len(parts)==1 else None
@@ -196,7 +196,9 @@ def render_clip(source,target,width=1920,height=1080,index=0,prompt=''):
     temp.replace(target)
     atomic_json(target.with_suffix('.json'),{'identity':clip_identity(source,width,height,index,prompt),
         'video_sha256':digest(target),'layers':layers,'passed':True,
-        'story_plan':plan,'actor_count':len(parts),'face_rigs':[part[2] for part in parts],
+        'story_plan':plan,'camera_motion':'continuous-safe-zoom-pan','background_motion':'sky-parallax-foliage-sway',
+        'actor_profiles':[actor_profile(plan,i,len(parts)) for i in range(len(parts))],
+        'story_plan_version':plan['version'],'actor_count':len(parts),'face_rigs':[part[2] for part in parts],
         'facial_motion':any(part[2] for part in parts),
         'facial_note':'2D blink, head turn and cheek lift' if rig else 'No confident single face; original face preserved'})
     return target

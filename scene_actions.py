@@ -8,7 +8,7 @@ import re
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
-VERSION = 'scene-stories-v1'
+VERSION = 'scene-stories-v2-camera-environment-cast'
 
 
 def smooth(value):
@@ -158,28 +158,102 @@ def draw_prop(canvas, plan, t, anchor, travel):
             d.line((px,py,px-2,py+size),fill=(151,207,245,175),width=max(1,size//5))
 
 
-def compose_frame(bg, subject, bbox, plan, t, rig=None, camera=True, prop=True):
-    state=state_at(plan,t)
+def background_motion(background, t):
+    """Subtle sky parallax and foliage sway; floor and frame edges stay fixed.
+
+    This uses the cleaned background only, so character faces never bend with
+    the scenery. It needs no extra images or per-frame model inference.
+    """
+    w,h=background.size
+    mesh=[]
+    def point(x,y):
+        u,v=x/w,y/h
+        edge=math.sin(math.pi*u)
+        sky=max(0,1-v/.60)
+        foliage=math.exp(-((v-.58)/.22)**4)
+        grass=math.exp(-((v-.88)/.055)**4)
+        dx=edge*w*(.004*math.sin(t*.75)*sky+
+            .0028*math.sin(t*1.8+u*5)*foliage+
+            .0018*math.sin(t*2.6+u*9)*grass)
+        dy=h*.0015*math.sin(math.pi*v)*math.sin(t*1.3+u*4)*foliage
+        return max(0,min(w,x+dx)),max(0,min(h,y+dy))
+    for y in range(0,h,48):
+        for x in range(0,w,48):
+            r,b=min(w,x+48),min(h,y+48)
+            mesh.append(((x,y,r,b),tuple(c for pt in [point(x,y),point(x,b),point(r,b),point(r,y)] for c in pt)))
+    return background.transform(background.size,Image.Transform.MESH,mesh,Image.Resampling.BICUBIC)
+
+
+def camera_viewport(size, bounds, plan, t):
+    """A continuous push-in and gentle pan, bounded to retain the whole cast."""
+    w,h=size
+    left,top,right,bottom=bounds
+    mx,my=w*.025,h*.025
+    # Limit zoom for edge-to-edge/tall/portrait compositions.
+    desired=1+.035*smooth(t/5)+.045*state_at(plan,t)['reaction']
+    zoom=max(1,min(desired,w/max(1,right-left+2*mx),h/max(1,bottom-top+2*my)))
+    cw,ch=w/zoom,h/zoom
+    wanted_x=(left+right)/2-cw/2+w*.004*math.sin(t*.55)
+    wanted_y=(top+bottom)/2-ch/2
+    low_x=max(0,right+mx-cw);high_x=min(w-cw,left-mx)
+    low_y=max(0,bottom+my-ch);high_y=min(h-ch,top-my)
+    x=max(low_x,min(high_x,wanted_x)) if low_x<=high_x else (w-cw)/2
+    y=max(low_y,min(high_y,wanted_y)) if low_y<=high_y else (h-ch)/2
+    return (x,y,x+cw,y+ch)
+
+
+def apply_camera(canvas, bounds, plan, t):
+    return canvas.resize(canvas.size,Image.Resampling.BICUBIC,
+        box=camera_viewport(canvas.size,bounds,plan,t)).convert('RGB')
+
+
+def actor_profile(plan, ordinal, count):
+    if count==1:
+        return dict(movement=plan['action'],delay=0.,phase=0.)
+    if plan['action']=='settle':
+        movement='settle'
+    else:
+        movement=('sway','two_hops','nod')[ordinal%3]
+    return dict(movement=movement,delay=ordinal*.22,phase=ordinal*1.7)
+
+
+def compose_frame(bg, subject, bbox, plan, t, rig=None, camera=True, prop=True, profile=None):
+    profile=profile or actor_profile(plan,0,1)
+    local_t=max(0,t-profile['delay'])
+    local_plan=dict(plan,action=profile['movement'])
+    state=state_at(local_plan,local_t)
     w,h=bg.size
     room_right=max(0,w-bbox[2]-4)
     room_left=max(0,bbox[0]-4)
-    # Pick the safe side once, before movement starts.
     direction=1 if room_right>=room_left else -1
-    plan=dict(plan,direction=direction)
     state['direction']=direction
-    travel=direction*min(w*.13,room_right if direction>0 else room_left)
-    lift=state['hop']*min(h*.075,max(0,bbox[1]*.4))
+    plan=dict(plan,direction=direction)
+    movement=profile['movement']
+    # Group members stay within their own space instead of sliding together.
+    travel=direction*min(w*.10,room_right if direction>0 else room_left) if movement=='approach' else 0
+    lift=state['hop']*min(h*.055,max(0,bbox[1]*.35))
     stretch=1+.035*state['hop']-.035*state['landing']
-    if plan['action']=='settle':
+    angle=0.
+    if movement=='settle':
         stretch-=.025*state['progress']
-    elif plan['action']=='sway':
-        stretch+=.008*math.sin(t*4)
+    elif movement in ('sway','nod'):
+        pulse=math.sin(local_t*(2.4 if movement=='sway' else 3.2)+profile['phase'])
+        # Ramp in from the original pose; every actor starts on its own beat.
+        pulse*=smooth(local_t/.45)
+        if movement=='sway':
+            angle=2.2*pulse
+        else:
+            stretch+=.018*pulse
     actor=face_motion(subject,rig,state)
-    actor=actor.resize((max(1,round(subject.width/stretch**.4)),max(1,round(subject.height*stretch))),Image.Resampling.BICUBIC)
+    aw=max(1,round(subject.width/stretch**.4));ah=max(1,round(subject.height*stretch))
+    actor=actor.resize((aw,ah),Image.Resampling.BICUBIC)
+    if angle:
+        actor=actor.rotate(angle,Image.Resampling.BICUBIC,expand=True)
+    actor.thumbnail((w,h),Image.Resampling.BICUBIC)
     cx=(bbox[0]+bbox[2])/2+travel*state['progress']
     x=max(0,min(w-actor.width,round(cx-actor.width/2)))
-    y=max(0,round(bbox[3]-actor.height-lift))
-    canvas=bg.copy().convert('RGBA')
+    y=max(0,min(h-actor.height,round(bbox[3]-actor.height-lift)))
+    canvas=background_motion(bg,t).convert('RGBA') if camera else bg.copy().convert('RGBA')
     shadow=Image.new('RGBA',bg.size)
     d=ImageDraw.Draw(shadow)
     radius=subject.width*.28*(1-.25*state['hop'])
@@ -191,13 +265,10 @@ def compose_frame(bg, subject, bbox, plan, t, rig=None, camera=True, prop=True):
         draw_prop(canvas,plan,t,(cx,face_y),travel)
     if not camera:
         return canvas
-    # Keep the entire frame during the action, then push toward the reacting face.
-    zoom=1+(.25 if rig else .10)*state['reaction']
-    crop_w,crop_h=w/zoom,h/zoom
-    target_y=face_y if rig else h*.5
-    left=max(0,min(w-crop_w,cx-crop_w/2))
-    top=max(0,min(h-crop_h,target_y-crop_h/2))
-    return canvas.crop((round(left),round(top),round(left+crop_w),round(top+crop_h))).resize((w,h),Image.Resampling.BICUBIC).convert('RGB')
+    bounds=(max(0,bbox[0]-subject.width*.04),max(0,bbox[1]-h*.08),
+            min(w,bbox[2]+max(0,travel)+subject.width*.04),bbox[3])
+    bounds=(min(bounds[0],bbox[0]+min(0,travel)),bounds[1],bounds[2],bounds[3])
+    return apply_camera(canvas,bounds,plan,t)
 
 
 def actor_parts(foreground):
@@ -209,36 +280,39 @@ def actor_parts(foreground):
     if not count:
         return []
     parts=[]
-    for number in np.flatnonzero(areas>=max(areas.max()*.12,20)):
-        mask=ndimage.binary_dilation(labels==number,iterations=2)
+    _,nearest=ndimage.distance_transform_edt(labels==0,return_indices=True)
+    owners=labels[tuple(nearest)]
+    for number in np.flatnonzero(areas>=max(areas.max()*.06,20)):
+        mask=ndimage.binary_dilation(labels==number,iterations=2) & (owners==number)
         item=foreground.copy()
         item.putalpha(Image.fromarray(np.where(mask,alpha,0).astype('uint8')))
         bbox=item.getbbox()
         if bbox:
             subject=item.crop(bbox)
             parts.append((subject,bbox,detect_face(subject)))
-    return parts
+    return sorted(parts,key=lambda part:part[1][0])
 
 
-def compose_scene(bg, parts, plan, t):
-    if len(parts)==1:
+def compose_scene(bg, parts, plan, t, camera=True, environment=True):
+    if not parts:
+        canvas=background_motion(bg,t) if environment else bg.copy()
+        return apply_camera(canvas,(0,0,*bg.size),plan,t) if camera else canvas.convert('RGB')
+    if len(parts)==1 and camera and environment:
         subject,bbox,rig=parts[0]
         return compose_frame(bg,subject,bbox,plan,t,rig)
-    # Disjoint children/animals keep their own face and feet. Small staggered
-    # reactions make the companions notice the same incoming object in turn.
-    canvas=bg.copy()
-    left=min(p[1][0] for p in parts); top=min(p[1][1] for p in parts)
-    right=max(p[1][2] for p in parts); bottom=max(p[1][3] for p in parts)
-    for i,(subject,bbox,rig) in enumerate(parts):
-        friend_plan=dict(plan,action='settle' if plan['action']=='settle' else 'sway')
-        canvas=compose_frame(canvas,subject,bbox,friend_plan,max(0,t-i*.12),rig,camera=False,prop=False)
+    canvas=background_motion(bg,t) if environment else bg.copy()
     w,h=bg.size
+    left=min(p[1][0]-p[0].width*.04 for p in parts)
+    top=min(p[1][1] for p in parts)-h*.08
+    right=max(p[1][2]+p[0].width*.04 for p in parts)
+    bottom=max(p[1][3] for p in parts)
+    # Painter's order follows the feet, independent of animation timing/order.
+    for i,(subject,bbox,rig) in sorted(enumerate(parts),key=lambda item:item[1][1][3]):
+        canvas=compose_frame(canvas,subject,bbox,plan,t,rig,camera=False,prop=False,
+            profile=actor_profile(plan,i,len(parts)))
     draw_prop(canvas,plan,t,((left+right)/2,top+(bottom-top)*.35),w*.10)
-    reaction=state_at(plan,t)['reaction']
-    zoom=1+.10*reaction
-    cw,ch=w/zoom,h/zoom
-    x=max(0,min(w-cw,(left+right)/2-cw/2));y=max(0,min(h-ch,(top+bottom)/2-ch/2))
-    return canvas.crop((round(x),round(y),round(x+cw),round(y+ch))).resize((w,h),Image.Resampling.BICUBIC).convert('RGB')
+    bounds=(max(0,left),max(0,top),min(w,right),min(h,bottom))
+    return apply_camera(canvas,bounds,plan,t) if camera else canvas.convert('RGB')
 
 
 def motion_prompt(scene):

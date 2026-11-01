@@ -2,7 +2,7 @@ import math
 import unittest
 import numpy as np
 from PIL import Image, ImageDraw
-from scene_actions import plan_scene, state_at, detect_face, compose_frame, actor_parts, compose_scene, motion_prompt
+from scene_actions import plan_scene, state_at, detect_face, compose_frame, actor_parts, compose_scene, motion_prompt, background_motion, camera_viewport, actor_profile
 
 
 class SceneActionTests(unittest.TestCase):
@@ -56,3 +56,62 @@ class SceneActionTests(unittest.TestCase):
     def test_world_does_not_override_the_current_lyric_action(self):
         scene={'lyric':'Roll our ball together', 'prompt':'Child and puppy with ball. Clear complete main character. World has moon and rain.'}
         self.assertEqual(plan_scene(motion_prompt(scene))['prop'],'ball')
+
+    def test_background_moves_without_transparent_edges_or_moving_floor(self):
+        w,h=320,180
+        array=np.zeros((h,w,4),dtype=np.uint8)
+        array[:,:,:3]=np.random.default_rng(8).integers(20,240,(h,w,3))
+        array[:,:,3]=255
+        image=Image.fromarray(array)
+        a=np.asarray(background_motion(image,0))
+        b=np.asarray(background_motion(image,1.4))
+        self.assertGreater(np.abs(a.astype(float)-b).mean(),1)
+        self.assertEqual(b[:,:,3].min(),255)
+        self.assertLessEqual(np.abs(a[-1].astype(int)-b[-1].astype(int)).max(),1)
+
+    def test_camera_pushes_in_but_keeps_cast_inside_landscape_and_portrait(self):
+        plan=plan_scene('children and animals')
+        for size,bounds in [((320,180),(80,30,250,155)),((180,320),(30,70,150,270)),
+                            ((320,180),(0,0,320,180))]:
+            first=camera_viewport(size,bounds,plan,0)
+            last=camera_viewport(size,bounds,plan,4.96)
+            for t in np.linspace(0,4.96,40):
+                x,y,r,b=camera_viewport(size,bounds,plan,float(t))
+                self.assertTrue(0<=x<=r<=size[0] and 0<=y<=b<=size[1])
+                self.assertTrue(x<=bounds[0] and y<=bounds[1])
+                self.assertTrue(r>=bounds[2] and b>=bounds[3])
+            if bounds[0]>0:
+                self.assertLess(last[2]-last[0],first[2]-first[0])
+
+    def test_multiple_characters_move_independently_with_stationary_camera(self):
+        bg=Image.new('RGBA',(320,180),'white')
+        parts=[(Image.new('RGBA',(35,75),'red'),(60,70,95,145),None),
+               (Image.new('RGBA',(40,70),'blue'),(205,60,245,130),None)]
+        plan=plan_scene('child and bunny wave hello')
+        def vertical_center(frame,color):
+            mask=(np.asarray(frame)==color).all(axis=2)
+            self.assertTrue(mask.any())
+            return np.nonzero(mask)[0].mean()
+        before=compose_scene(bg,parts,plan,0,camera=False,environment=False)
+        after=compose_scene(bg,parts,plan,2.65,camera=False,environment=False)
+        red_change=abs(vertical_center(after,[255,0,0])-vertical_center(before,[255,0,0]))
+        blue_change=abs(vertical_center(after,[0,0,255])-vertical_center(before,[0,0,255]))
+        self.assertGreater(blue_change,red_change+3)
+        self.assertNotEqual(actor_profile(plan,0,2),actor_profile(plan,1,2))
+
+    def test_small_companion_is_retained_and_masks_do_not_duplicate_pixels(self):
+        fg=Image.new('RGBA',(180,160))
+        d=ImageDraw.Draw(fg)
+        d.rectangle((20,20,69,119),fill='red')
+        d.rectangle((71,70,80,109),fill='blue')
+        parts=actor_parts(fg)
+        self.assertEqual(len(parts),2)
+        total=np.zeros((160,180),dtype=np.int32)
+        for image,bbox,_ in parts:
+            x,y,r,b=bbox
+            total[y:b,x:r]+=np.asarray(image)[:,:,3]
+        np.testing.assert_array_equal(total,np.asarray(fg)[:,:,3])
+
+    def test_empty_cast_is_a_valid_environment_shot(self):
+        image=compose_scene(Image.new('RGBA',(180,320),'skyblue'),[],plan_scene('clouds'),2)
+        self.assertEqual((image.mode,image.size),('RGB',(180,320)))

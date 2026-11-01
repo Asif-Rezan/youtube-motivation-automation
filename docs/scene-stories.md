@@ -27,3 +27,26 @@ successful completion is watched by `complete-scene-story.yml`, which reuses its
 finished video, restores configured scheduled publication and generates the
 missing Short. Other runs cannot trigger that one-episode continuation. Failed
 source runs never publish. The long video/music/images are not regenerated.
+
+## Camera, environment and independent cast motion
+
+The v2 scene renderer adds a continuous gentle camera push and pan. Camera
+framing is limited by the whole cast's bounds in landscape and portrait shots.
+The cleaned background has small sky parallax and foliage/grass sway, while
+character layers keep their own motion. This is a lightweight 2D background
+mesh, not a generated video or semantic simulation of individual plants.
+
+Disjoint characters get independent sway, hop and nod profiles, phases and
+reaction delays. Each remains anchored in its own space; cast members no longer
+all slide together. Smaller companions are retained and edge pixels have a
+single owner to avoid duplicate silhouettes. The image prompt asks for space
+between full-body characters. Touching or overlapping silhouettes still remain
+a group rather than being cut at guessed body boundaries.
+
+`demos/motion-improvements/render.py` renders a 15-second review reel from saved
+real episode layers: two landscape characters, two portrait characters and a
+single-character landscape. It checks decoding/duration and records frame/render
+timings in `validation.json`. The motion check workflow repeats these checks on
+GitHub without generating new music/images or publishing a video. The saved scene layers are retained under
+`demos/motion-improvements/assets` with source provenance and SHA-256 hashes, so
+the visual checks do not depend on expiring workflow artifacts.
