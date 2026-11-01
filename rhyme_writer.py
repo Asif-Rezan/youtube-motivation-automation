@@ -3,7 +3,7 @@ import hashlib
 import json
 import re
 from pathlib import Path
-from lyrics_cpu import MODEL_ID, request_story, StoryGenerationError
+from lyrics_cpu import MODEL_ID, request_story, StoryGenerationError, LYRIC_WORD_PATTERN
 
 VERSION='qwen-kids-original-v2'
 REFRAIN='dudi dudi dam dam dudi dudi dam'
@@ -102,12 +102,13 @@ def write_rhyme(day, identity, seconds, history, draft_path=None):
             schema={'type':'object','additionalProperties':False,'required':['verses'],'properties':{
                 'verses':{'type':'array','minItems':count,'maxItems':count,'items':{
                     'type':'object','additionalProperties':False,'required':['lyric','visual'],
-                    'properties':{'lyric':{'type':'string','minLength':10,'maxLength':100},
+                    'properties':{'lyric':{'type':'string','minLength':10,'maxLength':100,'pattern':LYRIC_WORD_PATTERN},
                                   'visual':{'type':'string','minLength':15,'maxLength':180}}}}}}
             # Keep useful model output; only ask again for rejected/missing lines.
             pending=state.get('pending',{})
             rows=list(pending.get('rows',[])) if pending.get('chapter')==chapter else []
-            feedback=pending.get('feedback',[]) if rows else []
+            feedback=pending.get('feedback',[]) if pending.get('chapter')==chapter else []
+            rejected=pending.get('rejected',[]) if pending.get('chapter')==chapter else []
             repair_round=pending.get('repair_round',0) if pending.get('chapter')==chapter else 0
             for retry in range(6):
                 remaining=count-len(rows)
@@ -118,17 +119,20 @@ def write_rhyme(day, identity, seconds, history, draft_path=None):
                 block=request_json(schema,
                     f'Write exactly {remaining} NEW short English sung lines for chapter {chapter+1}/{chapters} of this original episode: '
                     +json.dumps(outline)+'. Current chapter: '+outline['chapters'][chapter]+'. '
-                    'Each line occupies five seconds: use 4-9 simple singable words with playful rhyme and concrete actions. '
+                    'Each line occupies five seconds: aim for 4-8 simple singable words, NEVER more than 12. Use single spaces and plain English words without apostrophes or hyphens. Count words before returning JSON. '
                     f'Between every two original lines the singer will sing "{REFRAIN}" for five seconds. '
                     'Do not put that refrain in your output; the arranger inserts it. '
                     'Every verse line must be different. Develop this chapter rather than repeating earlier verses. '
                     'For each line, visual describes the same action and setting, featuring the episode characters with their exact appearance from the outline. Name the visible subjects, action, relevant props and setting explicitly. Match the lyric literally where possible, and vary locations as the chapter develops. '
                     'It is a text-free cartoon picture prompt, with no camera instructions or lettering. '
                     'Previous lines to avoid repeating: '+json.dumps(prior+[row['lyric'] for row in rows])+
-                    '. Fix these rejected-line constraints: '+json.dumps(feedback)+f'. Rewrite attempt {retry}.',
+                    '. Fix these rejected-line constraints: '+json.dumps(feedback)+
+                    '. Rewrite only these rejected candidates when supplied, preserving their action and visual meaning: '+json.dumps(rejected)+
+                    f'. Rewrite attempt {retry}.',
                     (base+attempt*10000+chapter*1000+repair_round+retry+1) % (2**31-1))
                 seen={normalized(line) for line in prior+[row['lyric'] for row in rows]}
                 feedback=[]
+                rejected=[]
                 for index,row in enumerate(block['verses']):
                     line=normalized(row['lyric'])
                     words=len(line.split())
@@ -136,12 +140,13 @@ def write_rhyme(day, identity, seconds, history, draft_path=None):
                             'reserved_refrain' if line==REFRAIN else
                             'duplicate_line' if line in seen else None)
                     if reason:
+                        rejected.append({'lyric':row['lyric'],'visual':row['visual']})
                         feedback.append({'line':index+1,'reason':reason,'word_count':words,
                                          'minimum_words':4,'maximum_words':12})
                     elif len(rows)<count:
                         rows.append(row)
                         seen.add(line)
-                state['pending']={'chapter':chapter,'rows':rows,'feedback':feedback,
+                state['pending']={'chapter':chapter,'rows':rows,'feedback':feedback,'rejected':rejected,
                                   'repair_round':repair_round+retry+1}
                 save()
                 if len(rows)==count:
