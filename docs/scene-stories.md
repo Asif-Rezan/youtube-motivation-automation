@@ -17,7 +17,13 @@ actor count and detected face rigs. Invalid foreground extraction retains the
 existing camera-only fallback and records the reason.
 
 Changing `.generation/scene-story-request.json` on main explicitly starts a new
-10-minute **generation-only** run. Its final video is saved as a GitHub artifact;
-that push run does not publish to YouTube/Facebook or create Shorts. Normal
-scheduled/manual runs retain their configured publication behavior and also use
-the new scene renderer. Cache versions invalidate previous motion clips.
+10-minute episode using the full pipeline, including independent Shorts music,
+portrait images and configured scheduled publication. Publication still follows
+`PUBLISH_ENABLED` and optional Facebook settings. Normal scheduled/manual runs
+use the same scene renderer. Cache versions invalidate previous motion clips.
+
+Run 41316394479 started before that correction and is generation-only. Its exact
+successful completion is watched by `complete-scene-story.yml`, which reuses its
+finished video, restores configured scheduled publication and generates the
+missing Short. Other runs cannot trigger that one-episode continuation. Failed
+source runs never publish. The long video/music/images are not regenerated.
