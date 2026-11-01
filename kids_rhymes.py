@@ -33,7 +33,7 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
     scenes=scenes[:seconds//5]
     outline=written['outline']
     song = dict(title=outline['title'], lyrics='\n'.join(scene['lyric'] for scene in scenes),duration=seconds,
-        prompt='Joyful nursery rhyme, cute sweet adult female singing voice, clear English diction, playful dudi dudi dam dam refrain, C major, 100 BPM, ukulele, xylophone, soft handclaps, gentle bass, warm child-friendly mix, no shouting. For the Dudi Dudi Dam Dam chorus, use a repeating C-G-Am-F chord progression, one chord per bar in 4/4 time.',
+        prompt='Joyful nursery rhyme, cute sweet adult female singing voice, clear English diction, playful dudi dudi dam dam refrain, major key, 100 BPM, ukulele, xylophone, soft handclaps, gentle bass, warm child-friendly mix, no shouting.',
         description=outline['description'],story_summary=outline['story_summary'],
         visual_identity=dict(characters=outline.get('characters',''), world=outline.get('visual_world','')),
         lyric_writer=dict(backend='local-qwen-cpu',version=written['writer_version'],novelty_checked=True),
