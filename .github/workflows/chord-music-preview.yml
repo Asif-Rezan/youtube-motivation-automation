@@ -49,16 +49,17 @@ jobs:
       - name: Install pinned CPU music runtime
         run: |
           pip install --no-cache-dir torch==2.10.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cpu
-          pip install --no-cache-dir -r requirements.txt -r requirements-music-cpu.txt
-      - name: Generate 30-second nursery rhyme with A-Bm-A-Bm-Em-D chords
+          pip install --no-cache-dir -r requirements.txt -r requirements-music-cpu.txt faster-whisper==1.2.1
+      - name: Generate and verify clear singing with the requested chords
         run: python -u demos/chord-music/render.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: riya-chord-music-${{ github.run_id }}
+          name: riya-chord-vocals-${{ github.run_id }}
           path: |
-            output/chord-music-preview/riya-chords-preview.mp3
-            output/chord-music-preview/settings.json
-            output/chord-music-preview/generated/*.wav
+            output/chord-vocal-preview/riya-chords-vocals.mp3
+            output/chord-vocal-preview/settings.json
+            output/chord-vocal-preview/vocal-check-*.json
+            output/chord-vocal-preview/generated/*.wav
           retention-days: 7
           if-no-files-found: warn
