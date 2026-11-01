@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 from PIL import Image, ImageDraw
 
-VERSION = 'storybook-motion-v2-visible-bubbles'
+VERSION = 'storybook-layered-characters-v3'
 FPS = 25
 SCENE_SECONDS = 5
 TRANSITION = .28
@@ -90,27 +90,17 @@ def render_scenes(root, scenes, width=1920, height=1080):
     root=Path(root)
     work=root/'motion'
     work.mkdir(exist_ok=True)
-    sprite=work/'bubble.png'
-    bubble_sprite(sprite)
-    previous=None
+    from character_motion import cached_clip, verify_clip
     clips=[]
     for scene in scenes:
         index=scene['index']
         source=root/f'scene-{index:03d}-source.png'
-        # Fail before FFmpeg starts when a required illustration is absent/corrupt.
-        with Image.open(source) as im:
-            im.verify()
         target=work/f'clip-{index:03d}.mp4'
-        args=['-i',str(source),'-loop','1','-framerate',str(FPS),'-i',str(sprite)]
-        if previous:
-            args += ['-loop','1','-framerate',str(FPS),'-i',str(previous)]
-        args += ['-filter_complex_threads','1','-filter_complex',scene_filter(index,width,height,previous is not None),
-            '-map','[out]','-an','-frames:v',str(FPS*SCENE_SECONDS),'-r',str(FPS),
-            '-c:v','libx264','-threads','4','-preset','fast','-crf','20','-pix_fmt','yuv420p',str(target)]
-        print(json.dumps({'phase':'animate scene','scene':index+1,'total':len(scenes)}),flush=True)
-        run_ffmpeg(args)
-        previous=work/'previous-frame.png'
-        run_ffmpeg(['-sseof','-0.2','-i',str(target),'-vf','reverse','-frames:v','1','-update','1',str(previous)])
+        with Image.open(source) as image:
+            image.verify()
+        if not cached_clip(source,target,width,height,index,scene.get('prompt','')):
+            raise RuntimeError(f'Scene {index} needs current character-motion clips; regenerate its image shard')
+        verify_clip(target,width,height)
         clips.append(target)
     listing=work/'clips.txt'
     listing.write_text(''.join(f"file '{p.name}'\n" for p in clips))

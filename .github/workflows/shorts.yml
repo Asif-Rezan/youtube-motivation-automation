@@ -201,6 +201,12 @@ jobs:
           root = Path('output')/run_id
           generate_song_images(root, json.loads((root/'song.json').read_text()))
           PY
+      - name: Prepare automatic character layers and animated scene clips
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          pip install --no-cache-dir -r requirements-motion-cpu.txt
+          python -u character_motion.py --root "output/$SONG_RUN_ID"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -208,6 +214,8 @@ jobs:
           path: |
             output/*/portrait/*.png
             output/*/portrait/image-manifest-*.json
+            output/*/portrait/characters/**
+            output/*/portrait/motion/**
           retention-days: 7
   short:
     needs: [short_images, short_music]

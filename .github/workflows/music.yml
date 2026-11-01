@@ -318,6 +318,12 @@ jobs:
           path: output/
       - name: Generate lyric-matched five-second scenes
         run: python -u prepare_music.py --run-id "$SONG_RUN_ID" --stage images
+      - name: Prepare automatic character layers and animated scene clips
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          pip install --no-cache-dir -r requirements-motion-cpu.txt
+          python -u character_motion.py --root "output/$SONG_RUN_ID"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -326,6 +332,8 @@ jobs:
             output/*/scene-*-source.png
             output/*/thumbnail-source.png
             output/*/image-manifest-*.json
+            output/*/characters/**
+            output/*/motion/**
           retention-days: 7
   short_images:
     needs: lyrics
@@ -372,6 +380,12 @@ jobs:
           path: output/
       - name: Generate native 9:16 Shorts illustrations
         run: python -u prepare_music.py --run-id "$SONG_RUN_ID" --stage images
+      - name: Prepare automatic character layers and animated scene clips
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          pip install --no-cache-dir -r requirements-motion-cpu.txt
+          python -u character_motion.py --root "output/$SONG_RUN_ID"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -379,6 +393,8 @@ jobs:
           path: |
             output/*/portrait/*.png
             output/*/portrait/image-manifest-*.json
+            output/*/portrait/characters/**
+            output/*/portrait/motion/**
           retention-days: 7
   publish:
     needs: [lyrics, music, images]
