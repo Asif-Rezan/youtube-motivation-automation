@@ -44,6 +44,7 @@ class ShortsTests(unittest.TestCase):
             audio.write_bytes(b'source')
             (source/'video.mp4').write_bytes(b'source')
             (target/'video.mp4').write_bytes(b'encoded')
+            (source/'song.json').write_text(json.dumps({'scenes':[{'index':i,'prompt':f'Character {i}'} for i in range(8)]}))
             portrait = source/'portrait'
             portrait.mkdir()
             for i in range(8):
@@ -131,6 +132,7 @@ class ShortsTests(unittest.TestCase):
             root=Path(tmp)
             with self.assertRaises(FileNotFoundError):
                 shorts.render_short(root,root/'target')
+            (root/'song.json').write_text(json.dumps({'scenes':[{'index':i,'prompt':'A dancing bunny'} for i in range(8)]}))
             (root/'portrait').mkdir()
             Image.new('RGB',(128,72),'pink').save(root/'portrait/scene-000-source.png')
             with self.assertRaisesRegex(ValueError,'native 9:16'):

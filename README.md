@@ -1,3 +1,29 @@
+## Automatic character animation
+
+Every newly generated landscape and portrait scene now uses CPU character
+segmentation (U2Net), background completion (LaMa), and layered puppet animation.
+Original 3D storybook artwork stays intact in the foreground. Characters breathe,
+sway and make gentle hops with landing squash; rabbit scenes additionally bend
+the upper ears and move the tail region. Connected characters move as a group;
+this is not full 3D rigging, action understanding or speech lip-sync. Automated
+mattes/inpainting can vary from the hand-prepared demo and require visual review.
+Implausible empty or oversized masks stop the affected image shard for review.
+
+Sixteen landscape and four portrait workers prepare layers and exact five-second
+1080p scene clips after image generation exits, releasing diffusion model memory.
+Final assembly requires current verified character-motion clips; it cannot silently
+fall back to the old zoom-and-bubbles slideshow. Clip/source hashes invalidate
+stale or corrupt caches. Layer PNGs and MP4 clips travel in the same seven-day
+artifacts as their source images, so retries reuse finished work. Old runs without
+these clips must regenerate their image shards using the new workflow.
+
+Install CPU PyTorch, `requirements.txt`, and `requirements-motion-cpu.txt`, then
+run `python character_motion.py --root output/RUN_ID` with the same IMAGE_SHARD,
+IMAGE_SHARDS and IMAGE_VARIANT values used to generate that worker's artwork.
+The first run downloads public U2Net and LaMa model weights. No paid image/video
+inference API or GPU runner is used. Model sources: [rembg](https://github.com/danielgatis/rembg)
+and [LaMa CPU wrapper/model](https://github.com/enesmsahin/simple-lama-inpainting).
+
 ## Facebook Page cross-posting
 
 Facebook integration setup and recovery: [docs/facebook-publishing.md](docs/facebook-publishing.md). The destination is Rezan Relaxation (`297892583408910`). Existing YouTube generation/upload remains active; Facebook requires its own Page authorization and `FACEBOOK_PAGE_ACCESS_TOKEN` secret. Facebook is enabled independently with `FACEBOOK_PUBLISH_ENABLED=true` after the authorized live test. Do not treat the code installation as a completed Meta connection.
