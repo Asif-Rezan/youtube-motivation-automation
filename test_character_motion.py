@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 import numpy as np
 from PIL import Image, ImageDraw
-from character_motion import prepare_layers, cached_clip, render_clip, deform
+from character_motion import prepare_layers, cached_clip, render_clip, deform, InvalidForegroundMask
 
 
 class CharacterMotionTests(unittest.TestCase):
@@ -43,6 +43,50 @@ class CharacterMotionTests(unittest.TestCase):
             for value in (0,255):
                 with self.assertRaisesRegex(ValueError,'Invalid foreground'):
                     prepare_layers(source,root/'layers',lambda im:Image.new('L',im.size,value),lambda im,m:im)
+
+    @unittest.skipUnless(shutil.which('ffmpeg'),'FFmpeg required')
+    def test_rejected_extraction_renders_verified_camera_motion(self):
+        for dimensions, coverage in (((160,90),.013),((90,160),.020)):
+            with self.subTest(dimensions=dimensions), tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp)
+                source=root/'source.png'
+                image=Image.new('RGB',dimensions,'blue')
+                ImageDraw.Draw(image).rectangle((30,20,60,60),fill='red')
+                image.save(source)
+                target=root/'motion'/'clip.mp4'
+                reason=f'Character extraction needs review: foreground coverage {coverage:.3f}'
+                with patch('character_motion.prepare_layers',side_effect=InvalidForegroundMask(reason)):
+                    render_clip(source,target,*dimensions,0,'wide shot')
+                saved=json.loads(target.with_suffix('.json').read_text())
+                self.assertEqual(saved['motion_mode'],'camera')
+                self.assertEqual(saved['fallback_reason'],reason)
+                self.assertTrue(cached_clip(source,target,*dimensions,0,'wide shot'))
+                frames=[]
+                for at in (0,4):
+                    frames.append(subprocess.check_output(['ffmpeg','-v','error','-ss',str(at),
+                        '-i',str(target),'-frames:v','1','-pix_fmt','rgb24','-f','rawvideo','pipe:1']))
+                self.assertNotEqual(frames[0],frames[1])
+                target.write_bytes(b'corrupt')
+                self.assertFalse(cached_clip(source,target,*dimensions,0,'wide shot'))
+
+    def test_failed_fallback_encoding_is_not_cached(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            source=root/'source.png'
+            Image.new('RGB',(80,60),'blue').save(source)
+            target=root/'clip.mp4'
+            with patch('character_motion.prepare_layers',side_effect=InvalidForegroundMask('empty')), \
+                 patch('character_motion.subprocess.run',side_effect=subprocess.CalledProcessError(1,'ffmpeg')):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    render_clip(source,target,80,60)
+            self.assertFalse(target.exists())
+            self.assertFalse(target.with_suffix('.json').exists())
+            self.assertFalse(cached_clip(source,target,80,60,0,''))
+
+    def test_unrelated_errors_still_fail(self):
+        with patch('character_motion.prepare_layers',side_effect=ValueError('wrong dimensions')):
+            with self.assertRaisesRegex(ValueError,'wrong dimensions'):
+                render_clip(Path('source.png'),Path('clip.mp4'))
 
     @unittest.skipUnless(shutil.which('ffmpeg'),'FFmpeg required')
     def test_actual_foreground_motion_and_cache_integrity(self):

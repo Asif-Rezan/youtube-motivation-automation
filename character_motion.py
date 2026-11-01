@@ -14,7 +14,7 @@ import subprocess
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps
 
-VERSION = 'dudi-layered-characters-v3-birefnet'
+VERSION = 'dudi-layered-characters-v4-extraction-recovery'
 FPS, SECONDS = 25, 5
 _SESSION = None
 _LAMA = None
@@ -29,6 +29,10 @@ def atomic_json(path, data):
     temp=path.with_suffix('.tmp.json')
     temp.write_text(json.dumps(data,indent=2))
     temp.replace(path)
+
+
+class InvalidForegroundMask(ValueError):
+    """Segmentation did not find a safe character silhouette."""
 
 
 def mask_for(image):
@@ -50,7 +54,7 @@ def mask_for(image):
     # Reject implausible extraction instead of publishing a moving rectangle.
     coverage=float((np.asarray(mask)>128).mean())
     if not .025 <= coverage <= .72:
-        raise ValueError(f'Character extraction needs review: foreground coverage {coverage:.3f}')
+        raise InvalidForegroundMask(f'Character extraction needs review: foreground coverage {coverage:.3f}')
     return mask
 
 
@@ -102,7 +106,7 @@ def prepare_layers(source,folder,extract=mask_for,inpaint=clean_plate):
         raise ValueError('Character mask dimensions must match the scene')
     coverage=float((np.asarray(mask)>128).mean())
     if not .025 <= coverage <= .72:
-        raise ValueError('Invalid foreground mask; scene needs review')
+        raise InvalidForegroundMask('Invalid foreground mask; scene needs review')
     foreground=image.convert('RGBA')
     foreground.putalpha(mask)
     foreground.save(folder/'foreground.png')
@@ -152,7 +156,12 @@ def cached_clip(source,target,width,height,index,prompt):
 
 def render_clip(source,target,width=1920,height=1080,index=0,prompt=''):
     folder=source.parent/'characters'/source.stem
-    layers=prepare_layers(source,folder)
+    try:
+        layers=prepare_layers(source,folder)
+    except InvalidForegroundMask as error:
+        # Some valid wide shots contain tiny characters. Preserve their artwork
+        # and use camera motion rather than inventing a cutout or losing a shard.
+        return render_camera_clip(source,target,width,height,index,prompt,str(error))
     bg=Image.open(folder/'background.png').convert('RGBA')
     fg=Image.open(folder/'foreground.png').convert('RGBA')
     bbox=fg.getbbox()
@@ -198,6 +207,33 @@ def render_clip(source,target,width=1920,height=1080,index=0,prompt=''):
     temp.replace(target)
     atomic_json(target.with_suffix('.json'),{'identity':clip_identity(source,width,height,index,prompt),
         'video_sha256':digest(target),'layers':layers,'passed':True})
+    return target
+
+
+def render_camera_clip(source,target,width,height,index,prompt,reason):
+    target.parent.mkdir(parents=True,exist_ok=True)
+    temp=target.with_suffix('.tmp.mp4')
+    print(json.dumps({'warning':'character_extraction_fallback','source':str(source),
+                      'reason':reason,'motion_mode':'camera'}),flush=True)
+    # Render every frame at output resolution with a small centered push-in.
+    filters=(f"scale={width}:{height}:force_original_aspect_ratio=increase,"
+             f"crop={width}:{height},"
+             f"zoompan=z='1+0.04*on/{FPS*SECONDS-1}':"
+             f"x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d={FPS*SECONDS}:"
+             f"s={width}x{height}:fps={FPS},setsar=1")
+    try:
+        subprocess.run(['ffmpeg','-y','-v','error','-i',str(source),'-vf',filters,
+                        '-an','-frames:v',str(FPS*SECONDS),'-c:v','libx264','-threads','4',
+                        '-preset','fast','-crf','20','-pix_fmt','yuv420p',
+                        '-movflags','+faststart',str(temp)],check=True)
+        verify_clip(temp,width,height)
+        temp.replace(target)
+    finally:
+        temp.unlink(missing_ok=True)
+    atomic_json(target.with_suffix('.json'),{
+        'identity':clip_identity(source,width,height,index,prompt),
+        'video_sha256':digest(target),'motion_mode':'camera',
+        'fallback_reason':reason,'passed':True})
     return target
 
 
