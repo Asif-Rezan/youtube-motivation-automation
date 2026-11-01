@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 from PIL import Image
 
-VERSION = 'storybook-layered-characters-v3'
+VERSION = 'storybook-scene-stories-v4'
 FPS = 25
 SCENE_SECONDS = 5
 TRANSITION = .28
@@ -49,6 +49,7 @@ def render_scenes(root, scenes, width=1920, height=1080):
     work=root/'motion'
     work.mkdir(exist_ok=True)
     from character_motion import cached_clip, verify_clip
+    from scene_actions import motion_prompt
     clips=[]
     for scene in scenes:
         index=scene['index']
@@ -56,7 +57,7 @@ def render_scenes(root, scenes, width=1920, height=1080):
         target=work/f'clip-{index:03d}.mp4'
         with Image.open(source) as image:
             image.verify()
-        if not cached_clip(source,target,width,height,index,scene.get('prompt','')):
+        if not cached_clip(source,target,width,height,index,motion_prompt(scene)):
             raise RuntimeError(f'Scene {index} needs current character-motion clips; regenerate its image shard')
         verify_clip(target,width,height)
         clips.append(target)

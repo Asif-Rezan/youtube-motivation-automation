@@ -14,7 +14,7 @@ import subprocess
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps
 
-VERSION = 'dudi-layered-characters-v4-extraction-recovery'
+VERSION = 'dudi-layered-characters-v5-scene-stories'
 FPS, SECONDS = 25, 5
 _SESSION = None
 _LAMA = None
@@ -43,13 +43,13 @@ def mask_for(image):
     mask=remove(image,session=_SESSION,only_mask=True).convert('L')
     mask=mask.point(lambda value:0 if value<12 else value)
     # Animate the main character/group, not unrelated distant butterflies or stars.
-    # Keep antialiased fur edges surrounding the dominant connected silhouette.
+    # Preserve substantial companions and their antialiased edges too.
     from scipy import ndimage
     labels,count=ndimage.label(np.asarray(mask)>64)
     if count:
         areas=np.bincount(labels.ravel())
         areas[0]=0
-        principal=ndimage.binary_dilation(labels==areas.argmax(),iterations=3)
+        principal=ndimage.binary_dilation(np.isin(labels,np.flatnonzero(areas >= areas.max()*.12)),iterations=3)
         mask=Image.fromarray(np.where(principal,np.asarray(mask),0).astype('uint8'))
     # Reject implausible extraction instead of publishing a moving rectangle.
     coverage=float((np.asarray(mask)>128).mean())
@@ -171,7 +171,10 @@ def render_clip(source,target,width=1920,height=1080,index=0,prompt=''):
     # Compose at native generation resolution, then upscale once in FFmpeg.
     # This bounds CPU work and preserves the same 1080p output as production.
     native=bg.size
-    rabbit=any(word in prompt.lower() for word in ('rabbit','bunny','hare'))
+    from scene_actions import plan_scene, actor_parts, compose_scene
+    plan=plan_scene(prompt,index)
+    parts=actor_parts(fg)
+    rig=parts[0][2] if len(parts)==1 else None
     target.parent.mkdir(parents=True,exist_ok=True)
     temp=target.with_suffix('.tmp.mp4')
     args=['ffmpeg','-y','-v','error','-f','rawvideo','-pix_fmt','rgb24','-s',f'{native[0]}x{native[1]}',
@@ -182,21 +185,7 @@ def render_clip(source,target,width=1920,height=1080,index=0,prompt=''):
     try:
         for frame in range(FPS*SECONDS):
             t=frame/FPS
-            cycle=(t+index*.17)%2.4
-            hop=max(0,math.sin(math.pi*(cycle-.65)/1.1)) if .65<cycle<1.75 else 0
-            landing=math.exp(-((cycle-1.85)/.13)**2)
-            stretch=1+.012*math.sin(t*3+index)+.035*hop-.025*landing
-            lift=hop*min(22,native[1]*.035,max(0,bbox[1]*.45))
-            stretch=min(stretch,max(.9,(bbox[3]-lift-2)/subject.height))
-            actor=deform(subject,t,index,rabbit)
-            actor=actor.resize((max(1,round(subject.width/stretch**.4)),max(1,round(subject.height*stretch))),Image.Resampling.BICUBIC)
-            center=(bbox[0]+bbox[2])/2
-            # Limit travel to safe margins so bodies never leave the image.
-            travel=min(native[0]*.015,max(0,bbox[0]-3),max(0,native[0]-bbox[2]-3))
-            x=round(center-actor.width/2+math.sin(t*2+index)*travel)
-            y=round(bbox[3]-actor.height-lift)
-            canvas=bg.copy()
-            canvas.alpha_composite(actor,(x,y))
+            canvas=compose_scene(bg,parts,plan,t)
             proc.stdin.write(canvas.convert('RGB').tobytes())
     finally:
         proc.stdin.close()
@@ -206,7 +195,10 @@ def render_clip(source,target,width=1920,height=1080,index=0,prompt=''):
     verify_clip(temp,width,height)
     temp.replace(target)
     atomic_json(target.with_suffix('.json'),{'identity':clip_identity(source,width,height,index,prompt),
-        'video_sha256':digest(target),'layers':layers,'passed':True})
+        'video_sha256':digest(target),'layers':layers,'passed':True,
+        'story_plan':plan,'actor_count':len(parts),'face_rigs':[part[2] for part in parts],
+        'facial_motion':any(part[2] for part in parts),
+        'facial_note':'2D blink, head turn and cheek lift' if rig else 'No confident single face; original face preserved'})
     return target
 
 
@@ -253,13 +245,14 @@ def prepare_shard(root):
     if count<1 or not 0<=shard<count:
         raise ValueError('Invalid character motion shard')
     from song_images import image_plan
+    from scene_actions import motion_prompt
     entries=[p for i,p in enumerate(image_plan(song)) if i%count==shard and p['kind'].startswith('scene-')]
     width,height=(1080,1920) if portrait else (1920,1080)
     for plan in entries:
         index=int(plan['kind'].split('-')[1])
         source=artwork/f"{plan['kind']}-source.png"
         target=artwork/'motion'/f'clip-{index:03d}.mp4'
-        prompt=song['scenes'][index]['prompt']
+        prompt=motion_prompt(song['scenes'][index])
         if not cached_clip(source,target,width,height,index,prompt):
             render_clip(source,target,width,height,index,prompt)
         print(json.dumps({'character_motion':True,'scene':index,'shard':shard}),flush=True)

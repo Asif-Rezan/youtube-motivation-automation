@@ -8,6 +8,7 @@ import subprocess
 
 REFRAIN = 'dudi dudi dam dam dudi dudi dam'
 from rhyme_writer import write_rhyme
+from scene_actions import plan_scene
 
 def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_override='female'):
     if vocal_gender_override not in ('auto', 'female'):
@@ -22,12 +23,13 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
     for section in written['sections']:
         for row in section:
             # Keep the lyric action before the image encoder token limit.
-            prompt=(row['visual'] + '. Clear complete main character, full body inside frame, space around ears and paws. Cute colorful 3D storybook cartoon. '
+            prompt=('A young child and a friendly animal together. '+row['visual'] + '. Clear complete main character, full body inside frame, space around ears and paws. Cute colorful 3D storybook cartoon. '
                 + outline.get('characters', '') + '. ' + outline.get('visual_world', '')
                 + '. Rounded soft shapes, adorable expressive faces, bright pastel colors, gentle playful mood, wide landscape, no text.')
             for lyric in (row['lyric'], REFRAIN):
                 i=len(scenes)
-                scenes.append(dict(index=i,start=i*5,end=(i+1)*5,lyric=lyric,prompt=prompt))
+                scenes.append(dict(index=i,start=i*5,end=(i+1)*5,lyric=lyric,prompt=prompt,
+                    story_action=plan_scene(row['lyric']+' '+row['visual'],i)))
     scenes=scenes[:seconds//5]
     outline=written['outline']
     song = dict(title=outline['title'], lyrics='\n'.join(scene['lyric'] for scene in scenes),duration=seconds,

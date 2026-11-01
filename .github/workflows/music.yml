@@ -1,5 +1,8 @@
 name: Dudi Dam TV kids rhyme generation
 on:
+  push:
+    branches: [main]
+    paths: [.generation/scene-story-request.json]
   workflow_dispatch:
     inputs:
       run_id:
@@ -51,7 +54,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   lyrics:
-    if: github.event_name == 'workflow_dispatch' || vars.AUTOMATION_ENABLED == 'true'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || vars.AUTOMATION_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     outputs:
@@ -76,6 +79,7 @@ jobs:
         shell: bash
         run: |
           RUN_ID="${REQUESTED_RUN_ID:-daily-$(TZ=Asia/Dhaka date +%F)}"
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then RUN_ID="scene-story-${GITHUB_RUN_ID}"; fi
           [[ "$RUN_ID" =~ ^[a-zA-Z0-9_-]{1,80}$ ]] || exit 1
           echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
       - name: Validate publication credentials before model generation
@@ -207,6 +211,7 @@ jobs:
             output/*/generation-state.json
           retention-days: 7
   short_music:
+    if: github.event_name != 'push'
     needs: lyrics
     runs-on: ubuntu-24.04
     timeout-minutes: 350
@@ -336,6 +341,7 @@ jobs:
             output/*/motion/**
           retention-days: 7
   short_images:
+    if: github.event_name != 'push'
     needs: lyrics
     runs-on: ubuntu-24.04
     timeout-minutes: 180
@@ -445,7 +451,7 @@ jobs:
             output/*/song.json
           retention-days: 7
       - name: Back up to Drive and publish publicly on Dudi Dam TV
-        if: vars.PUBLISH_ENABLED == 'true'
+        if: github.event_name != 'push' && vars.PUBLISH_ENABLED == 'true'
         run: python -u pipeline.py --run-id "$SONG_RUN_ID" --defer-drive-cleanup
       - uses: actions/upload-artifact@v4
         if: always()
@@ -454,6 +460,7 @@ jobs:
           path: output/*/*.json
           retention-days: 7
   shorts:
+    if: github.event_name != 'push'
     name: Create and publish the episode Short
     needs: [lyrics, publish, short_images, short_music]
     uses: ./.github/workflows/shorts.yml
@@ -467,7 +474,7 @@ jobs:
   facebook:
     name: Optional Facebook landscape publication
     needs: [lyrics, publish]
-    if: vars.FACEBOOK_PUBLISH_ENABLED == 'true' && vars.PUBLISH_ENABLED == 'true'
+    if: github.event_name != 'push' && vars.FACEBOOK_PUBLISH_ENABLED == 'true' && vars.PUBLISH_ENABLED == 'true'
     uses: ./.github/workflows/facebook.yml
     with:
       source_run: ${{ format('{0}', github.run_id) }}
@@ -478,7 +485,7 @@ jobs:
   cleanup:
     name: Clean published media from Drive
     needs: [lyrics, publish, shorts]
-    if: vars.PUBLISH_ENABLED == 'true'
+    if: github.event_name != 'push' && vars.PUBLISH_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
