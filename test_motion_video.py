@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from PIL import Image
-from motion_video import render_scenes, render_identity, render_is_current, scene_filter, FPS
+from motion_video import render_scenes, render_identity, render_is_current, FPS
 
 class MotionTests(unittest.TestCase):
     def test_verified_character_clips_are_used_for_every_scene(self):

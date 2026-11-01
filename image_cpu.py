@@ -45,7 +45,7 @@ def negative_prompt():
     return ('text, letters, typography, captions, Hindi writing, title, signature, watermark, logo, '
             'poster, magazine, red brushwork, elderly, old man, gray hair, deep wrinkles, '
             'orange skin, underexposed faces, silhouette, crowd, extra people, fused faces, '
-            'duplicated face, cropped head, extreme close-up, deformed hands, extra limbs, '
+            'duplicated face, cropped head, extreme close-up, deformed hands, extra limbs, extra ears, extra tails, '
             'plastic skin, blur, low quality, photorealistic, horror, frightening, collage, split screen, '
             'black panel, border, ' + os.getenv('IMAGE_NEGATIVE_PROMPT', ''))
 

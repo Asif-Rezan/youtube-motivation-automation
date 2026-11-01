@@ -22,7 +22,7 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
     for section in written['sections']:
         for row in section:
             # Keep the lyric action before the image encoder token limit.
-            prompt=(row['visual'] + '. Cute colorful 3D storybook cartoon. '
+            prompt=(row['visual'] + '. Clear complete main character, full body inside frame, space around ears and paws. Cute colorful 3D storybook cartoon. '
                 + outline.get('characters', '') + '. ' + outline.get('visual_world', '')
                 + '. Rounded soft shapes, adorable expressive faces, bright pastel colors, gentle playful mood, wide landscape, no text.')
             for lyric in (row['lyric'], REFRAIN):

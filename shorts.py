@@ -76,7 +76,8 @@ def render_short(source_root, target, start=0, seconds=40):
                 raise ValueError('Short illustration must have native 9:16 dimensions')
             im.verify()
         images[path.name] = digest(path)
-    plan = dict(version=VERSION, portrait_images=images, source_sha256=digest(source), start=start, seconds=seconds,
+    from character_motion import VERSION as character_version
+    plan = dict(version=VERSION, character_version=character_version, portrait_images=images, source_sha256=digest(source), start=start, seconds=seconds,
                 width=1080, height=1920)
     target.mkdir(parents=True, exist_ok=True)
     manifest = target / 'render.json'

@@ -50,7 +50,8 @@ class ShortsTests(unittest.TestCase):
             for i in range(8):
                 Image.new('RGB',(72,128),'pink').save(portrait/f'scene-{i:03d}-source.png')
             images = {p.name:shorts.digest(p) for p in portrait.glob('*.png')}
-            plan = dict(version=shorts.VERSION, portrait_images=images, source_sha256=shorts.digest(audio),
+            from character_motion import VERSION as character_version
+            plan = dict(version=shorts.VERSION, character_version=character_version, portrait_images=images, source_sha256=shorts.digest(audio),
                         start=0, seconds=40, width=1080, height=1920)
             shorts.atomic_json(target/'render.json',dict(plan=plan, output_sha256=shorts.digest(target/'video.mp4')))
             info = {'format':{'duration':'40'},'streams':[{'codec_type':'audio'}]}

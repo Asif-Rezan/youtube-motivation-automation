@@ -1,6 +1,6 @@
 """Automatic CPU character cutouts, clean plates and layered storybook motion.
 
-No image API or inference credits. U2Net isolates the foreground, LaMa fills
+No image API or inference credits. IS-Net isolates the foreground, LaMa fills
 its original location, and Pillow animates the extracted original artwork.
 """
 import argparse
@@ -80,7 +80,10 @@ def prepare_layers(source,folder,extract=mask_for,inpaint=clean_plate):
     identity={'version':VERSION,'source_sha256':digest(source),'mask_model':'isnet-general-use','inpaint':'big-lama-v0.1.0'}
     record=folder/'layers.json'
     if record.exists():
-        saved=json.loads(record.read_text())
+        try:
+            saved=json.loads(record.read_text())
+        except (OSError,ValueError):
+            saved={}
         if saved.get('identity')==identity and all((folder/name).is_file() and digest(folder/name)==sha
                 for name,sha in saved.get('assets',{}).items()) and len(saved.get('assets',{}))==2:
             return saved
