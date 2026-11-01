@@ -74,3 +74,19 @@ class PrepareOriginalTests(unittest.TestCase):
                     prepare_with_retries('same-id',stage)
                 run.assert_called_once()
                 sleep.assert_not_called()
+
+    def test_success_clears_only_its_own_failure_marker(self):
+        from prepare_music import prepare_with_retries
+        with tempfile.TemporaryDirectory() as tmp:
+            old=os.getcwd();os.chdir(tmp)
+            self.addCleanup(os.chdir,old)
+            marker=Path('output/recovered/failure.json')
+            marker.parent.mkdir(parents=True)
+            marker.write_text(json.dumps({'stage':'lyrics','retryable':True}))
+            with patch('prepare_music.prepare'):
+                prepare_with_retries('recovered','lyrics')
+            self.assertFalse(marker.exists())
+            marker.write_text(json.dumps({'stage':'render','retryable':False}))
+            with patch('prepare_music.prepare'):
+                prepare_with_retries('recovered','lyrics')
+            self.assertTrue(marker.exists())

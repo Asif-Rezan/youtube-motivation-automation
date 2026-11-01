@@ -98,7 +98,18 @@ def prepare_with_retries(run_id, stage='all', check_history=False, vocal_gender=
     from lyrics_cpu import StoryGenerationError
     for attempt in range(3):
         try:
-            return prepare(run_id,stage,check_history=check_history,vocal_gender=vocal_gender)
+            result=prepare(run_id,stage,check_history=check_history,vocal_gender=vocal_gender)
+            failure=Path('output')/run_id/'failure.json'
+            if failure.exists():
+                try:
+                    previous=json.loads(failure.read_text())
+                except (OSError,ValueError):
+                    previous={}
+                if previous.get('stage')==stage:
+                    failure.unlink(missing_ok=True)
+            if attempt:
+                print(json.dumps({'phase':'lyrics stage recovered','attempt':attempt+1}),flush=True)
+            return result
         except StoryGenerationError as error:
             record_failure(run_id,stage,error)
             if stage != 'lyrics' or not error.retryable or attempt == 2:

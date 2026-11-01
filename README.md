@@ -1,3 +1,18 @@
+## Lyric word-bound recovery
+
+Sung lines retain a compact 4–12 plain-word constraint in the native Qwen grammar,
+while large prose character bounds remain outside the native parser. The prompt
+aims for 4–8 words. Contractions/hyphens are avoided so generation and validation
+count words consistently. Rejected candidates are saved and supplied to targeted
+rewrites alongside their constraints; accepted lines and completed chapters stay
+in the checkpoint. Lyrics are never truncated or replaced with canned text.
+
+The lyrics stage retries explicitly retryable model/content failures up to three
+times using the same run ID and saved draft, with bounded backoff. Fatal errors
+and non-lyrics stages are not replayed. Successful recovery clears that stage's
+stale failure marker. A real CPU-model regression tests an adversarial 13-word
+request and a complete twelve-line chapter before production dispatch.
+
 ## Automatic character animation
 
 Every newly generated landscape and portrait scene now uses CPU character
