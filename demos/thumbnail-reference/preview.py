@@ -16,16 +16,19 @@ prompt=scene_prompt({'visual':'Happy children dance beside fluffy yellow chicks.
 song={'vocal_gender':'female','duration':5,'lyrics':'Happy friends dance and play together',
       'scenes':[{'index':0,'start':0,'end':5,'lyric':'Happy friends dance and play together','prompt':prompt}]}
 plan=next(p for p in image_plan(song) if p['kind']=='thumbnail')
-(root/'settings.json').write_text(json.dumps(plan,indent=2))
+settings=root/'settings.json'
+resume=settings.exists() and json.loads(settings.read_text())==plan and (root/'thumbnail-source.png').exists()
+settings.write_text(json.dumps(plan,indent=2))
 reference=Path(plan['reference_image'])
 if not reference.is_absolute():
     reference=Path(__file__).resolve().parents[2]/reference
-generate(plan['prompt'],root/'thumbnail-source.png',seed=plan['seed'],
-         width=plan['width'],height=plan['height'],steps=plan['steps'],
-         reference_image=reference,strength=plan['strength'])
+if not resume:
+    generate(plan['prompt'],root/'thumbnail-source.png',seed=plan['seed'],
+             width=plan['width'],height=plan['height'],steps=plan['steps'],
+             reference_image=reference,strength=plan['strength'])
 if plan.get('regional_variation'):
     from thumbnail_variation import refine_thumbnail
-    refine_thumbnail(root/'thumbnail-source.png',plan,generate)
+    refine_thumbnail(root/'thumbnail-source.png',plan,generate,resume=resume)
 with Image.open(root/'thumbnail-source.png') as image:
     ImageOps.fit(image.convert('RGB'),(1280,720),method=Image.Resampling.LANCZOS).save(root/'thumbnail.jpg',quality=92,optimize=True)
 print('Thumbnail preview ready',flush=True)
