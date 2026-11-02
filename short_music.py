@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import shutil
 
 from shorts import atomic_json, digest, probe, validate_clip
 
@@ -42,27 +43,51 @@ def prepare(run_id, start=0, seconds=40):
         return output
     from music_cpu import generate_segment
     raw = target/'generated.wav'
-    for attempt in range(3):
-        generate_segment(request, raw, state, save)
-        # Trim natural overrun; regenerate short outputs rather than loop/pad.
-        if float(probe(raw)['format']['duration']) >= seconds - .1:
-            from audio_mastering import VERSION, AudioGapError, verify_continuity
+    from audio_mastering import VERSION, AudioGapError, verify_continuity, uses_continuous_mix
+    continuous=uses_continuous_mix(request)
+    # Failed older runs retained the native syntheses even if generated.wav was
+    # removed by the old retry loop. Reuse a valid candidate before inference.
+    recovered=False
+    if continuous:
+        candidates=([raw] if raw.exists() else [])+sorted((target/'cpu-audio').glob('*.wav'))
+        for candidate in candidates:
             try:
-                if request.get('audio_mastering')==VERSION:
-                    verify_continuity(raw,seconds)
-                break
+                window=verify_continuity(candidate,seconds)
             except AudioGapError:
-                pass
-        raw.unlink()
-        state['short_duration_retries'] = attempt + 1
-        save()
-    else:
-        raise ValueError('Generated Short music is too short or has silence gaps; saved request retained')
+                continue
+            if candidate!=raw:
+                shutil.copyfile(candidate,raw)
+            state['recovered_candidate']=candidate.name
+            state['quality_window']=window
+            save()
+            recovered=True
+            break
+    last_error=None
+    for attempt in range(0 if recovered else 3):
+        generate_segment(request,raw,state,save)
+        try:
+            measured=float(probe(raw)['format']['duration'])
+            if measured<seconds-.1:
+                raise AudioGapError(f'Generated audio is {measured:.3f}s; requires {seconds}s','too_short')
+            if continuous:
+                state['quality_window']=verify_continuity(raw,seconds)
+            break
+        except AudioGapError as error:
+            last_error=error
+            detail=dict(attempt=attempt+1,code=error.code,detail=str(error))
+            state.setdefault('quality_attempts',[]).append(detail)
+            state['quality_attempts']=state['quality_attempts'][-10:]
+            raw.replace(target/f'rejected-{attempt+1}.wav')
+            state.update(short_duration_retries=attempt+1,audio_ready=False)
+            save()
+            print(json.dumps({'phase':'retry Shorts audio quality',**detail}),flush=True)
+    if not recovered and last_error is not None and not raw.exists():
+        raise ValueError(f'Shorts audio failed three quality attempts ({last_error.code}); candidates and music-state.json retained')
     temporary = target/'song.tmp.wav'
     try:
-        from audio_mastering import VERSION, master_parts
-        if request.get('audio_mastering')==VERSION:
-            master_parts([raw],temporary,seconds)
+        from audio_mastering import master_parts
+        if continuous:
+            state['mastering']=master_parts([raw],temporary,seconds)
         else:
             subprocess.run(['ffmpeg','-y','-v','error','-i',str(raw),'-t',str(seconds),
                 '-ar','44100','-ac','2',str(temporary)],check=True,capture_output=True)
@@ -72,6 +97,7 @@ def prepare(run_id, start=0, seconds=40):
         temporary.unlink(missing_ok=True)
     state['output_sha256'] = digest(output)
     state['audio_ready'] = True
+    state['generation_started'] = False
     save()
     print(json.dumps({'phase':'independent Shorts music ready','seconds':seconds}),flush=True)
     return output

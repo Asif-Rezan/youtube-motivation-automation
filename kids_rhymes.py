@@ -56,7 +56,7 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
         visual_identity=dict(characters=outline.get('characters',''), world=outline.get('visual_world','')),
         lyric_writer=dict(backend='local-qwen-cpu',version=written['writer_version'],novelty_checked=True),
         vocal_gender='female',song_date=day,scenes=scenes,bpm=120,
-        audio_mastering='continuous-kids-mix-v1',
+        audio_mastering='continuous-kids-mix-v2',
         tags=['Dudi Dam TV','kids rhymes','nursery rhymes','Dudi Dudi Dam Dam','kids dance'])
     validate_storyboard(song)
     return song
@@ -89,8 +89,8 @@ def generate_music(song, target, state, save):
     from pipeline import validate_song, validate_duration, duration
     from music_cpu import generate_segment
     validate_song(song)
-    from audio_mastering import VERSION, AudioGapError, verify_continuity, master_parts
-    continuous=song.get('audio_mastering')==VERSION
+    from audio_mastering import VERSION, AudioGapError, verify_continuity, master_parts, uses_continuous_mix
+    continuous=uses_continuous_mix(song)
     if target.exists() and (not continuous or state.get('mastering_version')==VERSION):
         validate_duration(duration(target))
         return
@@ -109,7 +109,10 @@ def generate_music(song, target, state, save):
                 if continuous:
                     verify_continuity(path,part['duration'])
                 break
-            except AudioGapError:
+            except AudioGapError as error:
+                print(json.dumps({'phase':'retry invalid music part','part':i//24,
+                    'attempt':attempt+1,'reason':error.code,'detail':str(error)}),flush=True)
+                part_state['last_quality_error']=dict(code=error.code,detail=str(error))
                 part_state.update(audio_ready=False,continuity_retries=attempt+1)
                 save()
                 path.replace(path.with_suffix('.rejected-gap.wav'))

@@ -93,3 +93,63 @@ class MusicGapRetryTests(unittest.TestCase):
             self.assertEqual(state['mastering_version'],VERSION)
             self.assertEqual(target.read_bytes(),b'final mix')
             self.assertTrue((root/'part-000.rejected-gap.wav').exists())
+
+
+@unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'),'FFmpeg runtime required')
+class BoundaryRepairTests(unittest.TestCase):
+    def make_audio(self,path,leading=0,trailing=0,internal=False):
+        rate=44100
+        t=np.arange(40*rate)/rate
+        signal=.03*np.sin(2*np.pi*440*t)
+        signal[(t<leading)|(t>40-trailing)]=0
+        if internal:signal[(t>=15.466083)&(t<16.857417)]=0
+        with wave.open(str(path),'wb') as audio:
+            audio.setnchannels(1);audio.setsampwidth(2);audio.setframerate(rate)
+            audio.writeframes((signal*32767).astype('<i2').tobytes())
+
+    def test_original_failure_edge_pattern_is_repaired_without_silent_padding(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            self.make_audio(root/'source.wav',1.294708,1.865729)
+            result=master_parts([root/'source.wav'],root/'fixed.wav',40)
+            self.assertAlmostEqual(result['tempo_compensation'],.92099,delta=.002)
+            window=verify_continuity(root/'fixed.wav',40,allow_edge_trim=False)
+            self.assertLess(window['edge_trim_seconds'],.1)
+
+    def test_true_internal_dropout_and_excessive_outro_remain_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            self.make_audio(root/'internal.wav',1.29,1.86,True)
+            self.make_audio(root/'tail.wav',0,4.587896)
+            for name,code in [('internal','internal_gap'),('tail','excessive_edge_silence')]:
+                with self.assertRaises(AudioGapError) as caught:
+                    verify_continuity(root/f'{name}.wav',40)
+                self.assertEqual(caught.exception.code,code)
+
+    def test_failed_short_keeps_diagnostics_then_recovers_saved_native_without_inference(self):
+        import short_music,test_short_music
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)/'output/test';root.mkdir(parents=True)
+            song=test_short_music.ShortMusicTests().song()
+            song['audio_mastering']='continuous-kids-mix-v1'
+            (root/'song.json').write_text(json.dumps(song))
+            def bad_generate(request,path,state,save):
+                self.make_audio(path,internal=True)
+            with patch('short_music.Path',side_effect=lambda p:Path(directory)/p),patch('music_cpu.generate_segment',side_effect=bad_generate) as model:
+                with self.assertRaisesRegex(ValueError,'three quality attempts'):
+                    short_music.prepare('test')
+                self.assertEqual(model.call_count,3)
+            target=root/'short-audio/clip-0-40'
+            state=json.loads((target/'music-state.json').read_text())
+            self.assertFalse(state['audio_ready'])
+            self.assertEqual(len(state['quality_attempts']),3)
+            self.assertEqual(len(list(target.glob('rejected-*.wav'))),3)
+            native=target/'cpu-audio';native.mkdir()
+            self.make_audio(native/'saved-valid.wav',1.294708,1.865729)
+            with patch('short_music.Path',side_effect=lambda p:Path(directory)/p),patch('music_cpu.generate_segment') as model:
+                output=short_music.prepare('test')
+                model.assert_not_called()
+            self.assertTrue(output.exists())
+            state=json.loads((target/'music-state.json').read_text())
+            self.assertTrue(state['audio_ready'])
+            self.assertEqual(state['recovered_candidate'],'saved-valid.wav')
