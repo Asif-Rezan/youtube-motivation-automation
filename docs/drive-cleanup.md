@@ -34,3 +34,5 @@ run 41336716292 reuses its existing Short artifact without generating or
 re-uploading a new YouTube Short.
 
 Manual cleanup dispatch accepts `dry_run=true` to audit eligibility without writing journals or deleting media. This distinguishes legacy publication mismatches from operational failures before a cleanup fix is rolled out. The original failed generation remains in GitHub history; a new cleanup verification uses the corrected code without regenerating or re-uploading the video.
+
+Tag comparison uses `upload_settings.normalized_tags`, matching upload verification: tag order, case and repeated whitespace do not create false mismatches. Real differences still preserve recovery media for review.

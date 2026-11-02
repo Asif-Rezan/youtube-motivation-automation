@@ -181,6 +181,12 @@ class DriveCleanupTests(unittest.TestCase):
         self.store.save.assert_not_called()
         self.store.client.files().delete.assert_not_called()
 
+    def test_cleanup_uses_the_same_tag_normalization_as_upload_verification(self):
+        self.video['snippet']['tags']=['  '+tag.upper().replace(' ','   ')+'  '
+                                      for tag in metadata_tags(self.song)]
+        cleanup(self.store,self.client,self.run_id,self.state)
+        self.store.client.files().delete.assert_called_once_with(fileId='file')
+
     def test_unavailable_video_preserves_media_with_explicit_reason(self):
         self.client.videos().list().execute.return_value={'items':[]}
         with self.assertRaises(CleanupNotEligible) as caught:

@@ -26,6 +26,7 @@ class CleanupNotEligible(RuntimeError):
 
 def verify_public(client, state):
     from pipeline import metadata_tags, upload_description
+    from upload_settings import normalized_tags
     if state.get('phase') not in ('published','scheduled') or not state.get('video_id') or state.get('thumbnail_uploaded') is not True:
         raise CleanupNotEligible('publication_receipt_incomplete')
     items = client.videos().list(part='snippet,status,processingDetails,contentDetails',
@@ -45,7 +46,7 @@ def verify_public(client, state):
             'channel_id':snippet.get('channelId')==required('EXPECTED_CHANNEL_ID'),
             'title':snippet.get('title')==title,
             'description':snippet.get('description')==description,
-            'tags':set(snippet.get('tags',[]))==set(tags),
+            'tags':normalized_tags(snippet.get('tags',[]))==normalized_tags(tags),
             'upload_status':status.get('uploadStatus') in ('uploaded','processed')}
     mismatches=[name for name,matched in checks.items() if not matched]
     if mismatches:
