@@ -48,12 +48,17 @@ def prepare(run_id, start=0, seconds=40):
     # Failed older runs retained the native syntheses even if generated.wav was
     # removed by the old retry loop. Reuse a valid candidate before inference.
     recovered=False
+    recovery_rejections=[]
     if continuous:
         candidates=([raw] if raw.exists() else [])+sorted((target/'cpu-audio').glob('*.wav'))
         for candidate in candidates:
             try:
                 window=verify_continuity(candidate,seconds)
-            except AudioGapError:
+            except AudioGapError as error:
+                recovery_rejections.append(dict(candidate=candidate.name,code=error.code,detail=str(error)))
+                continue
+            except (subprocess.CalledProcessError,ValueError) as error:
+                recovery_rejections.append(dict(candidate=candidate.name,code='unreadable_candidate',error_type=type(error).__name__))
                 continue
             if candidate!=raw:
                 shutil.copyfile(candidate,raw)
@@ -62,6 +67,8 @@ def prepare(run_id, start=0, seconds=40):
             save()
             recovered=True
             break
+        state['recovery_rejections']=recovery_rejections
+        save()
     last_error=None
     for attempt in range(0 if recovered else 3):
         generate_segment(request,raw,state,save)

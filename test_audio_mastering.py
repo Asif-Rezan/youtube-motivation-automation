@@ -145,6 +145,7 @@ class BoundaryRepairTests(unittest.TestCase):
             self.assertEqual(len(state['quality_attempts']),3)
             self.assertEqual(len(list(target.glob('rejected-*.wav'))),3)
             native=target/'cpu-audio';native.mkdir()
+            (native/'000-corrupt.wav').write_bytes(b'interrupted wave file')
             self.make_audio(native/'saved-valid.wav',1.294708,1.865729)
             with patch('short_music.Path',side_effect=lambda p:Path(directory)/p),patch('music_cpu.generate_segment') as model:
                 output=short_music.prepare('test')
@@ -153,3 +154,4 @@ class BoundaryRepairTests(unittest.TestCase):
             state=json.loads((target/'music-state.json').read_text())
             self.assertTrue(state['audio_ready'])
             self.assertEqual(state['recovered_candidate'],'saved-valid.wav')
+            self.assertEqual(state['recovery_rejections'][0]['code'],'unreadable_candidate')
