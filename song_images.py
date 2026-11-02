@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import random
 from pathlib import Path
 from PIL import Image
 from image_cpu import MODEL, REVISION
@@ -10,7 +11,7 @@ THUMBNAIL_REFERENCE = Path(__file__).resolve().parent/'assets/thumbnail/kids-dan
 
 def thumbnail_reference():
     path=Path(os.getenv('THUMBNAIL_REFERENCE_IMAGE',str(THUMBNAIL_REFERENCE)))
-    strength=float(os.getenv('THUMBNAIL_DENOISE_STRENGTH','0.72'))
+    strength=float(os.getenv('THUMBNAIL_DENOISE_STRENGTH','0.50'))
     if not 0 < strength <= 1:
         raise ValueError('Thumbnail denoise strength must be greater than zero and at most one')
     with Image.open(path) as image:
@@ -18,6 +19,35 @@ def thumbnail_reference():
     return dict(reference_image=str(path.relative_to(Path(__file__).resolve().parent))
                 if path.is_relative_to(Path(__file__).resolve().parent) else str(path),
                 reference_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),strength=strength)
+
+
+def thumbnail_cast(identity):
+    """Repeatable choices per episode, independent of the scene image seeds."""
+    rng=random.Random(int(hashlib.sha256((identity+'thumbnail-cast-v2').encode()).hexdigest(),16))
+    animals=rng.sample(['puppies','kittens','bunnies','ducklings','lambs','pandas',
+                        'baby elephants','baby turtles','baby deer','chicks'],2)
+    colors=rng.sample(['coral','teal','yellow','purple','lime','blue','pink','orange'],5)
+    faces=rng.sample(['curly black hair, brown eyes','straight auburn hair, green eyes',
+                      'wavy brown hair, blue eyes','short blond hair, hazel eyes',
+                      'black pigtails, dark eyes','brown bob, freckles'],5)
+    genders=['girl','boy','girl','boy',rng.choice(['girl','boy'])]
+    rng.shuffle(genders)
+    return dict(animals=animals,children=[dict(gender=g,color=c,face=f)
+                for g,c,f in zip(genders,colors,faces)])
+
+
+def thumbnail_prompt(cast):
+    animals=' and '.join(cast['animals'])
+    colors=', '.join(c['color'] for c in cast['children'])
+    children='; '.join(f"{i+1}: {c['gender']}, {c['face']}, {c['color']} shorts and matching top"
+                      for i,c in enumerate(cast['children']))
+    return ('Cute colorful 3D storybook cartoon. Five dancing toddler boys and girls, distinct faces. '
+            'Baby '+animals+'. Colorful shorts: '+colors+'. '
+            'Different hairstyles, skin tones and eye colors, joyful smiles, raised hands. '
+            'One large central child, two friends on each side. '
+            'Left to right children: '+children+'. '
+            'Fully clothed, vibrant magical garden party, glowing festive lights, flowers. '
+            'Only the selected animal species, no identical faces, no text, no photography.')
 
 
 def image_plan(song):
@@ -41,19 +71,14 @@ def image_plan(song):
                     ' Keep characters and lyric props visible, no borders or panels.')
                    for kind, prompt in entries]
     else:
-        entries.append(('thumbnail',
-            'Cute colorful 3D storybook cartoon, stylized animated children, rounded toy-like shapes. '
-            'Five happy toddlers dancing with baby animal friends, one large central child, '
-            'two friends on each side, joyful expressive faces, raised hands, colorful rompers. '
-            'Vibrant dreamy garden party, glowing festive lights, flowers, soft magical light. '
-            'Polished nursery rhyme thumbnail, no text, no photography. '
-            +song['scenes'][0]['prompt']))
+        cast=thumbnail_cast(identity)
+        entries.append(('thumbnail',thumbnail_prompt(cast)))
     plans = [dict(kind=kind, prompt=prompt, seed=int(hashlib.sha256((identity+kind).encode()).hexdigest()[:8],16),
         model=MODEL, revision=REVISION, width=int(os.getenv('CPU_IMAGE_WIDTH','576' if portrait else '1024')),
         height=int(os.getenv('CPU_IMAGE_HEIGHT','1024' if portrait else '576')), steps=int(os.getenv('CPU_IMAGE_STEPS','16')),
         visual_style='dudi-storybook-v2', allow_text=False) for kind,prompt in entries]
     if not portrait:
-        plans[-1].update(thumbnail_reference(),visual_style='dudi-reference-storybook-v1')
+        plans[-1].update(thumbnail_reference(),visual_style='dudi-reference-storybook-v2',thumbnail_cast=cast)
     return plans
 
 

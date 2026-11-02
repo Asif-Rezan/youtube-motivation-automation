@@ -5,7 +5,7 @@ on:
       strength:
         description: Image-to-image denoising strength (0 < value <= 1)
         type: string
-        default: '0.72'
+        default: '0.50'
         required: true
 permissions:
   contents: read

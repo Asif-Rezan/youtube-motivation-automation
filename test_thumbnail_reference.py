@@ -60,7 +60,7 @@ class ThumbnailReferenceTests(unittest.TestCase):
             calls=generate.call_args_list
             self.assertTrue(all('reference_image' not in call.kwargs for call in calls[:-1]))
             self.assertTrue(calls[-1].kwargs['reference_image'].exists())
-            self.assertEqual(calls[-1].kwargs['strength'],.72)
+            self.assertEqual(calls[-1].kwargs['strength'],.50)
             generate_song_images(tmp,song)
             self.assertEqual(generate.call_count,len(calls))
 
@@ -86,3 +86,25 @@ class ThumbnailReferenceTests(unittest.TestCase):
     def test_strength_without_reference_is_rejected(self):
         with self.assertRaises(ValueError):
             image_cpu.generate('test','unused.png',seed=1,strength=.72)
+
+
+class ThumbnailCastTests(unittest.TestCase):
+    def test_episode_variation_has_distinct_colors_faces_and_mixed_genders(self):
+        from song_images import thumbnail_cast, thumbnail_prompt
+        casts=[thumbnail_cast(str(i)) for i in range(20)]
+        self.assertEqual(casts,[thumbnail_cast(str(i)) for i in range(20)])
+        self.assertGreater(len({tuple(c['animals']) for c in casts}),5)
+        for cast in casts:
+            children=cast['children']
+            self.assertEqual(len({c['color'] for c in children}),5)
+            self.assertEqual(len({c['face'] for c in children}),5)
+            self.assertEqual({c['gender'] for c in children},{'girl','boy'})
+            prompt=thumbnail_prompt(cast)
+            self.assertTrue(all(animal in prompt[:200] for animal in cast['animals']))
+            self.assertTrue(all(child['color'] in prompt for child in children))
+            self.assertTrue(all(child['face'] in prompt for child in children))
+
+    def test_default_strength_is_selected_half(self):
+        with patch.dict(os.environ):
+            os.environ.pop('THUMBNAIL_DENOISE_STRENGTH',None)
+            self.assertEqual(thumbnail_reference()['strength'],.5)
