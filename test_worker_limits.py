@@ -69,6 +69,38 @@ class WorkerLimitsTests(unittest.TestCase):
             with self.assertRaises(subprocess.CalledProcessError):
                 run_worker([sys.executable, '-c', 'raise SystemExit(7)'], 10, 'unused')
 
+class GenerationStateTests(unittest.TestCase):
+    def test_worker_failure_retains_parts_and_clears_running_state(self):
+        import music_cpu
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            saved_part = root/'part-000.wav'
+            saved_part.write_bytes(b'previous valid part')
+            state = {'audio_ready': True}
+            from unittest.mock import Mock
+            save = Mock()
+            with patch('worker_limits.run_worker', side_effect=WorkerFailure('Result=oom-kill')):
+                with self.assertRaisesRegex(RuntimeError, 'oom-kill'):
+                    music_cpu.generate_segment({'duration':120}, root/'part-001.wav', state, save)
+            self.assertFalse(state['generation_started'])
+            self.assertFalse(state['audio_ready'])
+            self.assertIn('oom-kill', state['generation_failed'])
+            self.assertEqual(saved_part.read_bytes(), b'previous valid part')
+            self.assertTrue((root/'cpu-song-input.json').exists())
+            self.assertEqual(save.call_count, 2)
+
+    def test_bad_worker_output_is_saved_as_failed_state(self):
+        import music_cpu
+        from unittest.mock import Mock
+        with tempfile.TemporaryDirectory() as tmp:
+            state = {}
+            save = Mock()
+            with patch('worker_limits.run_worker'), patch('pipeline.duration', return_value=10):
+                with self.assertRaisesRegex(RuntimeError, 'Invalid generated segment duration'):
+                    music_cpu.generate_segment({'duration':120}, Path(tmp)/'part.wav', state, save)
+            self.assertFalse(state['generation_started'])
+            self.assertFalse(state['audio_ready'])
+
 
 if __name__ == '__main__':
     unittest.main()
