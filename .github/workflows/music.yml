@@ -151,8 +151,8 @@ jobs:
       ACESTEP_INIT_LLM: 'false'
       ACESTEP_GENERATION_TIMEOUT: '18000'
       CUDA_VISIBLE_DEVICES: ''
-      OMP_NUM_THREADS: '4'
-      MKL_NUM_THREADS: '4'
+      OMP_NUM_THREADS: '3'
+      MKL_NUM_THREADS: '3'
       HF_HUB_DISABLE_XET: '1'
       HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
     steps:
@@ -209,6 +209,7 @@ jobs:
             output/*/song.wav
             output/*/part-*.wav
             output/*/generation-state.json
+            output/*/worker-resources.txt
           retention-days: 7
   short_music:
     needs: lyrics
@@ -221,8 +222,8 @@ jobs:
       ACESTEP_INIT_LLM: 'false'
       ACESTEP_GENERATION_TIMEOUT: '18000'
       CUDA_VISIBLE_DEVICES: ''
-      OMP_NUM_THREADS: '4'
-      MKL_NUM_THREADS: '4'
+      OMP_NUM_THREADS: '3'
+      MKL_NUM_THREADS: '3'
       HF_HUB_DISABLE_XET: '1'
       HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
     steps:
@@ -277,6 +278,7 @@ jobs:
           path: |
             output/*/short-audio/**/*.wav
             output/*/short-audio/**/*.json
+            output/*/short-audio/**/worker-resources.txt
           retention-days: 7
   images:
     needs: lyrics
