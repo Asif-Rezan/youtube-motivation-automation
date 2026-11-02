@@ -6,6 +6,19 @@ from pathlib import Path
 from PIL import Image
 from image_cpu import MODEL, REVISION
 
+THUMBNAIL_REFERENCE = Path(__file__).resolve().parent/'assets/thumbnail/kids-dance-reference.png'
+
+def thumbnail_reference():
+    path=Path(os.getenv('THUMBNAIL_REFERENCE_IMAGE',str(THUMBNAIL_REFERENCE)))
+    strength=float(os.getenv('THUMBNAIL_DENOISE_STRENGTH','0.72'))
+    if not 0 < strength <= 1:
+        raise ValueError('Thumbnail denoise strength must be greater than zero and at most one')
+    with Image.open(path) as image:
+        image.verify()
+    return dict(reference_image=str(path.relative_to(Path(__file__).resolve().parent))
+                if path.is_relative_to(Path(__file__).resolve().parent) else str(path),
+                reference_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),strength=strength)
+
 
 def image_plan(song):
     from kids_rhymes import validate_storyboard
@@ -28,11 +41,20 @@ def image_plan(song):
                     ' Keep characters and lyric props visible, no borders or panels.')
                    for kind, prompt in entries]
     else:
-        entries.append(('thumbnail', song['scenes'][0]['prompt'] + ' Close-up joyful faces, colorful nursery rhyme thumbnail.'))
-    return [dict(kind=kind, prompt=prompt, seed=int(hashlib.sha256((identity+kind).encode()).hexdigest()[:8],16),
+        entries.append(('thumbnail',
+            'Cute colorful 3D storybook cartoon, stylized animated children, rounded toy-like shapes. '
+            'Five happy toddlers dancing with baby animal friends, one large central child, '
+            'two friends on each side, joyful expressive faces, raised hands, colorful rompers. '
+            'Vibrant dreamy garden party, glowing festive lights, flowers, soft magical light. '
+            'Polished nursery rhyme thumbnail, no text, no photography. '
+            +song['scenes'][0]['prompt']))
+    plans = [dict(kind=kind, prompt=prompt, seed=int(hashlib.sha256((identity+kind).encode()).hexdigest()[:8],16),
         model=MODEL, revision=REVISION, width=int(os.getenv('CPU_IMAGE_WIDTH','576' if portrait else '1024')),
         height=int(os.getenv('CPU_IMAGE_HEIGHT','1024' if portrait else '576')), steps=int(os.getenv('CPU_IMAGE_STEPS','16')),
         visual_style='dudi-storybook-v2', allow_text=False) for kind,prompt in entries]
+    if not portrait:
+        plans[-1].update(thumbnail_reference(),visual_style='dudi-reference-storybook-v1')
+    return plans
 
 
 def generate_song_images(root, song):
@@ -62,8 +84,14 @@ def generate_song_images(root, song):
                 pass
         if not valid:
             temporary = target.with_suffix('.tmp.png')
+            reference_options={}
+            if plan.get('reference_image'):
+                reference=Path(plan['reference_image'])
+                if not reference.is_absolute():
+                    reference=Path(__file__).resolve().parent/reference
+                reference_options=dict(reference_image=reference,strength=plan['strength'])
             generate(plan['prompt'], temporary, seed=plan['seed'], allow_text=False,
-                     width=plan['width'], height=plan['height'], steps=plan['steps'])
+                     width=plan['width'], height=plan['height'], steps=plan['steps'],**reference_options)
             with Image.open(temporary) as im:
                 im.verify()
             temporary.replace(target)
