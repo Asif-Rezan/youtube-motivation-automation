@@ -31,8 +31,9 @@ class KidsTests(unittest.TestCase):
     def test_lyric_scene_leads_prompt_and_episode_cast_is_preserved(self):
         song = self.song(480)
         prompt = song['scenes'][0]['prompt']
-        self.assertTrue(prompt.startswith('Dreamy natural outdoor scenery'))
-        self.assertIn('Two smiling toddlers',prompt[:180])
+        self.assertTrue(prompt.startswith('Cute colorful 3D storybook cartoon. Adorable baby elephant and baby turtle'))
+        self.assertIn('A small smiling child',prompt)
+        self.assertLess(prompt.index('baby elephant'),prompt.index('A small smiling child'))
         self.assertIn('Duckling and bunny exploring flower patch 0',prompt)
         self.assertIn(song['visual_identity']['characters'], prompt)
         self.assertIn(song['visual_identity']['world'], prompt)
@@ -48,11 +49,17 @@ class KidsTests(unittest.TestCase):
             self.assertEqual(len(song['scenes']),seconds//5)
             self.assertEqual(song['vocal_gender'],'female')
             validate_duration(seconds)
+            self.assertEqual(song['bpm'],120)
+            self.assertIn('120 BPM',song['prompt'])
+            self.assertIn('Continuous lively instrumental backing',song['prompt'])
         for seconds in (479,721):
             with self.assertRaises(ValueError):
                 self.song(seconds)
             with self.assertRaises(ValueError):
                 validate_duration(seconds)
+            self.assertEqual(song['bpm'],120)
+            self.assertIn('120 BPM',song['prompt'])
+            self.assertIn('Continuous lively instrumental backing',song['prompt'])
 
     def test_mismatched_storyboard_rejected(self):
         song = self.song()
@@ -117,9 +124,9 @@ class KidsTests(unittest.TestCase):
         from scene_actions import plan_scene,motion_prompt
         song=self.song(480)
         for index,scene in enumerate(song['scenes']):
-            self.assertIn('Two smiling toddlers',scene['prompt'][:180])
+            self.assertIn('A small smiling child',scene['prompt'])
             self.assertIn('baby elephant',scene['prompt'][:200])
-            self.assertTrue(scene['prompt'].startswith('Dreamy natural outdoor scenery'))
+            self.assertTrue(scene['prompt'].startswith('Cute colorful 3D storybook cartoon. Adorable'))
             self.assertIn('Cute colorful 3D storybook cartoon',scene['prompt'])
             if index%2:
                 self.assertEqual(scene['story_action']['action'],'dance')

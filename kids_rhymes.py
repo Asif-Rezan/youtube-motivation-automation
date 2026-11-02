@@ -12,18 +12,18 @@ from rhyme_writer import write_rhyme
 from scene_actions import plan_scene
 
 def scene_prompt(row,outline,dance=False):
-    """Keep nature, cast and the existing style inside the first encoder window."""
+    """Restore the original soft animal-led look, with children as companions."""
     cast=outline.get('characters','')
-    animal=re.search(r'\b(bunny|rabbit|hare|duckling|duck|chick|puppy|dog|kitten|cat|turtle|elephant|panda|lamb|fox|bear|deer|calf|penguin|squirrel)\b',cast,re.I)
-    animal=animal.group(1).lower() if animal else 'animal'
-    setting=' '.join(outline.get('visual_world','flower meadow with pastel blossom trees').split()[:8]).rstrip('.,;')
-    action=('Dancing, raised arms, tiny happy jumps' if dance else row['visual'])
-    return ('Dreamy natural outdoor scenery, '+setting+'. '
-        'Two smiling toddlers and a baby '+animal+', widely spaced full bodies. '
-        'Cute colorful 3D storybook cartoon. '+action+'. '
-        'Colorful toddler rompers, round cheeks, big expressive eyes. '
-        'Clear complete main character, separate silhouettes, lush flowers and soft natural light. '
-        +cast+'. '+outline.get('visual_world','')+'. Wide landscape, no text.')
+    animals=list(dict.fromkeys(re.findall(r'\b(bunny|rabbit|hare|duckling|duck|chick|puppy|dog|kitten|cat|turtle|elephant|panda|lamb|fox|bear|deer|calf|penguin|squirrel)\b',cast,re.I)))[:2]
+    subjects=' and '.join('baby '+animal.lower() for animal in animals) or 'cute baby animal friends'
+    action=('The animal friends and child dance happily together' if dance else row['visual'])
+    return ('Cute colorful 3D storybook cartoon. Adorable '+subjects+'. '
+        'Dreamy natural scenery, '+ ' '.join(outline.get('visual_world','flower garden').split()[:8])+'. '
+        'Rounded soft shapes, adorable expressive faces, bright pastel colors, gentle playful mood. '
+        'A small smiling child in colorful clothes joins the cute animals. '
+        +action+'. '+outline.get('visual_world','Dreamy natural flower garden')+'. '
+        +cast+'. Clear complete main character, full bodies, separate silhouettes, '
+        'soft natural light, dreamy flowers and trees, wide landscape, no text.')
 
 
 def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_override='female'):
@@ -44,18 +44,19 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
                 i=len(scenes)
                 dance=lyric==REFRAIN
                 prompt=scene_prompt(row,outline,dance)
-                motion_text=('Toddlers and baby animal dancing and bouncing together' if dance
-                             else row['lyric']+' '+row['visual'])
+                motion_text=('Cute baby animals and child dancing together' if dance
+                             else row['lyric']+' '+row['visual'])+' at 120 BPM'
                 scenes.append(dict(index=i,start=i*5,end=(i+1)*5,lyric=lyric,prompt=prompt,
-                    cast_style='dreamy-toddler-animal-dance-v2',visual_action=motion_text,story_action=plan_scene(motion_text,i)))
+                    cast_style='classic-cute-animals-with-child-v3',visual_action=motion_text,story_action=plan_scene(motion_text,i)))
     scenes=scenes[:seconds//5]
     outline=written['outline']
     song = dict(title=outline['title'], lyrics='\n'.join(scene['lyric'] for scene in scenes),duration=seconds,
-        prompt='Joyful nursery rhyme, cute sweet adult female singing voice, clear English diction, playful dudi dudi dam dam refrain, major key, 100 BPM, ukulele, xylophone, soft handclaps, gentle bass, warm child-friendly mix, no shouting.',
+        prompt='Joyful nursery rhyme, cute sweet adult female singing voice, clear English diction, playful dudi dudi dam dam refrain, C major, 120 BPM, bouncy ukulele, bright xylophone, steady handclaps and gentle bass. Continuous lively instrumental backing under every vocal line, no silent breaks, no stop-start pauses, no shouting.',
         description=outline['description'],story_summary=outline['story_summary'],
         visual_identity=dict(characters=outline.get('characters',''), world=outline.get('visual_world','')),
         lyric_writer=dict(backend='local-qwen-cpu',version=written['writer_version'],novelty_checked=True),
-        vocal_gender='female',song_date=day,scenes=scenes,
+        vocal_gender='female',song_date=day,scenes=scenes,bpm=120,
+        audio_mastering='continuous-kids-mix-v1',
         tags=['Dudi Dam TV','kids rhymes','nursery rhymes','Dudi Dudi Dam Dam','kids dance'])
     validate_storyboard(song)
     return song
@@ -88,7 +89,9 @@ def generate_music(song, target, state, save):
     from pipeline import validate_song, validate_duration, duration
     from music_cpu import generate_segment
     validate_song(song)
-    if target.exists():
+    from audio_mastering import VERSION, AudioGapError, verify_continuity, master_parts
+    continuous=song.get('audio_mastering')==VERSION
+    if target.exists() and (not continuous or state.get('mastering_version')==VERSION):
         validate_duration(duration(target))
         return
     # ACE-Step documents up to 600 seconds per request. Short independent parts
@@ -100,7 +103,18 @@ def generate_music(song, target, state, save):
         part = dict(song, duration=len(group)*5, lyrics='\n'.join(s['lyric'] for s in group), _segment=True)
         path = target.parent / f'part-{i//24:03d}.wav'
         part_state = state.setdefault('parts', {}).setdefault(str(i//24), {})
-        generate_segment(part, path, part_state, save)
+        for attempt in range(3 if continuous else 1):
+            generate_segment(part,path,part_state,save)
+            try:
+                if continuous:
+                    verify_continuity(path,part['duration'])
+                break
+            except AudioGapError:
+                part_state.update(audio_ready=False,continuity_retries=attempt+1)
+                save()
+                path.replace(path.with_suffix('.rejected-gap.wav'))
+                if attempt==2:
+                    raise
         parts.append(path)
     # Normalize every part to the planned boundary, refusing short generations.
     normalized = []
@@ -111,6 +125,11 @@ def generate_music(song, target, state, save):
         dest = target.parent / f'normalized-{i:03d}.wav'
         subprocess.run(['ffmpeg', '-y', '-i', str(path), '-t', str(requested), '-ar', '44100', '-ac', '2', str(dest)], check=True, capture_output=True)
         normalized.append(dest)
+    if continuous:
+        master_parts(normalized,target,song['duration'])
+        state.update(audio_ready=True,mastering_version=VERSION)
+        save()
+        return
     listing = target.parent/'audio-parts.txt'
     listing.write_text(''.join(f"file '{p.name}'\n" for p in normalized))
     temporary = target.with_suffix('.tmp.wav')

@@ -9,7 +9,7 @@ import re
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
-VERSION = 'scene-stories-v4-varied-dance'
+VERSION = 'scene-stories-v5-tempo-aware-dance'
 
 
 def smooth(value):
@@ -33,7 +33,10 @@ def plan_scene(prompt, index=0):
         kind, prop, action = 'discover', 'butterfly', 'approach'
     seed=int.from_bytes(hashlib.sha256(f'{index}:{prompt}'.encode()).digest()[:8],'big')
     variant=('wave','waist','step','sway','hop')[seed%5]
-    return dict(version=VERSION, kind=kind, prop=prop, action=action, dance_variant=variant,
+    tempo=re.search(r'\b(\d{2,3})\s*bpm\b',prompt,re.I)
+    bpm=int(tempo.group(1)) if tempo else 100
+    bpm=bpm if 30<=bpm<=300 else 100
+    return dict(version=VERSION, kind=kind, prop=prop, action=action, dance_variant=variant,beat_seconds=60/bpm,
                 direction=1 if index % 2 == 0 else -1,
                 beats=[dict(at=0., action='blink'), dict(at=.65, action='prop_enters'),
                        dict(at=1.35, action='look'), dict(at=2.1, action=action),
@@ -50,10 +53,10 @@ def state_at(plan, t):
                 hop = math.sin(math.pi * u)
             landing += math.exp(-((t - start - .68) / .09)**2)
     if plan['action']=='dance' and plan.get('dance_variant','hop')=='hop':
-        # The arrangement's existing tempo is 100 BPM (one beat / .6 sec).
+        # New episodes carry their requested tempo; old clips retain 100 BPM.
         ramp=smooth((t-.3)/.4)*smooth((5-t)/.4)
-        hop=max(0.,math.sin(2*math.pi*(t-.3)/.6))*ramp
-        landing=max(0.,-math.sin(2*math.pi*(t-.3)/.6))**6*ramp
+        hop=max(0.,math.sin(2*math.pi*(t-.3)/plan.get('beat_seconds',.6)))*ramp
+        landing=max(0.,-math.sin(2*math.pi*(t-.3)/plan.get('beat_seconds',.6)))**6*ramp
     blink = max(0., 1 - abs(t - .3) / .13)
     return dict(progress=progress, hop=hop, landing=landing, blink=blink,
                 look=smooth((t - 1.35) / .5), reaction=smooth((t - 4.1) / .65),
@@ -229,7 +232,7 @@ def actor_profile(plan, ordinal, count):
     return dict(movement=movement,delay=ordinal*.22,phase=ordinal*1.7)
 
 
-def dance_body_motion(subject, t, phase=0., variant='hop'):
+def dance_body_motion(subject, t, phase=0., variant='hop', beat_seconds=.6):
     """Small continuous image deformations, preserving the head and artwork.
 
     This is deliberately a gentle dance, not inferred joints: side regions wave,
@@ -244,7 +247,7 @@ def dance_body_motion(subject, t, phase=0., variant='hop'):
         'step':(.3,1.4,.4),'sway':(.25,.15,.7),
         'hop':(.7,.7,.6),
     }.get(variant,(.7,.7,.6))
-    beat=2*math.pi*t/.6+phase
+    beat=2*math.pi*t/beat_seconds+phase
     mesh=[]
     def point(x,y):
         u,v=x/w,y/h
@@ -289,7 +292,7 @@ def compose_frame(bg, subject, bbox, plan, t, rig=None, camera=True, prop=True, 
     if movement=='settle':
         stretch-=.025*state['progress']
     elif movement=='dance':
-        pulse=math.sin(2*math.pi*local_t/.6+profile['phase'])*smooth(local_t/.4)
+        pulse=math.sin(2*math.pi*local_t/local_plan.get('beat_seconds',.6)+profile['phase'])*smooth(local_t/.4)
         angle=3.0*pulse
         stretch+=.015*pulse
     elif movement in ('sway','nod'):
@@ -302,7 +305,7 @@ def compose_frame(bg, subject, bbox, plan, t, rig=None, camera=True, prop=True, 
             stretch+=.018*pulse
     actor=face_motion(subject,rig,state)
     if movement=='dance':
-        actor=dance_body_motion(actor,local_t,profile['phase'],local_plan['dance_variant'])
+        actor=dance_body_motion(actor,local_t,profile['phase'],local_plan['dance_variant'],local_plan.get('beat_seconds',.6))
     aw=max(1,round(subject.width/stretch**.4));ah=max(1,round(subject.height*stretch))
     actor=actor.resize((aw,ah),Image.Resampling.BICUBIC)
     if angle:

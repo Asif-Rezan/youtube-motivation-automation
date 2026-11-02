@@ -46,16 +46,26 @@ def prepare(run_id, start=0, seconds=40):
         generate_segment(request, raw, state, save)
         # Trim natural overrun; regenerate short outputs rather than loop/pad.
         if float(probe(raw)['format']['duration']) >= seconds - .1:
-            break
+            from audio_mastering import VERSION, AudioGapError, verify_continuity
+            try:
+                if request.get('audio_mastering')==VERSION:
+                    verify_continuity(raw,seconds)
+                break
+            except AudioGapError:
+                pass
         raw.unlink()
         state['short_duration_retries'] = attempt + 1
         save()
     else:
-        raise ValueError('Generated Short music is too short; saved request retained')
+        raise ValueError('Generated Short music is too short or has silence gaps; saved request retained')
     temporary = target/'song.tmp.wav'
     try:
-        subprocess.run(['ffmpeg','-y','-v','error','-i',str(raw),'-t',str(seconds),
-            '-ar','44100','-ac','2',str(temporary)],check=True,capture_output=True)
+        from audio_mastering import VERSION, master_parts
+        if request.get('audio_mastering')==VERSION:
+            master_parts([raw],temporary,seconds)
+        else:
+            subprocess.run(['ffmpeg','-y','-v','error','-i',str(raw),'-t',str(seconds),
+                '-ar','44100','-ac','2',str(temporary)],check=True,capture_output=True)
         verify_audio(temporary, seconds)
         temporary.replace(output)
     finally:
