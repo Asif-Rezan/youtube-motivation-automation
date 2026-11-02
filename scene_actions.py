@@ -3,12 +3,13 @@
 Face coordinates are normalized to the cropped actor, never the whole scene.
 Uncertain/multiple faces retain their original artwork rather than guessed eyes.
 """
+import hashlib
 import math
 import re
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
-VERSION = 'scene-stories-v3-toddler-animal-dance'
+VERSION = 'scene-stories-v4-varied-dance'
 
 
 def smooth(value):
@@ -30,7 +31,9 @@ def plan_scene(prompt, index=0):
         kind, prop, action = 'discover', 'butterfly', 'two_hops'
     else:
         kind, prop, action = 'discover', 'butterfly', 'approach'
-    return dict(version=VERSION, kind=kind, prop=prop, action=action,
+    seed=int.from_bytes(hashlib.sha256(f'{index}:{prompt}'.encode()).digest()[:8],'big')
+    variant=('wave','waist','step','sway','hop')[seed%5]
+    return dict(version=VERSION, kind=kind, prop=prop, action=action, dance_variant=variant,
                 direction=1 if index % 2 == 0 else -1,
                 beats=[dict(at=0., action='blink'), dict(at=.65, action='prop_enters'),
                        dict(at=1.35, action='look'), dict(at=2.1, action=action),
@@ -46,7 +49,7 @@ def state_at(plan, t):
             if 0 < u < 1:
                 hop = math.sin(math.pi * u)
             landing += math.exp(-((t - start - .68) / .09)**2)
-    if plan['action']=='dance':
+    if plan['action']=='dance' and plan.get('dance_variant','hop')=='hop':
         # The arrangement's existing tempo is 100 BPM (one beat / .6 sec).
         ramp=smooth((t-.3)/.4)*smooth((5-t)/.4)
         hop=max(0.,math.sin(2*math.pi*(t-.3)/.6))*ramp
@@ -216,17 +219,17 @@ def apply_camera(canvas, bounds, plan, t):
 
 def actor_profile(plan, ordinal, count):
     if plan['action']=='dance':
-        return dict(movement='dance',delay=ordinal*.08,phase=ordinal*1.1)
+        return dict(movement='dance',variant=plan.get('dance_variant','hop'),delay=ordinal*.08,phase=ordinal*1.1)
     if count==1:
         return dict(movement=plan['action'],delay=0.,phase=0.)
     if plan['action']=='settle':
         movement='settle'
     else:
-        movement=('sway','two_hops','nod')[ordinal%3]
+        movement=(('sway','two_hops','nod') if plan['action']=='two_hops' else ('sway','nod','sway'))[ordinal%3]
     return dict(movement=movement,delay=ordinal*.22,phase=ordinal*1.7)
 
 
-def dance_body_motion(subject, t, phase=0.):
+def dance_body_motion(subject, t, phase=0., variant='hop'):
     """Small continuous image deformations, preserving the head and artwork.
 
     This is deliberately a gentle dance, not inferred joints: side regions wave,
@@ -236,6 +239,11 @@ def dance_body_motion(subject, t, phase=0.):
     if ramp==0:
         return subject.copy()
     w,h=subject.size
+    arm_gain,leg_gain,waist_gain={
+        'wave':(1.4,.15,.3),'waist':(.25,.15,1.5),
+        'step':(.3,1.4,.4),'sway':(.25,.15,.7),
+        'hop':(.7,.7,.6),
+    }.get(variant,(.7,.7,.6))
     beat=2*math.pi*t/.6+phase
     mesh=[]
     def point(x,y):
@@ -243,9 +251,9 @@ def dance_body_motion(subject, t, phase=0.):
         # Keep the entire upper head/ears untouched. Smooth local fields avoid
         # seams and preserve transparency around the original silhouette.
         side=math.tanh((u-.5)*6)
-        arms=math.exp(-((v-.52)/.14)**4)*abs(side)**2
-        legs=smooth((v-.72)/.18)
-        waist=math.exp(-((v-.68)/.14)**4)
+        arms=arm_gain*math.exp(-((v-.52)/.14)**4)*abs(side)**2
+        legs=leg_gain*smooth((v-.72)/.18)
+        waist=waist_gain*math.exp(-((v-.68)/.14)**4)
         dx=w*ramp*(.018*math.sin(beat)*waist+
                      .012*math.sin(beat+side*.7)*arms+
                      .014*math.sin(beat)*side*legs)
@@ -264,7 +272,7 @@ def dance_body_motion(subject, t, phase=0.):
 def compose_frame(bg, subject, bbox, plan, t, rig=None, camera=True, prop=True, profile=None):
     profile=profile or actor_profile(plan,0,1)
     local_t=max(0,t-profile['delay'])
-    local_plan=dict(plan,action=profile['movement'])
+    local_plan=dict(plan,action=profile['movement'],dance_variant=profile.get('variant',plan.get('dance_variant','hop')))
     state=state_at(local_plan,local_t)
     w,h=bg.size
     room_right=max(0,w-bbox[2]-4)
@@ -294,7 +302,7 @@ def compose_frame(bg, subject, bbox, plan, t, rig=None, camera=True, prop=True, 
             stretch+=.018*pulse
     actor=face_motion(subject,rig,state)
     if movement=='dance':
-        actor=dance_body_motion(actor,local_t,profile['phase'])
+        actor=dance_body_motion(actor,local_t,profile['phase'],local_plan['dance_variant'])
     aw=max(1,round(subject.width/stretch**.4));ah=max(1,round(subject.height*stretch))
     actor=actor.resize((aw,ah),Image.Resampling.BICUBIC)
     if angle:

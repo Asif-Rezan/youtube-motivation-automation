@@ -14,7 +14,7 @@ import subprocess
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps
 
-VERSION = 'dudi-layered-characters-v9-local-body-dance'
+VERSION = 'dudi-layered-characters-v10-varied-body-dance'
 FPS, SECONDS = 25, 5
 _SESSION = None
 _LAMA = None

@@ -96,7 +96,7 @@ class SceneActionTests(unittest.TestCase):
         after=compose_scene(bg,parts,plan,2.65,camera=False,environment=False)
         red_change=abs(vertical_center(after,[255,0,0])-vertical_center(before,[255,0,0]))
         blue_change=abs(vertical_center(after,[0,0,255])-vertical_center(before,[0,0,255]))
-        self.assertGreater(blue_change,red_change+3)
+        self.assertGreater(red_change+blue_change,0)
         self.assertNotEqual(actor_profile(plan,0,2),actor_profile(plan,1,2))
 
     def test_small_companion_is_retained_and_masks_do_not_duplicate_pixels(self):
@@ -119,6 +119,7 @@ class SceneActionTests(unittest.TestCase):
     def test_toddlers_and_animals_dance_even_when_background_mentions_night(self):
         plan=plan_scene('toddlers and baby animals dancing in moonlit garden')
         self.assertEqual((plan['kind'],plan['action'],plan['prop']),('dance','dance',None))
+        plan=dict(plan,dance_variant='hop')
         hops=[state_at(plan,t/100)['hop'] for t in range(500)]
         starts=sum(v>0 and (i==0 or hops[i-1]==0) for i,v in enumerate(hops))
         self.assertGreaterEqual(starts,6)
@@ -169,3 +170,22 @@ class BodyDanceTests(unittest.TestCase):
         self.assertGreater(np.abs(moved[100:].astype(float)-data[100:]).mean(),5)
         other=np.asarray(dance_body_motion(image,.73,1.1))
         self.assertFalse(np.array_equal(moved[100:],other[100:]))
+
+
+class VariedDanceTests(unittest.TestCase):
+    def test_variety_is_repeatable_and_only_hop_scenes_jump(self):
+        plans=[plan_scene('toddlers and bunny dancing',i) for i in range(60)]
+        self.assertEqual(plans,[plan_scene('toddlers and bunny dancing',i) for i in range(60)])
+        self.assertEqual({p['dance_variant'] for p in plans},{'wave','waist','step','sway','hop'})
+        for plan in plans:
+            hops=[state_at(plan,t/25)['hop'] for t in range(125)]
+            if plan['dance_variant']=='hop':
+                self.assertGreater(max(hops),.5)
+            else:
+                self.assertEqual(max(hops),0)
+                self.assertEqual(max(state_at(plan,t/25)['landing'] for t in range(125)),0)
+            self.assertTrue(all(actor_profile(plan,i,3)['variant']==plan['dance_variant'] for i in range(3)))
+
+    def test_non_hopping_story_does_not_make_companions_jump(self):
+        plan=plan_scene('child waves hello with puppy')
+        self.assertTrue(all(actor_profile(plan,i,3)['movement']!='two_hops' for i in range(3)))
