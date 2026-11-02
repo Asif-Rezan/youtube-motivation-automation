@@ -78,7 +78,7 @@ def image_plan(song):
         height=int(os.getenv('CPU_IMAGE_HEIGHT','1024' if portrait else '576')), steps=int(os.getenv('CPU_IMAGE_STEPS','16')),
         visual_style='dudi-storybook-v2', allow_text=False) for kind,prompt in entries]
     if not portrait:
-        plans[-1].update(thumbnail_reference(),visual_style='dudi-reference-storybook-v2',thumbnail_cast=cast)
+        plans[-1].update(thumbnail_reference(),visual_style='dudi-reference-storybook-v3-regional',thumbnail_cast=cast,regional_variation='regional-cast-v1')
     return plans
 
 
@@ -117,6 +117,9 @@ def generate_song_images(root, song):
                 reference_options=dict(reference_image=reference,strength=plan['strength'])
             generate(plan['prompt'], temporary, seed=plan['seed'], allow_text=False,
                      width=plan['width'], height=plan['height'], steps=plan['steps'],**reference_options)
+            if plan.get('regional_variation'):
+                from thumbnail_variation import refine_thumbnail
+                refine_thumbnail(temporary,plan,generate)
             with Image.open(temporary) as im:
                 im.verify()
             temporary.replace(target)

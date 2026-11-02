@@ -20,6 +20,9 @@ class KidsTests(unittest.TestCase):
                 story_summary='Duck and bunny follow a bright rainbow through the garden.'),
                 sections=[[dict(lyric=f'Friendly ducks discover garden number {i}',visual=f'Duckling and bunny exploring flower patch {i}')
                            for i in range((seconds+9)//10)]])
+        regional=patch('thumbnail_variation.refine_thumbnail')
+        regional.start()
+        self.addCleanup(regional.stop)
         model=patch('kids_rhymes.write_rhyme',side_effect=written)
         model.start()
         self.addCleanup(model.stop)
