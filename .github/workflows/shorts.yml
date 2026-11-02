@@ -70,6 +70,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   short_music:
+    name: Generate Shorts music only when not already prepared
     if: ${{ !inputs.prepared_music }}
     runs-on: ubuntu-24.04
     timeout-minutes: 350
@@ -143,6 +144,7 @@ jobs:
             output/*/short-audio/**/*.json
           retention-days: 7
   short_images:
+    name: Generate portraits only when not already prepared
     if: ${{ !inputs.prepared_portraits }}
     runs-on: ubuntu-24.04
     timeout-minutes: 180
@@ -246,6 +248,14 @@ jobs:
           FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
           PUBLISH_ENABLED: ${{ vars.PUBLISH_ENABLED }}
         run: python validate_publication_config.py
+      - name: Explain prepared asset reuse
+        env:
+          PREPARED_MUSIC: ${{ inputs.prepared_music }}
+          PREPARED_PORTRAITS: ${{ inputs.prepared_portraits }}
+        run: |
+          echo "### Shorts asset reuse" >> "$GITHUB_STEP_SUMMARY"
+          echo "Prepared music: $PREPARED_MUSIC; prepared portraits: $PREPARED_PORTRAITS." >> "$GITHUB_STEP_SUMMARY"
+          echo "When true, the extra generation jobs are intentionally skipped; the Short uses the already-generated artifacts." >> "$GITHUB_STEP_SUMMARY"
       - name: Validate source and clip identity
         run: |
           python - <<'PY'
@@ -302,7 +312,7 @@ jobs:
   facebook:
     name: Optional Facebook Reel publication
     needs: short
-    if: vars.FACEBOOK_PUBLISH_ENABLED == 'true' && vars.PUBLISH_ENABLED == 'true'
+    if: ${{ always() && !cancelled() && needs.short.result == 'success' && vars.FACEBOOK_PUBLISH_ENABLED == 'true' && vars.PUBLISH_ENABLED == 'true' }}
     uses: ./.github/workflows/facebook.yml
     with:
       source_run: ${{ format('{0}', github.run_id) }}

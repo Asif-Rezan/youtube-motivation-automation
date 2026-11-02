@@ -1,0 +1,18 @@
+name: Recover skipped episode Facebook Reel
+on:
+  push:
+    branches: [main]
+    paths: [.generation/reel-recovery-request.json]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  reel:
+    if: vars.FACEBOOK_PUBLISH_ENABLED == 'true' && vars.PUBLISH_ENABLED == 'true'
+    uses: ./.github/workflows/facebook.yml
+    with:
+      source_run: '41336716292'
+      run_id: scene-story-41336716292
+      kind: short
+      non_blocking: false
+    secrets: inherit

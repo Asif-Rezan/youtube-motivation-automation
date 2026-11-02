@@ -481,8 +481,9 @@ jobs:
     secrets: inherit
   cleanup:
     name: Clean published media from Drive
-    needs: [lyrics, publish, shorts]
-    if: vars.PUBLISH_ENABLED == 'true'
+    needs: [lyrics, publish]
+    if: ${{ always() && !cancelled() && needs.publish.result == 'success' && vars.PUBLISH_ENABLED == 'true' }}
+    # cleanup does not need successful Shorts: it deletes long-video media only.
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -500,5 +501,11 @@ jobs:
           python-version: '3.12'
           cache: pip
       - run: pip install -r requirements.txt
-      - name: Verify public HD video and clean its temporary media
-        run: python -u cleanup_drive.py --run-id "$SONG_RUN_ID"
+      - name: Clean eligible public HD episodes and record pending schedules
+        run: python -u cleanup_drive.py --sweep
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: drive-cleanup-${{ github.run_id }}
+          path: output/drive-cleanup-report.json
+          retention-days: 14
