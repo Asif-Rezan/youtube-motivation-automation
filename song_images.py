@@ -37,17 +37,19 @@ def thumbnail_cast(identity):
 
 
 def thumbnail_prompt(cast):
-    animals=' and '.join(cast['animals'])
+    # Keep every requested type of variation ahead of the CLIP token cutoff.
+    animals=', '.join(cast['animals'])
     colors=', '.join(c['color'] for c in cast['children'])
-    children='; '.join(f"{i+1}: {c['gender']}, {c['face']}, {c['color']} shorts and matching top"
-                      for i,c in enumerate(cast['children']))
-    return ('Cute colorful 3D storybook cartoon. Five dancing toddler boys and girls, distinct faces. '
-            'Baby '+animals+'. Colorful shorts: '+colors+'. '
-            'Different hairstyles, skin tones and eye colors, joyful smiles, raised hands. '
-            'One large central child, two friends on each side. '
-            'Left to right children: '+children+'. '
-            'Fully clothed, vibrant magical garden party, glowing festive lights, flowers. '
-            'Only the selected animal species, no identical faces, no text, no photography.')
+    return ('Cute 3D storybook cartoon. Baby '+animals+'. '
+            'Five different toddler faces, girls and boys, pigtails, curls, freckles. '
+            +colors+' shorts. Dancing, happy smiles, colorful party lights.')
+
+
+def thumbnail_negative(cast):
+    exclusions='identical faces, cloned children, matching clothes, all boys, all girls'
+    if not any(a in ('chicks','ducklings') for a in cast['animals']):
+        exclusions='yellow chicks, chickens, ducks, birds, '+exclusions
+    return exclusions
 
 
 def image_plan(song):
@@ -78,7 +80,7 @@ def image_plan(song):
         height=int(os.getenv('CPU_IMAGE_HEIGHT','1024' if portrait else '576')), steps=int(os.getenv('CPU_IMAGE_STEPS','16')),
         visual_style='dudi-storybook-v2', allow_text=False) for kind,prompt in entries]
     if not portrait:
-        plans[-1].update(thumbnail_reference(),visual_style='dudi-reference-storybook-v2',thumbnail_cast=cast)
+        plans[-1].update(thumbnail_reference(),visual_style='dudi-reference-storybook-v3-compact',thumbnail_cast=cast,extra_negative_prompt=thumbnail_negative(cast))
     return plans
 
 
@@ -114,7 +116,8 @@ def generate_song_images(root, song):
                 reference=Path(plan['reference_image'])
                 if not reference.is_absolute():
                     reference=Path(__file__).resolve().parent/reference
-                reference_options=dict(reference_image=reference,strength=plan['strength'])
+                reference_options=dict(reference_image=reference,strength=plan['strength'],
+                                       extra_negative_prompt=plan.get('extra_negative_prompt',''))
             generate(plan['prompt'], temporary, seed=plan['seed'], allow_text=False,
                      width=plan['width'], height=plan['height'], steps=plan['steps'],**reference_options)
             with Image.open(temporary) as im:

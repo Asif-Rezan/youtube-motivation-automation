@@ -53,7 +53,7 @@ def negative_prompt():
 
 _pipeline = None
 
-def generate(prompt, path, seed, allow_text=False, width=None, height=None, steps=None, reference_image=None, strength=None):
+def generate(prompt, path, seed, allow_text=False, width=None, height=None, steps=None, reference_image=None, strength=None, extra_negative_prompt=''):
     if allow_text:
         raise ValueError('Dudi Dam TV artwork must be text-free')
     if reference_image is None and strength is not None:
@@ -105,7 +105,7 @@ def generate(prompt, path, seed, allow_text=False, width=None, height=None, step
         candidate = initial_prompt if attempt < 5 else rewritten
         if attempt == 5:
             print('Five safety rejections; retrying a restrained music portrait.', flush=True)
-        result = pipeline(prompt=candidate, negative_prompt=negative_prompt(), width=width, height=height,
+        result = pipeline(prompt=candidate, negative_prompt=(extra_negative_prompt+', '+negative_prompt()).strip(', '), width=width, height=height,
             num_inference_steps=steps, guidance_scale=GUIDANCE_SCALE,
             generator=torch.Generator(device='cpu').manual_seed(seed + attempt * 10007),**reference_options)
         if any(getattr(result, 'nsfw_content_detected', None) or []):

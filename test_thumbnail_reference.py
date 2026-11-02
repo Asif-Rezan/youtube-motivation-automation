@@ -75,12 +75,13 @@ class ThumbnailReferenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp,patch.object(image_cpu,'_pipeline',base),patch.dict('sys.modules',torch=torch,diffusers=diffusers):
             reference=Path(tmp)/'reference.png';Image.new('RGB',(128,72)).save(reference)
             target=Path(tmp)/'result.png'
-            image_cpu.generate('3D storybook kids',target,seed=3,width=256,height=256,steps=20,reference_image=reference,strength=.72)
+            image_cpu.generate('3D storybook kids',target,seed=3,width=256,height=256,steps=20,reference_image=reference,strength=.72,extra_negative_prompt='yellow chicks, identical faces')
             auto.from_pipe.assert_called_once_with(base)
             self.assertEqual(worker.call_count,2)
             for call in worker.call_args_list:
                 self.assertEqual(call.kwargs['strength'],.72)
                 self.assertEqual(call.kwargs['image'].size,(256,256))
+                self.assertTrue(call.kwargs['negative_prompt'].startswith('yellow chicks, identical faces'))
             self.assertTrue(target.exists())
 
     def test_strength_without_reference_is_rejected(self):
@@ -102,7 +103,9 @@ class ThumbnailCastTests(unittest.TestCase):
             prompt=thumbnail_prompt(cast)
             self.assertTrue(all(animal in prompt[:200] for animal in cast['animals']))
             self.assertTrue(all(child['color'] in prompt for child in children))
-            self.assertTrue(all(child['face'] in prompt for child in children))
+            self.assertLess(len(prompt.split()),55)
+            self.assertIn('girls and boys',prompt)
+            self.assertIn('pigtails, curls, freckles',prompt)
 
     def test_default_strength_is_selected_half(self):
         with patch.dict(os.environ):
