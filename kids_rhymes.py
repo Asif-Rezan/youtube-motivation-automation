@@ -10,6 +10,19 @@ REFRAIN = 'dudi dudi dam dam dudi dudi dam'
 from rhyme_writer import write_rhyme
 from scene_actions import plan_scene
 
+def scene_prompt(row,outline,dance=False):
+    """Keep reference-inspired toddler traits in the existing storybook style."""
+    action=('The same two toddlers and their baby animal dance side by side, '
+            'hands lifted, tiny playful jumps, happy open smiles'
+            if dance else row['visual'])
+    return ('Two smiling toddlers in colorful rompers, round cheeks and big expressive eyes, '
+        'beside a friendly baby animal. Cute colorful 3D storybook cartoon. '
+        +action+'. Clear complete main character, full bodies inside frame, '
+        'separate silhouettes with a clear gap, no overlapping bodies. '
+        +outline.get('characters','')+'. '+outline.get('visual_world','')
+        +'. Rounded soft shapes, bright pastel colors, gentle playful mood, wide landscape, no text.')
+
+
 def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_override='female'):
     if vocal_gender_override not in ('auto', 'female'):
         raise ValueError('Dudi Dam TV uses female vocals')
@@ -22,14 +35,16 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
     scenes = []
     for section in written['sections']:
         for row in section:
-            # Keep the lyric action before the image encoder token limit.
-            prompt=(row['visual'] + '. Clear complete main character, full body inside frame, space around ears and paws. A young child and a friendly animal together, separate full-body silhouettes with a clear gap, no overlapping bodies. Cute colorful 3D storybook cartoon. '
-                + outline.get('characters', '') + '. ' + outline.get('visual_world', '')
-                + '. Rounded soft shapes, adorable expressive faces, bright pastel colors, gentle playful mood, wide landscape, no text.')
+            # Put both cast types and the established style before the encoder
+            # token limit. Refrains get a distinct dancing composition.
             for lyric in (row['lyric'], REFRAIN):
                 i=len(scenes)
+                dance=lyric==REFRAIN
+                prompt=scene_prompt(row,outline,dance)
+                motion_text=('Toddlers and baby animal dancing and bouncing together' if dance
+                             else row['lyric']+' '+row['visual'])
                 scenes.append(dict(index=i,start=i*5,end=(i+1)*5,lyric=lyric,prompt=prompt,
-                    story_action=plan_scene(row['lyric']+' '+row['visual'],i)))
+                    cast_style='toddler-animal-dance-v1',story_action=plan_scene(motion_text,i)))
     scenes=scenes[:seconds//5]
     outline=written['outline']
     song = dict(title=outline['title'], lyrics='\n'.join(scene['lyric'] for scene in scenes),duration=seconds,

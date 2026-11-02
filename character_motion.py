@@ -14,7 +14,7 @@ import subprocess
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps
 
-VERSION = 'dudi-layered-characters-v6-environment-cast'
+VERSION = 'dudi-layered-characters-v7-toddler-dance'
 FPS, SECONDS = 25, 5
 _SESSION = None
 _LAMA = None

@@ -85,10 +85,10 @@ def write_rhyme(day, identity, seconds, history, draft_path=None):
             save()  # Preserve identity and retry state even if the first response fails.
             state['outline']=request_json(outline_schema,
                 f'Create a NEW {seconds//60}-minute nursery rhyme episode for Dudi Dum TV on {day}. '
-                f'Creative identity {identity}; variation {attempt}. Invent a distinct adventure and choose a NEW cast with one or two cheerful young children AND one or two friendly animal companions. Children and animals explore and play together. Vary their appearance and animal species between episodes. '
+                f'Creative identity {identity}; variation {attempt}. Invent a distinct adventure and choose a NEW cast with two cheerful toddlers aged 2-4 AND one friendly baby animal companion. Toddlers have round cheeks, large expressive eyes, soft short hair and colorful rompers or shirts with shorts. They dance, clap, bounce and make gentle little jumps together with their animal friend. Vary their clothing colors, appearance and animal species between episodes. '
                 f'Write {chapters} connected chapter ideas with a beginning, discoveries and a happy ending. '
                 'Keep characters under 320 characters and visual_world under 240 characters, including spaces. '
-                'characters must describe 2-4 protagonists including human children AND animals, with ages/species, clothing, colors and distinctive features, kept consistent throughout this episode. '
+                'characters must describe exactly two toddlers and one baby animal, with names, ages/species, clothing, hair colors and distinctive features, kept consistent throughout this episode. '
                 'visual_world must describe the story-specific setting, props and pastel palette. Vary the cast and world from recent episodes. '
                 'Teach gentle movement, kindness, colors or nature through concrete playful actions. '
                 'English title must name the actual new adventure, not a run ID. Write a concise 2-3 sentence description, 40-65 words and under 600 characters, describing this particular story. '
@@ -123,7 +123,7 @@ def write_rhyme(day, identity, seconds, history, draft_path=None):
                     f'Between every two original lines the singer will sing "{REFRAIN}" for five seconds. '
                     'Do not put that refrain in your output; the arranger inserts it. '
                     'Every verse line must be different. Develop this chapter rather than repeating earlier verses. '
-                    'For each line, visual describes the same action and setting, featuring the episode characters with their exact appearance from the outline. Keep at least one human child and one animal companion visible together. Name the visible subjects, action, relevant props and setting explicitly. Describe one small event: noticing something, reacting, approaching it and sharing a happy response. Avoid static posing or everyone jumping in every scene. Match the lyric literally where possible, and vary locations as the chapter develops. '
+                    'For each line, visual describes the same action and setting, featuring the episode characters with their exact appearance from the outline. Keep both toddlers and their baby animal companion visible together, with separate full bodies. Include frequent playful dancing, clapping, bouncing and little jumps, alternating with concrete discoveries. Name the visible subjects, action, relevant props and setting explicitly. Describe one small event: noticing something, reacting, approaching it and sharing a happy response. Avoid static posing. Use varied dance poses and playful actions rather than repeating one pose. Match the lyric literally where possible, and vary locations as the chapter develops. '
                     'It is a text-free cartoon picture prompt, with no camera instructions or lettering. '
                     'Previous lines to avoid repeating: '+json.dumps(prior+[row['lyric'] for row in rows])+
                     '. Fix these rejected-line constraints: '+json.dumps(feedback)+

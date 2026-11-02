@@ -1,0 +1,26 @@
+# Toddler and animal dance scenes
+
+Newly composed episodes feature two cheerful toddlers and a baby animal companion.
+The user-provided appearance reference informs round cheeks, large expressive
+eyes, short soft hair and playful raised-hand poses. Production keeps the existing
+colorful 3D storybook illustration style, SSD-1B revision, guidance, dimensions and
+step counts. The reference photo is not uploaded or copied into the repository.
+
+Cast descriptions specify consistent names, outfits and hair/animal colors. Early
+image-prompt tokens explicitly include toddlers and an animal, so a long scene
+or world description cannot push the human cast beyond the text encoder window.
+The shared refrain receives its own dancing composition rather than reusing the
+preceding verse composition. Verse scenes still follow their literal events.
+
+Dance plans override incidental moon/rain palette words and use the existing
+100-BPM arrangement's .6-second beat: gentle hops, landing squash and side sway.
+Each extracted actor has a different phase/delay. This remains layered puppet
+animation of illustrated poses, not full 3D skeletal or physically accurate limb
+animation. Touching silhouettes can still move together; prompts request a clear
+gap between bodies. Other story actions, moving scenery and camera framing remain.
+
+New cast/action versions invalidate stale animation clips. Already running Actions
+use their checked-out commit and are not retroactively changed. No production
+video is dispatched automatically by this change. The optional five-second
+preview workflow generates one new image with production image settings, then
+extracts the cast and renders/decode-checks their dance without publication.

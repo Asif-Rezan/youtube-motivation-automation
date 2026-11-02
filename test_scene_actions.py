@@ -115,3 +115,26 @@ class SceneActionTests(unittest.TestCase):
     def test_empty_cast_is_a_valid_environment_shot(self):
         image=compose_scene(Image.new('RGBA',(180,320),'skyblue'),[],plan_scene('clouds'),2)
         self.assertEqual((image.mode,image.size),('RGB',(180,320)))
+
+    def test_toddlers_and_animals_dance_even_when_background_mentions_night(self):
+        plan=plan_scene('toddlers and baby animals dancing in moonlit garden')
+        self.assertEqual((plan['kind'],plan['action'],plan['prop']),('dance','dance',None))
+        hops=[state_at(plan,t/100)['hop'] for t in range(500)]
+        starts=sum(v>0 and (i==0 or hops[i-1]==0) for i,v in enumerate(hops))
+        self.assertGreaterEqual(starts,6)
+        self.assertTrue(all(v==0 for v in hops[:30]))
+        self.assertTrue(all(actor_profile(plan,i,3)['movement']=='dance' for i in range(3)))
+
+    def test_dancing_kids_and_animal_have_distinct_motion_with_fixed_camera(self):
+        bg=Image.new('RGBA',(320,180),'white')
+        parts=[(Image.new('RGBA',(25,65),'red'),(50,70,75,135),None),
+               (Image.new('RGBA',(25,65),'blue'),(140,70,165,135),None),
+               (Image.new('RGBA',(30,45),'green'),(235,90,265,135),None)]
+        plan=plan_scene('toddlers clap and dance with puppy')
+        a=np.asarray(compose_scene(bg,parts,plan,0,camera=False,environment=False))
+        b=np.asarray(compose_scene(bg,parts,plan,.95,camera=False,environment=False))
+        for color in ([255,0,0],[0,0,255],[0,128,0]):
+            before=(a==color).all(axis=2); after=(b==color).all(axis=2)
+            self.assertTrue(before.any() and after.any())
+            self.assertTrue(np.any(before!=after))
+        self.assertEqual(np.asarray(b)[0,0].tolist(),[255,255,255,255] if b.shape[2]==4 else [255,255,255])

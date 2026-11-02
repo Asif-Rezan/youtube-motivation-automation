@@ -8,7 +8,7 @@ import re
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
-VERSION = 'scene-stories-v2-camera-environment-cast'
+VERSION = 'scene-stories-v3-toddler-animal-dance'
 
 
 def smooth(value):
@@ -18,7 +18,9 @@ def smooth(value):
 
 def plan_scene(prompt, index=0):
     words = set(re.findall(r'[a-z]+', prompt.lower()))
-    if words & {'sleep', 'sleepy', 'sleeping', 'bed', 'night', 'moon'}:
+    if words & {'dance','dances','dancing','clap','claps','clapping','bounce','bounces','bouncing','wiggle','wiggling','twirl','twirling','stomp','stomping'}:
+        kind, prop, action = 'dance', None, 'dance'
+    elif words & {'sleep', 'sleepy', 'sleeping', 'bed', 'night', 'moon'}:
         kind, prop, action = 'rest', 'star', 'settle'
     elif words & {'rain', 'rainy', 'water', 'splash', 'puddle'}:
         kind, prop, action = 'rain', 'droplet', 'sway'
@@ -44,6 +46,11 @@ def state_at(plan, t):
             if 0 < u < 1:
                 hop = math.sin(math.pi * u)
             landing += math.exp(-((t - start - .68) / .09)**2)
+    if plan['action']=='dance':
+        # The arrangement's existing tempo is 100 BPM (one beat / .6 sec).
+        ramp=smooth((t-.3)/.4)*smooth((5-t)/.4)
+        hop=max(0.,math.sin(2*math.pi*(t-.3)/.6))*ramp
+        landing=max(0.,-math.sin(2*math.pi*(t-.3)/.6))**6*ramp
     blink = max(0., 1 - abs(t - .3) / .13)
     return dict(progress=progress, hop=hop, landing=landing, blink=blink,
                 look=smooth((t - 1.35) / .5), reaction=smooth((t - 4.1) / .65),
@@ -127,7 +134,7 @@ def face_motion(actor, rig, state):
 
 
 def draw_prop(canvas, plan, t, anchor, travel):
-    if t < .65:
+    if t < .65 or plan.get('prop') is None:
         return
     w,h = canvas.size
     direction=plan['direction']
@@ -208,6 +215,8 @@ def apply_camera(canvas, bounds, plan, t):
 
 
 def actor_profile(plan, ordinal, count):
+    if plan['action']=='dance':
+        return dict(movement='dance',delay=ordinal*.08,phase=ordinal*1.1)
     if count==1:
         return dict(movement=plan['action'],delay=0.,phase=0.)
     if plan['action']=='settle':
@@ -236,6 +245,10 @@ def compose_frame(bg, subject, bbox, plan, t, rig=None, camera=True, prop=True, 
     angle=0.
     if movement=='settle':
         stretch-=.025*state['progress']
+    elif movement=='dance':
+        pulse=math.sin(2*math.pi*local_t/.6+profile['phase'])*smooth(local_t/.4)
+        angle=3.0*pulse
+        stretch+=.015*pulse
     elif movement in ('sway','nod'):
         pulse=math.sin(local_t*(2.4 if movement=='sway' else 3.2)+profile['phase'])
         # Ramp in from the original pose; every actor starts on its own beat.
