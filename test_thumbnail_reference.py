@@ -55,13 +55,12 @@ class ThumbnailReferenceTests(unittest.TestCase):
         song=self.song()
         def worker(prompt,target,**kwargs):
             Image.new('RGB',(32,18),'pink').save(target)
-        with tempfile.TemporaryDirectory() as tmp,patch('image_cpu.generate',side_effect=worker) as generate,patch('thumbnail_variation.refine_thumbnail') as refine:
+        with tempfile.TemporaryDirectory() as tmp,patch('image_cpu.generate',side_effect=worker) as generate:
             generate_song_images(tmp,song)
             calls=generate.call_args_list
             self.assertTrue(all('reference_image' not in call.kwargs for call in calls[:-1]))
             self.assertTrue(calls[-1].kwargs['reference_image'].exists())
             self.assertEqual(calls[-1].kwargs['strength'],.50)
-            refine.assert_called_once()
             generate_song_images(tmp,song)
             self.assertEqual(generate.call_count,len(calls))
 
@@ -109,22 +108,3 @@ class ThumbnailCastTests(unittest.TestCase):
         with patch.dict(os.environ):
             os.environ.pop('THUMBNAIL_DENOISE_STRENGTH',None)
             self.assertEqual(thumbnail_reference()['strength'],.5)
-
-
-class RegionalEditTests(unittest.TestCase):
-    def test_targeted_edits_use_local_prompts_and_preserve_outside_regions(self):
-        from thumbnail_variation import refine_thumbnail
-        from song_images import thumbnail_cast
-        with tempfile.TemporaryDirectory() as tmp:
-            target=Path(tmp)/'thumb.png'
-            Image.new('RGB',(1024,576),'gray').save(target)
-            def worker(prompt,result,**kwargs):
-                Image.new('RGB',(512,512),'blue').save(result)
-            generate=Mock(side_effect=worker)
-            refine_thumbnail(target,dict(seed=4,thumbnail_cast=thumbnail_cast('test')),generate)
-            self.assertEqual(generate.call_count,7)
-            self.assertTrue(all(c.kwargs['strength']==.82 for c in generate.call_args_list[:5]))
-            self.assertTrue(all(c.kwargs['strength']==1. for c in generate.call_args_list[5:]))
-            with Image.open(target) as image:
-                self.assertEqual(image.getpixel((500,300)),(128,128,128))
-                self.assertNotEqual(image.getpixel((500,90)),(128,128,128))

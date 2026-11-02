@@ -23,9 +23,6 @@ if not reference.is_absolute():
 generate(plan['prompt'],root/'thumbnail-source.png',seed=plan['seed'],
          width=plan['width'],height=plan['height'],steps=plan['steps'],
          reference_image=reference,strength=plan['strength'])
-if plan.get('regional_variation'):
-    from thumbnail_variation import refine_thumbnail
-    refine_thumbnail(root/'thumbnail-source.png',plan,generate)
 with Image.open(root/'thumbnail-source.png') as image:
     ImageOps.fit(image.convert('RGB'),(1280,720),method=Image.Resampling.LANCZOS).save(root/'thumbnail.jpg',quality=92,optimize=True)
 print('Thumbnail preview ready',flush=True)
