@@ -1,6 +1,12 @@
 name: Reference storybook thumbnail preview
 on:
   workflow_dispatch:
+    inputs:
+      strength:
+        description: Image-to-image denoising strength (0 < value <= 1)
+        type: string
+        default: '0.72'
+        required: true
 permissions:
   contents: read
 jobs:
@@ -15,7 +21,7 @@ jobs:
       CPU_IMAGE_WIDTH: '1024'
       CPU_IMAGE_HEIGHT: '576'
       CPU_IMAGE_STEPS: '20'
-      THUMBNAIL_DENOISE_STRENGTH: '0.72'
+      THUMBNAIL_DENOISE_STRENGTH: ${{ inputs.strength }}
     steps:
       - uses: actions/checkout@v4
         with:
