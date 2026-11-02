@@ -29,10 +29,21 @@ def image_plan(song):
                    for kind, prompt in entries]
     else:
         entries.append(('thumbnail', song['scenes'][0]['prompt'] + ' Close-up joyful faces, colorful nursery rhyme thumbnail.'))
-    return [dict(kind=kind, prompt=prompt, seed=int(hashlib.sha256((identity+kind).encode()).hexdigest()[:8],16),
+    plans = [dict(kind=kind, prompt=prompt, seed=int(hashlib.sha256((identity+kind).encode()).hexdigest()[:8],16),
         model=MODEL, revision=REVISION, width=int(os.getenv('CPU_IMAGE_WIDTH','576' if portrait else '1024')),
         height=int(os.getenv('CPU_IMAGE_HEIGHT','1024' if portrait else '576')), steps=int(os.getenv('CPU_IMAGE_STEPS','16')),
         visual_style='dudi-storybook-v2', allow_text=False) for kind,prompt in entries]
+    if not portrait:
+        thumbnail=plans[-1]
+        thumbnail.update(width=int(os.getenv('THUMBNAIL_IMAGE_WIDTH','1344')),
+                         height=int(os.getenv('THUMBNAIL_IMAGE_HEIGHT','768')),
+                         steps=int(os.getenv('THUMBNAIL_IMAGE_STEPS','20')),
+                         visual_style='dudi-storybook-hd-thumbnail-v1')
+        w,h,steps=thumbnail['width'],thumbnail['height'],thumbnail['steps']
+        if (w%8 or h%8 or not 256<=w<=1536 or not 256<=h<=1536
+                or abs(w/h-16/9)>.1 or not 1<=steps<=50):
+            raise ValueError('Thumbnail requires near-16:9 dimensions, multiples of eight in 256–1536 and 1–50 steps')
+    return plans
 
 
 def generate_song_images(root, song):

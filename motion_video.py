@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 from PIL import Image
 
-VERSION = 'storybook-scene-stories-v4'
+VERSION = 'storybook-scene-stories-v5-hd-thumbnail'
 FPS = 25
 SCENE_SECONDS = 5
 TRANSITION = .28
@@ -71,9 +71,8 @@ def render_animated(root, song):
     root=Path(root)
     identity=render_identity(root)
     listing=render_scenes(root,song['scenes'])
-    with Image.open(root/'thumbnail-source.png') as im:
-        from PIL import ImageOps
-        ImageOps.fit(im.convert('RGB'),(1280,720)).save(root/'thumbnail.jpg',quality=92)
+    from thumbnail_export import export_thumbnail
+    export_thumbnail(root/'thumbnail-source.png',root/'thumbnail.jpg')
     temp=root/'video.tmp.mp4'
     run_ffmpeg(['-f','concat','-safe','1','-i',str(listing),'-i',str(root/'song.wav'),
         '-map','0:v:0','-map','1:a:0','-c:v','copy','-c:a','aac','-b:a','192k',

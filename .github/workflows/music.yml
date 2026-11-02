@@ -297,6 +297,9 @@ jobs:
       CPU_IMAGE_WIDTH: '1024'
       CPU_IMAGE_HEIGHT: '576'
       CPU_IMAGE_STEPS: '20'
+      THUMBNAIL_IMAGE_WIDTH: '1344'
+      THUMBNAIL_IMAGE_HEIGHT: '768'
+      THUMBNAIL_IMAGE_STEPS: '20'
     steps:
       - uses: actions/checkout@v4
         with:
