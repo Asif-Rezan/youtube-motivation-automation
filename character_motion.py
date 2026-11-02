@@ -14,7 +14,7 @@ import subprocess
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps
 
-VERSION = 'dudi-layered-characters-v8-dreamy-toddler-dance'
+VERSION = 'dudi-layered-characters-v9-local-body-dance'
 FPS, SECONDS = 25, 5
 _SESSION = None
 _LAMA = None
@@ -200,6 +200,7 @@ def render_clip(source,target,width=1920,height=1080,index=0,prompt=''):
         'actor_profiles':[actor_profile(plan,i,len(parts)) for i in range(len(parts))],
         'story_plan_version':plan['version'],'actor_count':len(parts),'face_rigs':[part[2] for part in parts],
         'facial_motion':any(part[2] for part in parts),
+        'body_motion':'gentle-local-arms-legs-waist' if plan['action']=='dance' else None,
         'facial_note':'2D blink, head turn and cheek lift' if rig else 'No confident single face; original face preserved'})
     return target
 

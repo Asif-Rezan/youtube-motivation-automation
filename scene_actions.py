@@ -226,6 +226,41 @@ def actor_profile(plan, ordinal, count):
     return dict(movement=movement,delay=ordinal*.22,phase=ordinal*1.7)
 
 
+def dance_body_motion(subject, t, phase=0.):
+    """Small continuous image deformations, preserving the head and artwork.
+
+    This is deliberately a gentle dance, not inferred joints: side regions wave,
+    lower regions alternate steps, and the middle sways without cutting limbs.
+    """
+    ramp=smooth(t/.4)
+    if ramp==0:
+        return subject.copy()
+    w,h=subject.size
+    beat=2*math.pi*t/.6+phase
+    mesh=[]
+    def point(x,y):
+        u,v=x/w,y/h
+        # Keep the entire upper head/ears untouched. Smooth local fields avoid
+        # seams and preserve transparency around the original silhouette.
+        side=math.tanh((u-.5)*6)
+        arms=math.exp(-((v-.52)/.14)**4)*abs(side)**2
+        legs=smooth((v-.72)/.18)
+        waist=math.exp(-((v-.68)/.14)**4)
+        dx=w*ramp*(.018*math.sin(beat)*waist+
+                     .012*math.sin(beat+side*.7)*arms+
+                     .014*math.sin(beat)*side*legs)
+        dy=h*ramp*(.018*math.sin(beat+side*1.2)*arms+
+                     .014*math.sin(beat+side*1.5)*legs)
+        return x+dx,y+dy
+    for y in range(0,h,12):
+        for x in range(0,w,12):
+            r,b=min(w,x+12),min(h,y+12)
+            mesh.append(((x,y,r,b),tuple(c for pt in [point(x,y),point(x,b),point(r,b),point(r,y)] for c in pt)))
+    result=subject.transform(subject.size,Image.Transform.MESH,mesh,Image.Resampling.BICUBIC)
+    result.paste(subject.crop((0,0,w,round(h*.28))),(0,0))
+    return result
+
+
 def compose_frame(bg, subject, bbox, plan, t, rig=None, camera=True, prop=True, profile=None):
     profile=profile or actor_profile(plan,0,1)
     local_t=max(0,t-profile['delay'])
@@ -258,6 +293,8 @@ def compose_frame(bg, subject, bbox, plan, t, rig=None, camera=True, prop=True, 
         else:
             stretch+=.018*pulse
     actor=face_motion(subject,rig,state)
+    if movement=='dance':
+        actor=dance_body_motion(actor,local_t,profile['phase'])
     aw=max(1,round(subject.width/stretch**.4));ah=max(1,round(subject.height*stretch))
     actor=actor.resize((aw,ah),Image.Resampling.BICUBIC)
     if angle:

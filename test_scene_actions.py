@@ -2,7 +2,7 @@ import math
 import unittest
 import numpy as np
 from PIL import Image, ImageDraw
-from scene_actions import plan_scene, state_at, detect_face, compose_frame, actor_parts, compose_scene, motion_prompt, background_motion, camera_viewport, actor_profile
+from scene_actions import plan_scene, state_at, detect_face, compose_frame, actor_parts, compose_scene, motion_prompt, background_motion, camera_viewport, actor_profile, dance_body_motion
 
 
 class SceneActionTests(unittest.TestCase):
@@ -157,3 +157,15 @@ class SceneActionTests(unittest.TestCase):
         scene={'lyric':'Roll a ball together','visual_action':'Roll a ball together',
                'prompt':'Dreamy moonlit forest with soft rain. Children and animals.'}
         self.assertEqual(plan_scene(motion_prompt(scene))['prop'],'ball')
+
+
+class BodyDanceTests(unittest.TestCase):
+    def test_head_is_preserved_while_body_moves_and_starts_at_rest(self):
+        data=np.random.default_rng(4).integers(0,256,(240,160,4),dtype=np.uint8)
+        image=Image.fromarray(data)
+        self.assertTrue(np.array_equal(np.asarray(dance_body_motion(image,0)),data))
+        moved=np.asarray(dance_body_motion(image,.73))
+        self.assertTrue(np.array_equal(moved[:60],data[:60]))
+        self.assertGreater(np.abs(moved[100:].astype(float)-data[100:]).mean(),5)
+        other=np.asarray(dance_body_motion(image,.73,1.1))
+        self.assertFalse(np.array_equal(moved[100:],other[100:]))
