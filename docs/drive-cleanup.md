@@ -24,7 +24,7 @@ still require that reserve; no storage upgrade is purchased.
 Unfinished, unavailable, mismatched, private or unverified uploads are never
 purged merely because they are old. Such runs are preserved or reported for
 review. A failed check does not prevent other eligible runs from being examined,
-but the workflow fails visibly if any checks failed. Near-full quota is surfaced
+but expected eligibility exclusions do not fail generation. Missing videos, metadata/identity mismatches, incomplete publication receipts and non-public/non-HD videos are preserved with structured reasons and field names in `review`. They emit warnings without exposing metadata or API response bodies. Authentication, API, storage/journal and unsafe deletion-target failures remain visible failures. YouTube verification requests use three SDK retries for transient failures. Near-full quota is surfaced
 in the summary rather than bypassing publication verification.
 
 In reusable Shorts workflows, generation of already-prepared music/portraits is
@@ -32,3 +32,5 @@ intentionally skipped. Facebook Reel publication explicitly requires successful
 Short completion and tolerates those intentional ancestor skips. Recovery of
 run 41336716292 reuses its existing Short artifact without generating or
 re-uploading a new YouTube Short.
+
+Manual cleanup dispatch accepts `dry_run=true` to audit eligibility without writing journals or deleting media. This distinguishes legacy publication mismatches from operational failures before a cleanup fix is rolled out. The original failed generation remains in GitHub history; a new cleanup verification uses the corrected code without regenerating or re-uploading the video.

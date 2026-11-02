@@ -4,7 +4,7 @@ import types
 import unittest
 from unittest.mock import Mock, patch
 
-from cleanup_drive import cleanup, PublicationPending, sweep, run_states
+from cleanup_drive import cleanup, PublicationPending, CleanupNotEligible, sweep, run_states, verify_public
 from pipeline import metadata_tags, upload_description
 
 
@@ -166,6 +166,52 @@ class DriveCleanupTests(unittest.TestCase):
         store.check_private.assert_called_once_with('good')
         store.client.files().get_media.assert_called_with(fileId='good')
         self.assertEqual(store.client.files().list.call_args.kwargs['pageToken'],'next')
+
+
+    def test_metadata_mismatch_is_preserved_with_safe_field_reasons_not_sweep_failure(self):
+        self.video['snippet']['title']='An edited private title value'
+        self.store.load.return_value=None
+        with patch('cleanup_drive.run_states',return_value=iter([(self.run_id,self.state)])), \
+             patch('cleanup_drive.quota',return_value={}):
+            report=sweep(self.store,self.client)
+        self.assertEqual(report['failed'],[])
+        self.assertEqual(report['preserved'],[self.run_id])
+        self.assertEqual(report['review'],[dict(run=self.run_id,reason='video_verification_mismatch',fields=['title'])])
+        self.assertNotIn('An edited private title value',str(report))
+        self.store.save.assert_not_called()
+        self.store.client.files().delete.assert_not_called()
+
+    def test_unavailable_video_preserves_media_with_explicit_reason(self):
+        self.client.videos().list().execute.return_value={'items':[]}
+        with self.assertRaises(CleanupNotEligible) as caught:
+            cleanup(self.store,self.client,self.run_id,self.state)
+        self.assertEqual(caught.exception.reason,'video_unavailable')
+        self.store.client.files().delete.assert_not_called()
+
+    def test_audit_checks_publication_without_writing_or_deleting(self):
+        self.store.load.return_value=None
+        with patch('cleanup_drive.run_states',return_value=iter([(self.run_id,self.state)])), \
+             patch('cleanup_drive.quota',return_value={}):
+            report=sweep(self.store,self.client,dry_run=True)
+        self.assertEqual(report['eligible'],[self.run_id])
+        self.assertEqual(report['cleaned'],[])
+        self.store.save.assert_not_called()
+        self.store.find.assert_not_called()
+        self.store.client.files().delete.assert_not_called()
+        self.client.videos().list().execute.assert_called_with(num_retries=3)
+
+    def test_api_and_delete_failures_remain_visible_sweep_failures(self):
+        self.store.load.return_value=None
+        error=RuntimeError('Sensitive response text')
+        error.resp=types.SimpleNamespace(status=503)
+        self.client.videos().list().execute.side_effect=error
+        with patch('cleanup_drive.run_states',return_value=iter([(self.run_id,self.state)])), \
+             patch('cleanup_drive.quota',return_value={}):
+            report=sweep(self.store,self.client)
+        self.assertEqual(report['failed'],[dict(run=self.run_id,error_type='RuntimeError',http_status=503)])
+        self.assertNotIn('Sensitive response text',str(report))
+        self.assertFalse(report['review'])
+        self.store.client.files().delete.assert_not_called()
 
 
 class CleanupQuotaReserveTests(unittest.TestCase):

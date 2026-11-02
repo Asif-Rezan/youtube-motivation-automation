@@ -16,14 +16,22 @@ class PublicationPending(RuntimeError):
     """The verified episode is still private/scheduled; keep recovery media."""
 
 
+class CleanupNotEligible(RuntimeError):
+    """Expected verification exclusion, not an operational cleanup failure."""
+    def __init__(self,reason,fields=()):
+        self.reason=reason
+        self.fields=list(fields)
+        super().__init__(reason)
+
+
 def verify_public(client, state):
     from pipeline import metadata_tags, upload_description
     if state.get('phase') not in ('published','scheduled') or not state.get('video_id') or state.get('thumbnail_uploaded') is not True:
-        raise RuntimeError('Published video and uploaded thumbnail required before cleanup')
+        raise CleanupNotEligible('publication_receipt_incomplete')
     items = client.videos().list(part='snippet,status,processingDetails,contentDetails',
-                                id=state['video_id']).execute().get('items', [])
+                                id=state['video_id']).execute(num_retries=3).get('items', [])
     if len(items) != 1:
-        raise RuntimeError('Published video unavailable; preserve Drive media')
+        raise CleanupNotEligible('video_unavailable')
     video = items[0]
     snippet, status = video.get('snippet', {}), video.get('status', {})
     song = state['song']
@@ -33,17 +41,21 @@ def verify_public(client, state):
     title=expected.get('title',song['title'])
     description=expected.get('description',state.get('upload_description',upload_description(song)))
     tags=expected.get('tags',metadata_tags(song))
-    if (video.get('id') != state['video_id'] or snippet.get('channelId') != required('EXPECTED_CHANNEL_ID')
-            or snippet.get('title') != title or snippet.get('description') != description
-            or set(snippet.get('tags', [])) != set(tags)
-            or status.get('uploadStatus') not in ('uploaded','processed')):
-        raise RuntimeError('Video identity or metadata verification failed; preserve Drive media')
+    checks={'video_id':video.get('id')==state['video_id'],
+            'channel_id':snippet.get('channelId')==required('EXPECTED_CHANNEL_ID'),
+            'title':snippet.get('title')==title,
+            'description':snippet.get('description')==description,
+            'tags':set(snippet.get('tags',[]))==set(tags),
+            'upload_status':status.get('uploadStatus') in ('uploaded','processed')}
+    mismatches=[name for name,matched in checks.items() if not matched]
+    if mismatches:
+        raise CleanupNotEligible('video_verification_mismatch',mismatches)
     if state.get('phase') == 'scheduled' and status.get('privacyStatus') == 'private':
         raise PublicationPending('Scheduled episode is not public yet')
     if (status.get('privacyStatus') != 'public' or status.get('uploadStatus') != 'processed'
             or video.get('processingDetails',{}).get('processingStatus') != 'succeeded'
             or video.get('contentDetails',{}).get('definition') != 'hd'):
-        raise RuntimeError('Public HD video verification failed; preserve Drive media')
+        raise CleanupNotEligible('public_hd_not_ready')
 
 
 def cleanup(store, client, run_id, state):
@@ -131,9 +143,9 @@ def quota(store):
     return result.get('storageQuota',{})
 
 
-def sweep(store,client):
+def sweep(store,client,dry_run=False):
     report=dict(checked_at=dt.datetime.now(dt.timezone.utc).isoformat(),
-        quota_before=quota(store),cleaned=[],pending=[],preserved=[],failed=[])
+        quota_before=quota(store),cleaned=[],pending=[],preserved=[],review=[],eligible=[],failed=[])
     for run_id,state in run_states(store):
         if isinstance(state,dict) and state.get('_read_error'):
             report['failed'].append(dict(run=run_id,error_type=state['_read_error']))
@@ -145,14 +157,22 @@ def sweep(store,client):
             journal=store.load(f'runs/{run_id}/cleanup.json',None)
             if journal and journal.get('complete') and journal.get('run')==run_id and journal.get('video_id')==state.get('video_id'):
                 continue
+            if dry_run:
+                verify_public(client,state)
+                report['eligible'].append(run_id)
+                continue
             journal=cleanup(store,client,run_id,state)
             report['cleaned'].append(dict(run=run_id,deleted_media=len(journal['deleted'])))
         except PublicationPending:
             report['pending'].append(run_id)
+        except CleanupNotEligible as error:
+            report['preserved'].append(run_id)
+            report['review'].append(dict(run=run_id,reason=error.reason,fields=error.fields))
         except Exception as error:
             # Keep failed runs visible, finish checking the rest, never dump API
             # responses/credentials, never interpret an error as permission to delete.
-            report['failed'].append(dict(run=run_id,error_type=type(error).__name__))
+            report['failed'].append(dict(run=run_id,error_type=type(error).__name__,
+                http_status=getattr(getattr(error,'resp',None),'status',None)))
     report['quota_after']=quota(store)
     return report
 
@@ -162,14 +182,17 @@ def main():
     choice=parser.add_mutually_exclusive_group(required=True)
     choice.add_argument('--run-id')
     choice.add_argument('--sweep',action='store_true')
+    parser.add_argument('--dry-run',action='store_true',help='Read-only eligibility audit; requires --sweep')
     args = parser.parse_args()
+    if args.dry_run and not args.sweep:
+        parser.error('--dry-run requires --sweep')
     if args.run_id and not re.fullmatch(r'[a-zA-Z0-9_-]{1,80}', args.run_id):
         raise ValueError('Invalid run ID')
     from pipeline import youtube_client
     store = Store()
     client=youtube_client()
     if args.sweep:
-        report=sweep(store,client)
+        report=sweep(store,client,dry_run=args.dry_run)
     else:
         state=store.load(f'runs/{args.run_id}/state.json',{})
         try:
@@ -177,10 +200,15 @@ def main():
             report=dict(cleaned=[dict(run=args.run_id,deleted_media=len(journal['deleted']))],pending=[],failed=[])
         except PublicationPending:
             report=dict(cleaned=[],pending=[args.run_id],failed=[])
+        except CleanupNotEligible as error:
+            report=dict(cleaned=[],pending=[],preserved=[args.run_id],
+                        review=[dict(run=args.run_id,reason=error.reason,fields=error.fields)],failed=[])
     output=Path('output/drive-cleanup-report.json')
     output.parent.mkdir(parents=True,exist_ok=True)
     output.write_text(json.dumps(report,indent=2))
     print(json.dumps(report),flush=True)
+    for item in report.get('review',[]):
+        print(f"::warning::Cleanup preserved {item['run']}: {item['reason']}; fields={','.join(item['fields']) or 'none'}. No media deleted for this episode.",flush=True)
     if report['failed']:
         raise RuntimeError('Some cleanup checks failed; preserved media and saved report for review')
 

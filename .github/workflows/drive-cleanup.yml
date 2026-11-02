@@ -8,6 +8,12 @@ on:
       - cleanup_drive.py
       - .github/workflows/drive-cleanup.yml
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Read-only eligibility audit without deletion
+        type: boolean
+        default: false
+        required: false
 permissions:
   contents: read
 concurrency:
@@ -32,7 +38,12 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - name: Verify YouTube status and clean only completed public HD episodes
-        run: python -u cleanup_drive.py --sweep
+        env:
+          CLEANUP_DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: |
+          args=(--sweep)
+          if [[ "$CLEANUP_DRY_RUN" == "true" ]]; then args+=(--dry-run); fi
+          python -u cleanup_drive.py "${args[@]}"
       - name: Summarize storage and cleanup result
         if: always()
         run: |
@@ -47,7 +58,7 @@ jobs:
           usage=int(quota.get('usage',0));limit=int(quota.get('limit',0))
           with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as summary:
               summary.write('### Verified Drive media cleanup\n')
-              summary.write(f"Cleaned episodes: {len(report['cleaned'])}; scheduled/private preserved: {len(report['pending'])}; failed checks: {len(report['failed'])}.\n\n")
+              summary.write(f"Cleaned episodes: {len(report['cleaned'])}; scheduled/private preserved: {len(report['pending'])}; preserved for review: {len(report.get('review',[]))}; failed API/cleanup operations: {len(report['failed'])}.\n\n")
               summary.write(f'Account storage: {usage/1024**3:.2f} GiB used of {limit/1024**3:.2f} GiB.\n')
           if limit and usage/limit>.9:
               print('::warning::Drive account storage exceeds 90%; pending/unverified media was retained. Review the cleanup report.')
