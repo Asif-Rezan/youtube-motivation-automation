@@ -7,14 +7,8 @@ on:
         type: string
         default: '0.50'
         required: true
-      resume_run_id:
-        description: Optional previous preview run to resume
-        type: string
-        default: ''
-        required: false
 permissions:
   contents: read
-  actions: read
 jobs:
   thumbnail:
     runs-on: ubuntu-24.04
@@ -39,14 +33,6 @@ jobs:
         run: |
           pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt -r requirements-images-cpu.txt
-      - name: Restore completed preview regions
-        if: inputs.resume_run_id != ''
-        uses: actions/download-artifact@v4
-        with:
-          name: reference-storybook-thumbnail-preview
-          path: output/thumbnail-reference-preview/
-          run-id: ${{ inputs.resume_run_id }}
-          github-token: ${{ github.token }}
       - name: Generate production reference-guided thumbnail
         run: python -u demos/thumbnail-reference/preview.py
       - uses: actions/upload-artifact@v4

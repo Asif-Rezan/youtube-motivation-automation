@@ -41,7 +41,7 @@ def tint_clothing(image,cast):
     return out
 
 
-def refine_thumbnail(target,plan,generate_image,resume=False):
+def refine_thumbnail(target,plan,generate_image):
     """Restyle faces locally and replace the two animals with fresh species."""
     target=Path(target)
     cast=plan['thumbnail_cast']
@@ -68,19 +68,8 @@ def refine_thumbnail(target,plan,generate_image,resume=False):
         initial=folder/f'{name}-input.png';result=folder/f'{name}-result.png'
         crop.save(initial)
         print(f'Refining thumbnail region {name}: {prompt}',flush=True)
-        cached=False
-        if resume and result.exists():
-            try:
-                with Image.open(result) as saved:
-                    saved.verify()
-                cached=True
-            except (OSError,ValueError):
-                pass
-        if not cached:
-            generate_image(prompt,result,seed=plan['seed']+7919*(i+1),width=512,height=512,
-                           steps=12,reference_image=initial,strength=strength)
-        else:
-            print(f'Reusing completed region {name}',flush=True)
+        generate_image(prompt,result,seed=plan['seed']+7919*(i+1),width=512,height=512,
+                       steps=12,reference_image=initial,strength=strength)
         with Image.open(result) as generated:
             patch=generated.convert('RGB').resize(crop.size,Image.Resampling.LANCZOS)
         # Feather only the crop boundary. Everything outside the region remains
