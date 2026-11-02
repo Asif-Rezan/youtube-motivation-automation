@@ -16,7 +16,7 @@ def service_command(command, timeout, unit, memory_kib, cpus):
     if memory_bytes < 2 * 1024**3:
         raise WorkerFailure('Runner has insufficient RAM for bounded CPU synthesis')
     args = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe',
-            '--service-type=exec', '--remain-after-exit', '--unit=' + unit,
+            '--service-type=exec', '--unit=' + unit,
             '--uid=' + str(os.getuid()), '--gid=' + str(os.getgid()),
             '--working-directory=' + str(Path.cwd()),
             '-p', 'MemoryMax=' + str(memory_bytes),
@@ -27,7 +27,7 @@ def service_command(command, timeout, unit, memory_kib, cpus):
     # The system manager does not inherit the job environment. Pass only runtime
     # settings; publication credentials are deliberately excluded.
     for key, value in os.environ.items():
-        if key in {'PATH', 'HOME', 'VIRTUAL_ENV', 'REFERENCE_AUDIO_PATH',
+        if key in {'PATH', 'HOME', 'VIRTUAL_ENV', 'LD_LIBRARY_PATH', 'REFERENCE_AUDIO_PATH',
                    'CUDA_VISIBLE_DEVICES', 'OMP_NUM_THREADS', 'MKL_NUM_THREADS'} or key.startswith(('ACESTEP_', 'HF_HUB_')):
             args.append('--setenv=' + key + '=' + value)
     return args + ['--'] + list(command)
