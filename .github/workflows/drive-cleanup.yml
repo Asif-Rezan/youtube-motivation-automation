@@ -11,7 +11,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: dudi-dam-tv-publish
+  group: dudi-drive-cleanup
   cancel-in-progress: false
 jobs:
   cleanup:
