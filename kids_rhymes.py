@@ -3,6 +3,7 @@ import hashlib
 import json
 import math
 import os
+import re
 from pathlib import Path
 import subprocess
 
@@ -11,16 +12,18 @@ from rhyme_writer import write_rhyme
 from scene_actions import plan_scene
 
 def scene_prompt(row,outline,dance=False):
-    """Keep reference-inspired toddler traits in the existing storybook style."""
-    action=('The same two toddlers and their baby animal dance side by side, '
-            'hands lifted, tiny playful jumps, happy open smiles'
-            if dance else row['visual'])
-    return ('Two smiling toddlers in colorful rompers, round cheeks and big expressive eyes, '
-        'beside a friendly baby animal. Cute colorful 3D storybook cartoon. '
-        +action+'. Clear complete main character, full bodies inside frame, '
-        'separate silhouettes with a clear gap, no overlapping bodies. '
-        +outline.get('characters','')+'. '+outline.get('visual_world','')
-        +'. Rounded soft shapes, bright pastel colors, gentle playful mood, wide landscape, no text.')
+    """Keep nature, cast and the existing style inside the first encoder window."""
+    cast=outline.get('characters','')
+    animal=re.search(r'\b(bunny|rabbit|hare|duckling|duck|chick|puppy|dog|kitten|cat|turtle|elephant|panda|lamb|fox|bear|deer|calf|penguin|squirrel)\b',cast,re.I)
+    animal=animal.group(1).lower() if animal else 'animal'
+    setting=' '.join(outline.get('visual_world','flower meadow with pastel blossom trees').split()[:8]).rstrip('.,;')
+    action=('Dancing, raised arms, tiny happy jumps' if dance else row['visual'])
+    return ('Dreamy natural outdoor scenery, '+setting+'. '
+        'Two smiling toddlers and a baby '+animal+', widely spaced full bodies. '
+        'Cute colorful 3D storybook cartoon. '+action+'. '
+        'Colorful toddler rompers, round cheeks, big expressive eyes. '
+        'Clear complete main character, separate silhouettes, lush flowers and soft natural light. '
+        +cast+'. '+outline.get('visual_world','')+'. Wide landscape, no text.')
 
 
 def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_override='female'):
@@ -44,7 +47,7 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
                 motion_text=('Toddlers and baby animal dancing and bouncing together' if dance
                              else row['lyric']+' '+row['visual'])
                 scenes.append(dict(index=i,start=i*5,end=(i+1)*5,lyric=lyric,prompt=prompt,
-                    cast_style='toddler-animal-dance-v1',story_action=plan_scene(motion_text,i)))
+                    cast_style='dreamy-toddler-animal-dance-v2',visual_action=motion_text,story_action=plan_scene(motion_text,i)))
     scenes=scenes[:seconds//5]
     outline=written['outline']
     song = dict(title=outline['title'], lyrics='\n'.join(scene['lyric'] for scene in scenes),duration=seconds,

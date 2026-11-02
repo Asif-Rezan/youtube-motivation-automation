@@ -24,3 +24,5 @@ use their checked-out commit and are not retroactively changed. No production
 video is dispatched automatically by this change. The optional five-second
 preview workflow generates one new image with production image settings, then
 extracts the cast and renders/decode-checks their dance without publication.
+
+Natural dreamy outdoor scenery stays prominent in every scene prompt: flower meadows, blossom gardens, forests, soft natural light and pastel surroundings. Studio stages and empty backdrops are excluded. Small animal companions remain separate animation layers where segmentation permits; thin hand contacts can be separated conservatively for dance scenes.

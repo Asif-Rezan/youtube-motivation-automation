@@ -31,7 +31,8 @@ class KidsTests(unittest.TestCase):
     def test_lyric_scene_leads_prompt_and_episode_cast_is_preserved(self):
         song = self.song(480)
         prompt = song['scenes'][0]['prompt']
-        self.assertTrue(prompt.startswith('Two smiling toddlers'))
+        self.assertTrue(prompt.startswith('Dreamy natural outdoor scenery'))
+        self.assertIn('Two smiling toddlers',prompt[:180])
         self.assertIn('Duckling and bunny exploring flower patch 0',prompt)
         self.assertIn(song['visual_identity']['characters'], prompt)
         self.assertIn(song['visual_identity']['world'], prompt)
@@ -116,8 +117,9 @@ class KidsTests(unittest.TestCase):
         from scene_actions import plan_scene,motion_prompt
         song=self.song(480)
         for index,scene in enumerate(song['scenes']):
-            self.assertIn('Two smiling toddlers',scene['prompt'][:100])
-            self.assertIn('friendly baby animal',scene['prompt'][:150])
+            self.assertIn('Two smiling toddlers',scene['prompt'][:180])
+            self.assertIn('baby elephant',scene['prompt'][:200])
+            self.assertTrue(scene['prompt'].startswith('Dreamy natural outdoor scenery'))
             self.assertIn('Cute colorful 3D storybook cartoon',scene['prompt'])
             if index%2:
                 self.assertEqual(scene['story_action']['action'],'dance')

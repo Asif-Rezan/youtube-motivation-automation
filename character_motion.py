@@ -14,7 +14,7 @@ import subprocess
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps
 
-VERSION = 'dudi-layered-characters-v7-toddler-dance'
+VERSION = 'dudi-layered-characters-v8-dreamy-toddler-dance'
 FPS, SECONDS = 25, 5
 _SESSION = None
 _LAMA = None
@@ -49,7 +49,7 @@ def mask_for(image):
     if count:
         areas=np.bincount(labels.ravel())
         areas[0]=0
-        principal=ndimage.binary_dilation(np.isin(labels,np.flatnonzero(areas >= max(areas.max()*.06,mask.width*mask.height*.0008))),iterations=3)
+        principal=ndimage.binary_dilation(np.isin(labels,np.flatnonzero(areas >= max(areas.max()*.03,mask.width*mask.height*.0008))),iterations=3)
         mask=Image.fromarray(np.where(principal,np.asarray(mask),0).astype('uint8'))
     # Reject implausible extraction instead of publishing a moving rectangle.
     coverage=float((np.asarray(mask)>128).mean())
@@ -173,7 +173,7 @@ def render_clip(source,target,width=1920,height=1080,index=0,prompt=''):
     native=bg.size
     from scene_actions import plan_scene, actor_parts, compose_scene, actor_profile
     plan=plan_scene(prompt,index)
-    parts=actor_parts(fg)
+    parts=actor_parts(fg,split_touching=plan['kind']=='dance')
     rig=parts[0][2] if len(parts)==1 else None
     target.parent.mkdir(parents=True,exist_ok=True)
     temp=target.with_suffix('.tmp.mp4')

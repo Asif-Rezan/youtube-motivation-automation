@@ -103,7 +103,7 @@ class SceneActionTests(unittest.TestCase):
         fg=Image.new('RGBA',(180,160))
         d=ImageDraw.Draw(fg)
         d.rectangle((20,20,69,119),fill='red')
-        d.rectangle((71,70,80,109),fill='blue')
+        d.rectangle((71,70,75,109),fill='blue')
         parts=actor_parts(fg)
         self.assertEqual(len(parts),2)
         total=np.zeros((160,180),dtype=np.int32)
@@ -138,3 +138,22 @@ class SceneActionTests(unittest.TestCase):
             self.assertTrue(before.any() and after.any())
             self.assertTrue(np.any(before!=after))
         self.assertEqual(np.asarray(b)[0,0].tolist(),[255,255,255,255] if b.shape[2]==4 else [255,255,255])
+
+    def test_thin_hand_contact_can_split_dancers_without_losing_artwork(self):
+        fg=Image.new('RGBA',(200,120))
+        d=ImageDraw.Draw(fg)
+        for x in (20,85,150):
+            d.rectangle((x,20,x+25,100),fill='coral')
+        d.line((45,60,150,60),fill='coral',width=1)
+        self.assertEqual(len(actor_parts(fg)),1)
+        parts=actor_parts(fg,split_touching=True)
+        self.assertEqual(len(parts),3)
+        total=np.zeros((120,200),dtype=np.int32)
+        for image,(x,y,r,b),_ in parts:
+            total[y:b,x:r]+=np.asarray(image)[:,:,3]
+        np.testing.assert_array_equal(total,np.asarray(fg)[:,:,3])
+
+    def test_explicit_motion_is_not_overridden_by_dreamy_night_background(self):
+        scene={'lyric':'Roll a ball together','visual_action':'Roll a ball together',
+               'prompt':'Dreamy moonlit forest with soft rain. Children and animals.'}
+        self.assertEqual(plan_scene(motion_prompt(scene))['prop'],'ball')

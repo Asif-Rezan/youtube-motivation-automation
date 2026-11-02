@@ -1,3 +1,10 @@
+## Toddlers dancing with animal friends
+
+New episodes now plan two cheerful toddlers with a baby animal in the existing
+colorful 3D storybook style. Shared refrains get separate dancing compositions
+and gentle 100-BPM puppet hops/sway for each extracted actor. Image model, image
+size, step counts and guidance are unchanged. See [cast and dance details](docs/toddler-animal-dance.md).
+
 ## Lyric word-bound recovery
 
 Sung lines retain a compact 4–12 plain-word constraint in the native Qwen grammar,

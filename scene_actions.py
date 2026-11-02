@@ -284,19 +284,31 @@ def compose_frame(bg, subject, bbox, plan, t, rig=None, camera=True, prop=True, 
     return apply_camera(canvas,bounds,plan,t)
 
 
-def actor_parts(foreground):
+def actor_parts(foreground,split_touching=False):
     """Separate disjoint substantial silhouettes so friends react independently."""
     from scipy import ndimage
     alpha=np.asarray(foreground)[:,:,3]
     labels,count=ndimage.label(alpha>64)
+    split=False
+    if split_touching and count==1:
+        # Remove only thin contact bridges to propose separate body cores;
+        # all original pixels are then assigned to the nearest core below.
+        cores=ndimage.binary_opening(alpha>64,iterations=max(1,round(min(alpha.shape)*.009)))
+        candidates,n=ndimage.label(cores)
+        sizes=np.bincount(candidates.ravel());sizes[0]=0
+        keep=np.flatnonzero(sizes>=max(sizes.max()*.06,20))
+        if 2<=len(keep)<=4:
+            labels=np.where(np.isin(candidates,keep),candidates,0)
+            count=len(keep)
+            split=True
     areas=np.bincount(labels.ravel());areas[0]=0
     if not count:
         return []
     parts=[]
     _,nearest=ndimage.distance_transform_edt(labels==0,return_indices=True)
     owners=labels[tuple(nearest)]
-    for number in np.flatnonzero(areas>=max(areas.max()*.06,20)):
-        mask=ndimage.binary_dilation(labels==number,iterations=2) & (owners==number)
+    for number in np.flatnonzero(areas>=max(areas.max()*.03,20)):
+        mask=(owners==number) if split else ndimage.binary_dilation(labels==number,iterations=2) & (owners==number)
         item=foreground.copy()
         item.putalpha(Image.fromarray(np.where(mask,alpha,0).astype('uint8')))
         bbox=item.getbbox()
@@ -331,4 +343,6 @@ def compose_scene(bg, parts, plan, t, camera=True, environment=True):
 def motion_prompt(scene):
     # The episode palette may mention night/rain; choose actions from the current
     # lyric and literal scene, before the shared world/style suffix.
+    if scene.get('visual_action'):
+        return scene.get('visual_action')
     return scene.get('lyric','')+' '+scene.get('prompt','').split('. Clear complete main character',1)[0]

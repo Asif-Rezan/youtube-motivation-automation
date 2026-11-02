@@ -16,7 +16,7 @@ prompt=scene_prompt(row,outline,True)
 source=root/'scene-000-source.png'
 from image_cpu import generate
 if not source.exists():
-    generate(prompt,source,seed=20261102,width=1024,height=576,steps=20)
+    generate(prompt,source,seed=20261103,width=1024,height=576,steps=20)
 # Release the diffusion model before loading the cutout and inpainting models.
 import image_cpu
 image_cpu._pipeline=None

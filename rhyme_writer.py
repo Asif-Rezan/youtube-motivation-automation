@@ -89,7 +89,7 @@ def write_rhyme(day, identity, seconds, history, draft_path=None):
                 f'Write {chapters} connected chapter ideas with a beginning, discoveries and a happy ending. '
                 'Keep characters under 320 characters and visual_world under 240 characters, including spaces. '
                 'characters must describe exactly two toddlers and one baby animal, with names, ages/species, clothing, hair colors and distinctive features, kept consistent throughout this episode. '
-                'visual_world must describe the story-specific setting, props and pastel palette. Vary the cast and world from recent episodes. '
+                'visual_world must describe a natural dreamy outdoor setting: a flower meadow, blossom garden, forest, stream or soft cloud landscape, with lush plants, gentle natural light and a pastel palette. Never use a plain studio backdrop, stage or empty white room. Vary the cast and natural world from recent episodes. '
                 'Teach gentle movement, kindness, colors or nature through concrete playful actions. '
                 'English title must name the actual new adventure, not a run ID. Write a concise 2-3 sentence description, 40-65 words and under 600 characters, describing this particular story. '
                 'Avoid scary situations, danger, commercial brands, adult themes, requests to subscribe and copying existing songs. '
