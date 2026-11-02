@@ -26,7 +26,7 @@ def thumbnail_cast(identity):
     rng=random.Random(int(hashlib.sha256((identity+'thumbnail-cast-v2').encode()).hexdigest(),16))
     animals=rng.sample(['puppies','kittens','bunnies','ducklings','lambs','pandas',
                         'baby elephants','baby turtles','baby deer','chicks'],2)
-    colors=rng.sample(['coral','teal','yellow','purple','lime','blue','pink','orange'],5)
+    colors=rng.sample(['coral','teal','orange','pink','white','black','cyan','magenta'],5)
     faces=rng.sample(['curly black hair, brown eyes','straight auburn hair, green eyes',
                       'wavy brown hair, blue eyes','short blond hair, hazel eyes',
                       'black pigtails, dark eyes','brown bob, freckles'],5)
@@ -37,18 +37,22 @@ def thumbnail_cast(identity):
 
 
 def thumbnail_prompt(cast):
-    # Keep every requested type of variation ahead of the CLIP token cutoff.
-    animals=', '.join(cast['animals'])
+    species={'puppies':'brown puppy','kittens':'gray kitten','bunnies':'white bunny',
+             'ducklings':'white duckling','lambs':'white lamb','pandas':'black and white panda',
+             'baby elephants':'gray elephant calf','baby turtles':'green turtle',
+             'baby deer':'brown fawn','chicks':'yellow chick'}
+    animals=' and '.join(species[a] for a in cast['animals'])
     colors=', '.join(c['color'] for c in cast['children'])
-    return ('Cute 3D storybook cartoon. Baby '+animals+'. '
-            'Five different toddler faces, girls and boys, pigtails, curls, freckles. '
-            +colors+' shorts. Dancing, happy smiles, colorful party lights.')
+    return ('Cute 3D storybook. Five smiling toddlers: girls with black pigtails, boys with brown curls. '
+            'Left to right '+colors+' shorts. A '+animals+' in front. '
+            'Different faces, dancing, colorful party lights.')
 
 
 def thumbnail_negative(cast):
-    exclusions='identical faces, cloned children, matching clothes, all boys, all girls'
+    exclusions=('blue shorts, red shorts, green shorts, purple shorts, yellow shorts, '
+                'blond hair, identical faces, cloned children, matching clothes, all boys, all girls')
     if not any(a in ('chicks','ducklings') for a in cast['animals']):
-        exclusions='yellow chicks, chickens, ducks, birds, '+exclusions
+        exclusions='chicks, chickens, ducks, yellow animals, birds, '+exclusions
     return exclusions
 
 
@@ -80,7 +84,7 @@ def image_plan(song):
         height=int(os.getenv('CPU_IMAGE_HEIGHT','1024' if portrait else '576')), steps=int(os.getenv('CPU_IMAGE_STEPS','16')),
         visual_style='dudi-storybook-v2', allow_text=False) for kind,prompt in entries]
     if not portrait:
-        plans[-1].update(thumbnail_reference(),visual_style='dudi-reference-storybook-v3-compact',thumbnail_cast=cast,extra_negative_prompt=thumbnail_negative(cast))
+        plans[-1].update(thumbnail_reference(),visual_style='dudi-reference-storybook-v4-directed',thumbnail_cast=cast,extra_negative_prompt=thumbnail_negative(cast))
     return plans
 
 

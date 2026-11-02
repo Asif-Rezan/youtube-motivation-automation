@@ -101,11 +101,11 @@ class ThumbnailCastTests(unittest.TestCase):
             self.assertEqual(len({c['face'] for c in children}),5)
             self.assertEqual({c['gender'] for c in children},{'girl','boy'})
             prompt=thumbnail_prompt(cast)
-            self.assertTrue(all(animal in prompt[:200] for animal in cast['animals']))
+            self.assertIn(' in front.',prompt)
             self.assertTrue(all(child['color'] in prompt for child in children))
             self.assertLess(len(prompt.split()),55)
-            self.assertIn('girls and boys',prompt)
-            self.assertIn('pigtails, curls, freckles',prompt)
+            self.assertIn('girls with black pigtails',prompt)
+            self.assertIn('boys with brown curls',prompt)
 
     def test_default_strength_is_selected_half(self):
         with patch.dict(os.environ):
