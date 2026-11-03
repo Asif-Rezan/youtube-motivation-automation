@@ -214,15 +214,40 @@ Portrait publication checkpoints use `shorts/RUN_ID/music-portrait-clip-START-DU
 
 For a local export, supply `output/RUN_ID/song.json`, `short-audio/clip-START-DURATION/song.wav` and `portrait/scene-NNN-source.png` for the selected range, then run `python shorts.py --run-id RUN_ID --start 0 --seconds 40`. Source/output hashes and a full video/audio decode validate the export before upload. `rhyme-short-*` artifacts contain the finished Short; `short-publication-*` contain publication checkpoints; `short-artwork-*` contain native portrait images and generation manifests.
 
-## Fixed public title, description and blank tags
+## Story-based SEO metadata and matching thumbnails
 
-All new YouTube uploads, including Shorts, use the exact owner-supplied title and description in `upload_metadata.json`. Tags are always `[]`. The description is sent verbatim: no automatic credit line, extra hashtags, or `#Shorts` suffix is added. The fixed title is 97 characters and the description is 3213 characters. Internal story titles/descriptions remain available for lyric planning, novelty checks, and source identification; they are not selected as public metadata. This avoids breaking saved storyboards or treating every song as a duplicate because the public title is shared.
+New generation IDs run one additional local Qwen packaging pass after the lyrics.
+It writes three truthful title candidates, chooses one, and creates a unique
+story-specific description and 5–15 relevant tags. The topic/action and natural
+kids-rhyme search phrases lead the title and opening description. Tags are
+secondary discovery metadata, not a ranking guarantee. Title/description/tag
+limits, selected-title membership and a source fingerprint are checked before
+upload. Invalid output receives bounded retries, preserving the finished lyrics.
+No hosted packaging API, live keyword-volume lookup or paid vidIQ call is needed
+in production. The prompt uses qualitative title-thumbnail design guidance;
+it does not predict or promise CTR.
 
-The previous metadata selection is commented out in `pipeline.publish` and `shorts.short_metadata`. To restore story-based metadata, restore the two commented assignment lines in `pipeline.publish` instead of the fixed metadata assignments; in `shorts.short_metadata`, restore the commented return block instead of `fixed_metadata()`. Keep the existing settings, upload checkpointing, disclosures, and verification intact. The original `kids_rhymes.upload_description` and `metadata_tags` helpers remain available.
+The saved `song.json` contains `packaging.video`, `packaging.shorts`, three title
+candidates and the selected thumbnail scene/focus. Shorts metadata describes only
+the first 40 seconds; manually selected other clips derive metadata from their
+actual lyrics. Retries reuse this saved package. Existing uploaded/scheduled IDs
+retain their durable upload body and thumbnail receipt. `upload_metadata.json`
+and its old fixed-metadata helper remain as historical files, unused by new
+publication. Existing unpublished artifacts without a package fall back to their
+own story metadata, never the shared fixed text.
 
-This selection applies when starting a new upload. Existing uploaded/scheduled video IDs keep their checkpointed metadata, so resuming an upload does not silently change a live video's title or description. Updating existing YouTube videos requires a separate explicit metadata update. No existing video is edited by this code change.
+The thumbnail uses an actual generated scene from the same episode as its img2img
+reference (strength 0.35), emphasizing an existing baby-and-animal interaction
+with expressive faces, clear silhouettes and a simple mobile-readable composition.
+The scene's own image worker creates the thumbnail after the anchor exists,
+without generating another reference image or using the previous external pool.
+Source pixel checksums invalidate stale thumbnail caches. Native 1344×768
+inference and 1920×1080 JPEG export remain. Full-model image quality and CTR still
+need review after a real generation.
 
-Shorts title override: new Shorts use `shorts_title` in `upload_metadata.json`: `Dudi dudi dum dum 🍼😻#shorts #shortsfeed #dudidudidam`. Long videos retain the fixed `title`. Both formats keep the same fixed description and empty tags. The Shorts publisher explicitly selects the Shorts metadata variant before upload.
+Facebook uses the verified YouTube upload body's matching title/description.
+Account identities, language, music, animation, publishing schedule, disclosures
+and cleanup guards keep their current settings.
 
 ## Independent Shorts music
 
@@ -240,7 +265,7 @@ For an already uploaded Short whose schedule/verification failed, run **Recover 
 
 ## Higher-resolution thumbnails
 
-Thumbnails generate directly at 1344×768 with the same SSD-1B storybook model, without an image reference. Export removes six source pixels from the top and bottom to produce a 1344×756 crop, then scales to a 1920×1080 JPEG using Lanczos. JPEG quality starts at 95 and is reduced only when needed to stay under a conservative 2 MB byte budget. Scene and portrait generation dimensions stay unchanged. Thumbnail-specific settings are `THUMBNAIL_IMAGE_WIDTH`, `THUMBNAIL_IMAGE_HEIGHT`, and `THUMBNAIL_IMAGE_STEPS`; the defaults are 1344, 768, and 20. The image manifest includes these settings so old low-resolution thumbnails are regenerated when a job resumes with this code. Export resolution is 1920×1080; this is not native 1920×1080 diffusion generation.
+Thumbnails generate at 1344×768 with the same SSD-1B storybook model, using an actual scene from their own episode as the image reference. Export removes six source pixels from the top and bottom to produce a 1344×756 crop, then scales to a 1920×1080 JPEG using Lanczos. JPEG quality starts at 95 and is reduced only when needed to stay under a conservative 2 MB byte budget. Scene and portrait generation dimensions stay unchanged. Thumbnail-specific settings are `THUMBNAIL_IMAGE_WIDTH`, `THUMBNAIL_IMAGE_HEIGHT`, and `THUMBNAIL_IMAGE_STEPS`; the defaults are 1344, 768, and 20. The image manifest includes these settings so old low-resolution thumbnails are regenerated when a job resumes with this code. Export resolution is 1920×1080; this is not native 1920×1080 diffusion generation.
 
 ## Cute animal scenes and continuous upbeat music
 

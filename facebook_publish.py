@@ -200,8 +200,13 @@ def run(run_id, kind):
     state = store.load(key,{})
     # Retries preserve the frozen target; never silently move an expired schedule.
     stamp = schedule_timestamp(target) if not state.get('video_id') else int(state['publish_at'])
-    from upload_metadata import fixed_metadata
-    metadata = fixed_metadata('shorts' if kind=='short' else 'video')
+    from episode_packaging import public_metadata
+    snippet=youtube.get('upload_body',{}).get('snippet',{})
+    if snippet:
+        metadata=dict(title=snippet['title'],description=snippet['description'],tags=snippet.get('tags',[]))
+    else:
+        song=json.loads((Path('output')/run_id/'song.json').read_text())
+        metadata=public_metadata(song,'shorts' if kind=='short' else 'video')
     metadata['description'] += '\n\nCreated with AI-generated music and illustrations.'
     def save():
         root.mkdir(parents=True,exist_ok=True)

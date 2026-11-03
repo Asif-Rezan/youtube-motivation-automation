@@ -54,15 +54,27 @@ def prepare(run_id, stage='all', check_history=False, vocal_gender='female'):
         if reason or song_duplicate_reason(song, history):
             from pipeline import DuplicateSongError
             raise DuplicateSongError()
+        from episode_packaging import generate_package, validate_package
+        if song.get('packaging'):
+            validate_package(song['packaging'],song)
+        else:
+            song['packaging']=generate_package(song,history)
+            temp=root/'song.packaged.tmp'
+            temp.write_text(json.dumps(song,ensure_ascii=False,indent=2))
+            temp.replace(root/'song.json')
         if store:
             entry = dict(run=run_id, title=song['title'], story_summary=song['story_summary'],
-                visual_identity=song.get('visual_identity', {}),
+                visual_identity=song.get('visual_identity', {}), public_title=song['packaging']['video']['title'],
                 verse_lines=lines, hash=__import__('hashlib').sha256(song['lyrics'].encode()).hexdigest())
             lyric_history = [h for h in lyric_history if h.get('run') != run_id]
             lyric_history.append(entry)
             store.save('lyrics-history.json', lyric_history)
         print(json.dumps({'phase':'lyrics ready', 'run_id':run_id}), flush=True)
         return
+    if stage == 'all' and not song.get('packaging'):
+        from episode_packaging import generate_package
+        song['packaging']=generate_package(song,history)
+        (root/'song.json').write_text(json.dumps(song,ensure_ascii=False,indent=2))
     import lyrics_cpu
     if lyrics_cpu._model is not None:
         lyrics_cpu._model.close()

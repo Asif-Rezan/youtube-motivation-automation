@@ -26,8 +26,10 @@ class PrepareOriginalTests(unittest.TestCase):
             old=os.getcwd();os.chdir(tmp)
             self.addCleanup(os.chdir,old)
             store=Mock(); store.load.return_value=[]
-            with patch('storage.Store',return_value=store),patch('prepare_music.make_song',return_value=fixture_song()) as writer,patch('prepare_music.generate') as music:
+            with patch('storage.Store',return_value=store),patch('prepare_music.make_song',return_value=fixture_song()) as writer,patch('prepare_music.generate') as music, patch('episode_packaging.generate_package', side_effect=lambda song,history: __import__('test_episode_packaging').fixture_package(song)) as packager:
                 prepare('original-test',stage='lyrics',check_history=True)
+                prepare('original-test',stage='lyrics',check_history=True)
+                packager.assert_called_once()
                 music.assert_not_called()
                 writer.assert_called_once()
                 key,entries=store.save.call_args.args
