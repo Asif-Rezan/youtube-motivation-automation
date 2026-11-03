@@ -251,3 +251,11 @@ New long and Short mixes use -14 LUFS loudness normalization with a -1.5 dB true
 Generation uses the pinned [ACE-Step BPM parameter](https://github.com/ace-step/ACE-Step-1.5/blob/ca1e85fe9430179831e6bc6be790c332190a3866/acestep/inference.py) and [FFmpeg loudnorm](https://ffmpeg.org/ffmpeg-filters.html#loudnorm). Caption/BPM requests guide the model; exact musical tempo and the new visual appearance still need review on an actual new episode.
 
 Failed Shorts retain per-attempt reason codes and rejected candidates. On resume, valid saved native syntheses are inspected and reused before any model call; legacy v1 checkpoints are supported. `audio-continuity-regression.yml` is a manual diagnostic for a recent failed run whose input/Shorts artifacts still exist. It restores the real checkpoint and proves recovery without AI inference or publication. Self-contained synthetic boundary/internal-gap regressions remain in the normal test suite after those temporary artifacts expire.
+
+
+Cleanup verification requires the saved video/channel identity, matching title and
+description, public visibility, completed HD processing and exact private Drive
+file IDs/hashes. Changed YouTube tags are reported as a notice and do not prevent
+cleanup. Scheduled/private media remains available for recovery until publication;
+the hourly sweep revisits it. Cleanup permanently deletes only the verified
+automation media and never empties the account's unrelated Trash.
