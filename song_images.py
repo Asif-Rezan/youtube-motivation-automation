@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import random
 from pathlib import Path
 from PIL import Image
 from image_cpu import MODEL, REVISION
@@ -9,9 +10,20 @@ from image_cpu import MODEL, REVISION
 
 THUMBNAIL_REFERENCE = Path(__file__).resolve().parent/'assets/thumbnail/kids-dance-reference.png'
 
+THUMBNAIL_REFERENCES = (
+    THUMBNAIL_REFERENCE,
+    THUMBNAIL_REFERENCE.parent/'rose-garden.jpg',
+    THUMBNAIL_REFERENCE.parent/'flower-dance.jpg',
+    THUMBNAIL_REFERENCE.parent/'animal-costumes.jpg',
+    THUMBNAIL_REFERENCE.parent/'rainbow-party.jpg',
+)
 
-def thumbnail_reference():
-    path = Path(os.getenv('THUMBNAIL_REFERENCE_IMAGE', str(THUMBNAIL_REFERENCE)))
+
+def thumbnail_reference(identity=''):
+    override = os.getenv('THUMBNAIL_REFERENCE_IMAGE')
+    # Stable pseudo-random selection: shards and retries of the same generation agree.
+    selection_seed = os.getenv('SONG_RUN_ID', '') + ':' + identity
+    path = Path(override) if override else random.Random(selection_seed).choice(THUMBNAIL_REFERENCES)
     if not path.is_absolute():
         path = Path(__file__).resolve().parent/path
     strength = float(os.getenv('THUMBNAIL_DENOISE_STRENGTH', '0.50'))
@@ -60,7 +72,7 @@ def image_plan(song):
         thumbnail.update(width=int(os.getenv('THUMBNAIL_IMAGE_WIDTH','1344')),
                          height=int(os.getenv('THUMBNAIL_IMAGE_HEIGHT','768')),
                          steps=int(os.getenv('THUMBNAIL_IMAGE_STEPS','20')),
-                         visual_style='dudi-reference-storybook-hd-v1', **thumbnail_reference())
+                         visual_style='dudi-reference-storybook-hd-v1', **thumbnail_reference(identity))
         w,h,steps=thumbnail['width'],thumbnail['height'],thumbnail['steps']
         if (w%8 or h%8 or not 256<=w<=1536 or not 256<=h<=1536
                 or abs(w/h-16/9)>.1 or not 1<=steps<=50):

@@ -33,6 +33,20 @@ class ThumbnailReferenceTests(unittest.TestCase):
         self.assertEqual(first[-1]['kind'],'thumbnail')
         self.assertIn('3D storybook',first[-1]['prompt'][:80])
 
+    def test_pool_selection_is_stable_for_retry_and_varies_across_generations(self):
+        from song_images import THUMBNAIL_REFERENCES
+        expected = {str(p.relative_to(Path(__file__).resolve().parent)) for p in THUMBNAIL_REFERENCES}
+        selected = set()
+        with patch.dict(os.environ, clear=True):
+            for index in range(100):
+                with patch.dict(os.environ, SONG_RUN_ID=f'kids-{index}'):
+                    first = thumbnail_reference('same-song')
+                    self.assertEqual(first, thumbnail_reference('same-song'))
+                    self.assertEqual(first['strength'], .50)
+                    selected.add(first['reference_image'])
+            self.assertEqual(selected, expected)
+            self.assertEqual(len(expected), 5)
+
     def test_changed_reference_content_changes_cache_identity(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/'reference.png'
