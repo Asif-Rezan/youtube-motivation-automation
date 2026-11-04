@@ -12,7 +12,7 @@ jobs:
           python-version: '3.11'
       - name: Install audio tools for regression tests
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
-      - run: pip install -r requirements.txt
+      - run: pip install -r requirements-checks.txt
       - run: python -m unittest -v
       - name: Verify bounded CPU worker on real Linux cgroups
         run: python check_worker_limits.py

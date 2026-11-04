@@ -29,7 +29,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
-          pip install -r requirements.txt
+          pip install -r requirements-checks.txt
       - name: Run component and motion regression tests
         run: python -m unittest -v
       - name: Render and decode-check landscape and portrait scenes

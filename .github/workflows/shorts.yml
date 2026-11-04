@@ -101,7 +101,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: pip
+          # Installs below bypass pip caching to reserve disk for models/media.
+          # Do not enable setup-python caching: its post step fails on an absent cache.
       - name: Prepare CPU runner memory and audio tools
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
@@ -173,7 +174,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: pip
+          # Installs below bypass pip caching to reserve disk for models/media.
+          # Do not enable setup-python caching: its post step fails on an absent cache.
       - name: Prepare CPU image memory
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
