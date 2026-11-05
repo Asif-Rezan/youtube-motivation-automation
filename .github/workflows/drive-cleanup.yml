@@ -44,6 +44,29 @@ jobs:
           args=(--sweep)
           if [[ "$CLEANUP_DRY_RUN" == "true" ]]; then args+=(--dry-run); fi
           python -u cleanup_drive.py "${args[@]}"
+      - name: Inventory this project root and private kids folder
+        if: always()
+        run: |
+          python - <<'PYINVENTORY'
+          import json, os
+          from pathlib import Path
+          from storage import Store, drive_retry
+          store=Store()
+          report={}
+          for label,folder in dict(project_root=os.environ['DRIVE_FOLDER_ID'],kids_folder=store.folder).items():
+              files=[];token=None
+              while True:
+                  page=drive_retry(lambda:store.client.files().list(q=f"'{folder}' in parents",
+                      pageSize=1000,pageToken=token,
+                      fields='nextPageToken,files(id,name,mimeType,size,trashed,appProperties)').execute())
+                  files.extend(page.get('files',[]))
+                  token=page.get('nextPageToken')
+                  if not token:break
+              report[label]={'files':files,'bytes':sum(int(f.get('size',0)) for f in files)}
+          Path('output').mkdir(exist_ok=True)
+          Path('output/project-drive-inventory.json').write_text(json.dumps(report,indent=2))
+          print(json.dumps({k:{'file_count':len(v['files']),'bytes':v['bytes']} for k,v in report.items()}))
+          PYINVENTORY
       - name: Summarize storage and cleanup result
         if: always()
         run: |
@@ -67,5 +90,7 @@ jobs:
         if: always()
         with:
           name: drive-cleanup-report-${{ github.run_id }}
-          path: output/drive-cleanup-report.json
+          path: |
+            output/drive-cleanup-report.json
+            output/project-drive-inventory.json
           retention-days: 14
