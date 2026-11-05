@@ -208,13 +208,21 @@ def run(run_id, kind):
         song=json.loads((Path('output')/run_id/'song.json').read_text())
         metadata=public_metadata(song,'shorts' if kind=='short' else 'video')
     metadata['description'] += '\n\nCreated with AI-generated music and illustrations.'
+    # Keep the original bytes when resuming a pre-existing landscape upload.
+    feed_copy=kind=='video' and (not state or state.get('media_format')=='feed-4x5-crop-v1')
+    path=root/'video.mp4'
+    if feed_copy:
+        from facebook_feed import prepare
+        path=prepare(path,store,run_id)
     def save():
+        if feed_copy:
+            state['media_format']='feed-4x5-crop-v1'
         root.mkdir(parents=True,exist_ok=True)
         temp = root/'facebook-state.tmp'
         temp.write_text(json.dumps(state,indent=2))
         temp.replace(root/'facebook-state.json')
         store.save(key,state)
-    publish(Facebook(os.getenv('FACEBOOK_PAGE_ACCESS_TOKEN')),root/'video.mp4',kind,metadata,stamp,state,save)
+    publish(Facebook(os.getenv('FACEBOOK_PAGE_ACCESS_TOKEN')),path,kind,metadata,stamp,state,save)
 
 
 if __name__ == '__main__':

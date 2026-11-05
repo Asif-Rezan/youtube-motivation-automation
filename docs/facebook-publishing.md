@@ -49,3 +49,10 @@ Official API references used:
 - [Reel publishing and schedule parameters](https://developers.facebook.com/documentation/video-api/guides/reels-publishing)
 
 The implementation uses Graph API `v26.0`, as shown in Meta's current reference when this integration was prepared. Review Meta's API-version lifecycle before upgrading.
+
+
+## Facebook feed format
+
+New landscape episode uploads are exported as **1080×1350 (4:5)** using a direct center crop before Facebook upload. There is no blurred background or padding. The center remains visible and the sides are cropped; source audio and duration are retained. YouTube video and 9:16 Reel media are unchanged.
+
+The exact cropped MP4 is saved under the episode's private Facebook storage key before upload, so a retry resumes the same media bytes and Facebook video ID. Existing landscape upload checkpoints keep their original media rather than switching format mid-upload. The export is enabled for new Facebook publications launched from this version of the workflow.
