@@ -5,16 +5,22 @@ import re
 from pathlib import Path
 from lyrics_cpu import MODEL_ID, request_story, StoryGenerationError, LYRIC_WORD_PATTERN
 
-VERSION='qwen-kids-original-v5-babies-and-animals'
+VERSION='qwen-kids-original-v6-verse-chorus'
 REFRAIN='dudi dudi dam dam dudi dudi dam'
+# Fixed channel chorus: the arranger sings it between four-line verses.
+CHORUS=(REFRAIN,'clap your hands and dance with me',REFRAIN,'jump up high and spin around')
 
 
 def normalized(text):
     return ' '.join(re.findall(r'[a-z]+',text.lower()))
 
 
+def chorus_line(text):
+    return normalized(text) in {normalized(line) for line in CHORUS}
+
+
 def verse_lines(song):
-    return [normalized(s['lyric']) for s in song['scenes'] if normalized(s['lyric']) != REFRAIN]
+    return [normalized(s['lyric']) for s in song['scenes'] if not chorus_line(s['lyric'])]
 
 
 def novelty_reason(lines, history):
@@ -57,7 +63,7 @@ def request_json(schema, prompt, seed, budget=2600):
                 'attempt':attempt+1,'error_code':error.code}),flush=True)
 
 
-def write_rhyme(day, identity, seconds, history, draft_path=None):
+def write_rhyme(day, identity, seconds, history, draft_path=None, verse_count=None):
     path=Path(draft_path) if draft_path else None
     state=json.loads(path.read_text()) if path and path.exists() else {}
     if state and (state.get('writer_version'),state.get('run_id'),state.get('duration')) != (VERSION,identity,seconds):
@@ -69,7 +75,13 @@ def write_rhyme(day, identity, seconds, history, draft_path=None):
             temp.write_text(json.dumps(state,ensure_ascii=False,indent=2))
             temp.replace(path)
     base=int(hashlib.sha256(identity.encode()).hexdigest()[:8],16)%(2**31-10000)
-    chapters=(seconds+119)//120
+    if verse_count is not None and not 4<=verse_count<=60:
+        raise ValueError('verse_count must be 4-60 lines')
+    chapters=(verse_count+11)//12 if verse_count else (seconds+119)//120
+    def chapter_lines(chapter):
+        if verse_count:
+            return min(12,verse_count-chapter*12)
+        return min(12,(seconds-chapter*120+9)//10)
     recent=[{'title':h.get('title',''),'story':h.get('story_summary',''),'visual_identity':h.get('visual_identity',{})} for h in history[-12:]]
     outline_schema={'type':'object','additionalProperties':False,'required':['title','story_summary','description','chapters','characters','visual_world'],
         'properties':{'characters':{'type':'string','minLength':20,'maxLength':320},
@@ -98,7 +110,7 @@ def write_rhyme(day, identity, seconds, history, draft_path=None):
         outline=state['outline']
         prior=[row['lyric'] for section in state['sections'] for row in section]
         for chapter in range(len(state['sections']),chapters):
-            count=min(12,(seconds-chapter*120+9)//10)
+            count=chapter_lines(chapter)
             schema={'type':'object','additionalProperties':False,'required':['verses'],'properties':{
                 'verses':{'type':'array','minItems':count,'maxItems':count,'items':{
                     'type':'object','additionalProperties':False,'required':['lyric','visual'],
@@ -120,8 +132,9 @@ def write_rhyme(day, identity, seconds, history, draft_path=None):
                     f'Write exactly {remaining} NEW short English sung lines for chapter {chapter+1}/{chapters} of this original episode: '
                     +json.dumps(outline)+'. Current chapter: '+outline['chapters'][chapter]+'. '
                     'Each line occupies five seconds: aim for 4-8 simple singable words, NEVER more than 12. Use single spaces and plain English words without apostrophes or hyphens. Count words before returning JSON. '
-                    f'Between every two original lines the singer will sing "{REFRAIN}" for five seconds. '
-                    'Do not put that refrain in your output; the arranger inserts it. '
+                    'The arranger groups your lines into four-line verses, each followed by a dance chorus: '
+                    +json.dumps(list(CHORUS))+'. Do not put any chorus line in your output; the arranger inserts it. '
+                    'Make every four consecutive lines a small complete verse that rhymes or repeats a fun sound. '
                     'Every verse line must be different. Develop this chapter rather than repeating earlier verses. '
                     'For each line, visual describes the same action and setting, featuring the episode characters with their exact appearance from the outline. Describe BOTH human toddlers and cute baby animals at the beginning of every visual. Keep both babies and animals equally prominent with separate full bodies, hands and feet visible, playing or dancing together. Never describe a solo animal composition. Alternate playful dancing, waving and little steps with concrete animal-led discoveries; do not make every scene jump. Name the visible subjects, action, relevant props and setting explicitly. Describe one small event: noticing something, reacting, approaching it and sharing a happy response. Avoid static posing. Use varied dance poses and playful actions rather than repeating one pose. Match the lyric literally where possible, and vary locations as the chapter develops. '
                     'It is a text-free cartoon picture prompt, with no camera instructions or lettering. '
@@ -137,7 +150,7 @@ def write_rhyme(day, identity, seconds, history, draft_path=None):
                     line=normalized(row['lyric'])
                     words=len(line.split())
                     reason=('word_count' if not 4<=words<=12 else
-                            'reserved_refrain' if line==REFRAIN else
+                            'reserved_refrain' if chorus_line(line) else
                             'duplicate_line' if line in seen else None)
                     if reason:
                         rejected.append({'lyric':row['lyric'],'visual':row['visual']})

@@ -1,3 +1,42 @@
+## Version log (how to go back)
+
+| Version | Commit / tag | What it is |
+|---|---|---|
+| v2 retention (current) | this PR | 4-minute chorus-first verse-chorus song, opening scene = thumbnail, punch-in hook motion, two dance moves per scene, consistent lighting, SEO titles without sound-alike names, real chapters |
+| v1 baseline | tag `v1-pre-retention-2026-11-07` (commit `c1b61b2`) | 10-minute song with the refrain after every line, 8-step ACE-Step, best-scene thumbnail |
+
+Why v2: video `r2gjHCPxpEU` kept 80% of viewers at 0:06, 36% at 0:24 and 8% at 1:55
+(average 0:42 of 10:01, 25% likes), with 95.6% of traffic from Suggested next to other
+channels' "Duri Duri Dum Dum" videos.
+
+To return to v1 for new episodes, restore the old code on a branch and merge it:
+
+```bash
+git switch -c rollback/v1 && git restore --source v1-pre-retention-2026-11-07 -- . && git commit -m "Roll back to v1 generator"
+```
+
+`VIDEO_DURATION_SECONDS` (`.github/workflows/music.yml`) controls length: 180–300 seconds in v2,
+480–720 in v1. `ACESTEP_INFERENCE_STEPS` (default 8, max 20) tunes the turbo music model, which
+upstream distills for 8 steps.
+
+## Retention-focused episodes (v2)
+
+- **Hook first:** every song opens with the full four-line chorus (0:00–0:20), sung with
+  ACE-Step `[Chorus - high energy]` / `[Verse]` tags and "starts instantly, no intro" in the caption.
+- **Thumbnail = first frames:** the package must pick scene 0 for the thumbnail, and the scene-0
+  clip is animated from `thumbnail-source.png`, so viewers see exactly what they clicked.
+- **Faster opening:** the first three clips (15 s) cut from a wide shot to a punch-in at 2.5 s,
+  with a livelier pan and 1.5x larger dance moves.
+- **More dance:** each dance scene switches to a second move at 2.5 s; chorus scenes rotate
+  eight dance poses; every scene and the thumbnail share one lighting/time of day.
+- **Structure:** four-line verses alternate with the fixed channel chorus
+  (`dudi dudi dam dam dudi dudi dam`, `clap your hands and dance with me`, ...).
+- **SEO:** titles start with the real search phrase (animal + action + "Song for Kids"), never
+  other channels' song names or sound-alikes (Dodi/Duri/Duty/Dum Dum, enforced in code), and
+  descriptions get real chapter timestamps from the storyboard.
+- **Checks:** `episode-packaging-check.yml` runs real Qwen on PRs; `episode-preview.yml` builds a
+  full video without publishing on any `preview/**` branch and verifies length and the opening frame.
+
 ## Cute animals with a child playmate
 
 New episodes keep cute baby animals as the leads, with a small child playmate

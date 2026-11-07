@@ -103,8 +103,9 @@ def validate_song(song):
     song['lyrics'] = normalize_lyrics(song['lyrics'])
     if 'dudi dudi dam dam dudi dudi dam' not in song['lyrics'].lower():
         raise ValueError('Dudi refrain required')
-    if not 480 <= song.get('duration', 0) <= 720:
-        raise ValueError('Song must be 480-720 seconds')
+    from kids_rhymes import MIN_SECONDS, MAX_SECONDS
+    if not MIN_SECONDS <= song.get('duration', 0) <= MAX_SECONDS:
+        raise ValueError('Song must be 180-300 seconds')
     if 'tags' in song and (not isinstance(song['tags'], list) or
             not all(isinstance(tag, str) and 0 < len(tag.strip()) <= 40 for tag in song['tags'])):
         raise ValueError('Invalid song tags')
@@ -129,8 +130,9 @@ def duration(path):
 
 
 def validate_duration(seconds):
-    if not 480 <= seconds <= 720:
-        raise ValueError('Measured song/video duration outside 8-12 minutes')
+    from kids_rhymes import MIN_SECONDS, MAX_SECONDS
+    if not MIN_SECONDS <= seconds <= MAX_SECONDS:
+        raise ValueError('Measured song/video duration outside 3-5 minutes')
 
 
 def render(root):

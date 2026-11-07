@@ -7,16 +7,54 @@ import re
 from pathlib import Path
 import subprocess
 
-REFRAIN = 'dudi dudi dam dam dudi dudi dam'
-from rhyme_writer import write_rhyme
+from rhyme_writer import write_rhyme, REFRAIN, CHORUS
+SONG_FORM = 'chorus-first-verse-chorus-v1'
+MIN_SECONDS, MAX_SECONDS, DEFAULT_SECONDS = 180, 300, 240
+
+
+def song_form(seconds):
+    """Open on the full chorus hook, then alternate four-line verses and choruses."""
+    slots=seconds//5
+    form=[('chorus',min(4,slots))]
+    used=form[0][1]
+    while slots-used>4:
+        for kind in ('verse','chorus'):
+            n=min(4,slots-used)
+            if n>0:
+                form.append((kind,n))
+                used+=n
+    if used<slots:
+        form.append(('chorus',slots-used))
+    return form
+
+
+# Distinct dance poses so consecutive chorus scenes never repeat a composition.
+CHORUS_POSES = (
+    'All dance together, waving arms and stepping feet.',
+    'All clap hands together above their heads, big happy smiles.',
+    'All jump up high together with arms stretched wide.',
+    'All spin around in a happy circle, holding hands.',
+    'All wiggle and shake side to side, tiny feet tapping.',
+    'All march in a line, knees up, swinging arms.',
+    'All bounce and bob together, paws and hands in the air.',
+    'All twirl and pose, one leg lifted, arms out like stars.',
+)
+
+
+def episode_lighting(outline):
+    """One time of day for every scene and the thumbnail, from the saved world."""
+    world=(outline.get('visual_world','')+' '+outline.get('characters','')).lower()
+    if re.search(r'\b(night|moon|moonlit|moonlight|stars?|starry|evening|dusk|sunset|twilight)\b',world):
+        return 'soft moonlit evening'
+    return 'bright sunny daytime'
 from scene_actions import plan_scene
 
-def scene_prompt(row,outline,dance=False):
+def scene_prompt(row,outline,dance=False,lighting=None,pose=None):
     """Restore the original soft animal-led look, with children as companions."""
     cast=outline.get('characters','')
     animals=list(dict.fromkeys(re.findall(r'\b(bunny|rabbit|hare|duckling|duck|chick|puppy|dog|kitten|cat|turtle|elephant|panda|lamb|fox|bear|deer|calf|penguin|squirrel)\b',cast,re.I)))[:2]
     subjects=' and '.join('baby '+animal.lower() for animal in animals) or 'cute baby animal friends'
-    action = ('All dance together, waving arms and stepping feet.' if dance
+    action = ((pose or CHORUS_POSES[0]) if dance
               else 'All play together. ' + row['visual'])
     return ('Cute colorful 3D storybook cartoon. Two cute human toddlers in colorful clothes '
         'beside adorable '+subjects+'. Both babies and animals equally prominent, '
@@ -24,35 +62,43 @@ def scene_prompt(row,outline,dance=False):
         'Dreamy natural flower garden, soft light, rounded shapes, pastel colors. '
         +outline.get('visual_world','Dreamy natural flower garden')+'. '+cast+'. '
         'The two human babies stay visible alongside the animals, no solo animal portrait, '
-        'wide landscape, no text.')
+        'wide landscape, no text. Consistent '+(lighting or episode_lighting(outline))+
+        ' lighting and the same pastel color palette in every scene.')
 
 
 def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_override='female'):
     if vocal_gender_override not in ('auto', 'female'):
         raise ValueError('Dudi Dam TV uses female vocals')
-    seconds = int(os.getenv('VIDEO_DURATION_SECONDS', '600'))
-    if not 480 <= seconds <= 720 or seconds % 5:
-        raise ValueError('VIDEO_DURATION_SECONDS must be 480-720, in five-second steps')
+    seconds = int(os.getenv('VIDEO_DURATION_SECONDS', str(DEFAULT_SECONDS)))
+    if not MIN_SECONDS <= seconds <= MAX_SECONDS or seconds % 5:
+        raise ValueError(f'VIDEO_DURATION_SECONDS must be {MIN_SECONDS}-{MAX_SECONDS}, in five-second steps')
     identity = generation_id or day
-    written = write_rhyme(day, identity, seconds, history, draft_path)
+    form = song_form(seconds)
+    verse_count = sum(n for kind, n in form if kind == 'verse')
+    written = write_rhyme(day, identity, seconds, history, draft_path, verse_count=verse_count)
     outline = written['outline']
+    lighting = episode_lighting(outline)
+    rows = iter([row for section in written['sections'] for row in section])
     scenes = []
-    for section in written['sections']:
-        for row in section:
-            # Put both cast types and the established style before the encoder
-            # token limit. Refrains get a distinct dancing composition.
-            for lyric in (row['lyric'], REFRAIN):
-                i=len(scenes)
-                dance=lyric==REFRAIN
-                prompt=scene_prompt(row,outline,dance)
-                motion_text=('Two human toddlers and cute baby animals dancing together' if dance
-                             else row['lyric']+' '+row['visual'])+' at 120 BPM'
-                scenes.append(dict(index=i,start=i*5,end=(i+1)*5,lyric=lyric,prompt=prompt,
-                    cast_style='cute-babies-and-animals-together-v4',visual_action=motion_text,story_action=plan_scene(motion_text,i)))
-    scenes=scenes[:seconds//5]
+    for kind, count in form:
+        for j in range(count):
+            i = len(scenes)
+            if kind == 'verse':
+                row = next(rows)
+                lyric, dance = row['lyric'], False
+                motion_text = row['lyric']+' '+row['visual']
+            else:
+                row, lyric, dance = {}, CHORUS[j % len(CHORUS)], True
+                # Chorus words pick literal moves: clapping, then jumping and spinning.
+                motion_text = 'Two human toddlers and cute baby animals dancing together, '+lyric
+            motion_text += ' at 120 BPM'
+            scenes.append(dict(index=i,start=i*5,end=(i+1)*5,lyric=lyric,section=kind,
+                prompt=scene_prompt(row,outline,dance,lighting,CHORUS_POSES[i % len(CHORUS_POSES)] if dance else None),
+                cast_style='cute-babies-and-animals-together-v4',visual_action=motion_text,story_action=plan_scene(motion_text,i)))
     outline=written['outline']
     song = dict(title=outline['title'], lyrics='\n'.join(scene['lyric'] for scene in scenes),duration=seconds,
-        prompt='Joyful nursery rhyme, cute sweet adult female singing voice, clear English diction, playful dudi dudi dam dam refrain, C major, 120 BPM, bouncy ukulele, bright xylophone, steady handclaps and gentle bass. Continuous lively instrumental backing under every vocal line, no silent breaks, no stop-start pauses, no shouting.',
+        song_form=SONG_FORM, lighting=lighting,
+        prompt='Joyful kids dance song with a catchy verse-chorus structure. Starts instantly on the first beat with the full high-energy chorus, no instrumental intro. Cute sweet adult female singing voice, clear English diction, playful dudi dudi dam dam chorus, C major, 120 BPM, bouncy ukulele, bright xylophone, steady handclaps and gentle bass. Continuous lively instrumental backing under every vocal line, no silent breaks, no stop-start pauses, no shouting.',
         description=outline['description'],story_summary=outline['story_summary'],
         visual_identity=dict(characters=outline.get('characters',''), world=outline.get('visual_world','')),
         lyric_writer=dict(backend='local-qwen-cpu',version=written['writer_version'],novelty_checked=True),
@@ -86,6 +132,18 @@ def metadata_tags(song):
     return list(dict.fromkeys(song.get('tags', []) + ['Dudi Dam TV', 'kids rhymes']))
 
 
+def tagged_lyrics(scenes):
+    """ACE-Step section tags so the chorus is sung as the energetic hook."""
+    lines, previous = [], None
+    for scene in scenes:
+        section = scene.get('section')
+        if section and section != previous:
+            lines.append('[Chorus - high energy]' if section == 'chorus' else '[Verse]')
+        previous = section
+        lines.append(scene['lyric'])
+    return '\n'.join(lines)
+
+
 def generate_music(song, target, state, save):
     from pipeline import validate_song, validate_duration, duration
     from music_cpu import generate_segment
@@ -101,7 +159,7 @@ def generate_music(song, target, state, save):
     scenes = song['scenes']
     for i in range(0, len(scenes), 24):
         group = scenes[i:i+24]
-        part = dict(song, duration=len(group)*5, lyrics='\n'.join(s['lyric'] for s in group), _segment=True)
+        part = dict(song, duration=len(group)*5, lyrics=tagged_lyrics(group), _segment=True)
         path = target.parent / f'part-{i//24:03d}.wav'
         part_state = state.setdefault('parts', {}).setdefault(str(i//24), {})
         for attempt in range(3 if continuous else 1):
