@@ -26,7 +26,7 @@ class PrepareOriginalTests(unittest.TestCase):
             old=os.getcwd();os.chdir(tmp)
             self.addCleanup(os.chdir,old)
             store=Mock(); store.load.return_value=[]
-            with patch('storage.Store',return_value=store),patch('prepare_music.make_song',return_value=fixture_song()) as writer,patch('prepare_music.generate') as music, patch('episode_packaging.generate_package', side_effect=lambda song,history: __import__('test_episode_packaging').fixture_package(song)) as packager:
+            with patch('storage.Store',return_value=store),patch('prepare_music.make_song',return_value=fixture_song()) as writer,patch('prepare_music.generate') as music, patch('episode_packaging.generate_package', side_effect=lambda song,history,**_: __import__('test_episode_packaging').fixture_package(song)) as packager:
                 prepare('original-test',stage='lyrics',check_history=True)
                 prepare('original-test',stage='lyrics',check_history=True)
                 packager.assert_called_once()
@@ -56,7 +56,11 @@ class PrepareOriginalTests(unittest.TestCase):
              patch('prepare_music.record_failure') as failure, patch('prepare_music.time.sleep'):
             prepare_with_retries('same-id','lyrics',True,'female')
         self.assertEqual(run.call_count,2)
-        self.assertEqual(run.call_args_list[0],run.call_args_list[1])
+        first,second=run.call_args_list
+        self.assertEqual(first.args,second.args)
+        self.assertEqual({k:v for k,v in first.kwargs.items() if k!='retry'},
+                         {k:v for k,v in second.kwargs.items() if k!='retry'})
+        self.assertEqual((first.kwargs['retry'],second.kwargs['retry']),(0,1))
         failure.assert_called_once()
         with patch('prepare_music.prepare',side_effect=error) as run, \
              patch('prepare_music.record_failure'), patch('prepare_music.time.sleep'):
