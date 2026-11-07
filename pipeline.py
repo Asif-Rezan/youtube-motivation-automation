@@ -101,8 +101,9 @@ def validate_song(song):
     if len(song['title']) > 100 or len(song['description']) > 4400:
         raise ValueError('YouTube metadata too long')
     song['lyrics'] = normalize_lyrics(song['lyrics'])
-    if 'dudi dudi dam dam dudi dudi dam' not in song['lyrics'].lower():
-        raise ValueError('Dudi refrain required')
+    hook = song.get('hook') or 'dudi dudi dam dam dudi dudi dam'
+    if hook.lower() not in song['lyrics'].lower():
+        raise ValueError('Episode chorus hook required')
     from kids_rhymes import MIN_SECONDS, MAX_SECONDS
     if not MIN_SECONDS <= song.get('duration', 0) <= MAX_SECONDS:
         raise ValueError('Song must be 180-300 seconds')

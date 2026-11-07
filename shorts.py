@@ -115,7 +115,7 @@ def short_metadata(song, start, seconds):
     else:
         # Manual clips are grounded in their selected lyrics, not later story events.
         lines=[s['lyric'] for s in song['scenes'][start//5:(start+seconds)//5]
-               if s['lyric'] != 'dudi dudi dam dam dudi dudi dam']
+               if s['lyric'] != song.get('hook','dudi dudi dam dam dudi dudi dam')]
         hook=(lines[0] if lines else song['title']).strip().rstrip('.!?')
         metadata=dict(title=hook[:65]+' | Kids Dance Song #Shorts',
             description=f"{seconds}-second sing-along with the episode's baby and animal friends.\n"+

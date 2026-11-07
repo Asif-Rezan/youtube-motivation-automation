@@ -8,7 +8,8 @@ from unittest.mock import patch
 
 import kids_rhymes
 from kids_rhymes import song_form, tagged_lyrics, episode_lighting, CHORUS_POSES
-from rhyme_writer import CHORUS, REFRAIN, verse_lines, chorus_line
+from rhyme_writer import CHORUS, REFRAIN, verse_lines, chorus_line, hook_reason
+HOOK = ['hoppy hoppy hop hop', 'clap clap clap with me', 'hoppy hoppy hop hop', 'wiggle your ears and spin']
 
 
 class SongFormTests(unittest.TestCase):
@@ -40,6 +41,22 @@ class SongFormTests(unittest.TestCase):
         self.assertEqual(verse_lines(song), ['tiny ducks paddle in a row'])
         self.assertTrue(chorus_line('Clap your hands and dance with me!'))
 
+    def test_episode_hook_rules(self):
+        self.assertIsNone(hook_reason(HOOK))
+        self.assertEqual(hook_reason(list(CHORUS)), 'borrowed_hook')
+        self.assertEqual(hook_reason(['bunny jumps so high', 'clap', 'bunny jumps so high', 'spin around now']), 'hook_word_count')
+        self.assertEqual(hook_reason(['little bunny hops along', 'clap your hands now', 'little bunny hops along', 'spin around now']), 'hook_needs_repeated_sound')
+        self.assertEqual(hook_reason(HOOK[:2] + ['other line here', HOOK[3]]), 'hook_must_repeat_line_one_as_line_three')
+        self.assertEqual(hook_reason(HOOK, [{'hook': 'Hoppy hoppy hop hop!'}]), 'repeated_hook')
+
+    def test_final_chorus_is_tagged_as_energetic_finish(self):
+        scenes = [dict(lyric='a', section='chorus'), dict(lyric='b', section='verse'), dict(lyric='c', section='chorus')]
+        self.assertEqual(tagged_lyrics(scenes).splitlines()[-2], '[Final Chorus - big energetic finish]')
+
+    def test_episode_chorus_lines_are_not_verses(self):
+        song = dict(chorus=HOOK, scenes=[dict(lyric=line) for line in HOOK] + [dict(lyric='Tiny ducks paddle')])
+        self.assertEqual(verse_lines(song), ['tiny ducks paddle'])
+
     def test_lighting_follows_the_episode_world(self):
         self.assertEqual(episode_lighting({'visual_world': 'A moonlit meadow with fireflies'}), 'soft moonlit evening')
         self.assertEqual(episode_lighting({'visual_world': 'A sunny flower garden'}), 'bright sunny daytime')
@@ -54,7 +71,7 @@ class MakeSongTests(unittest.TestCase):
             return dict(writer_version='test', outline=dict(title='Bunny Finds the Moon',
                 characters='A white baby bunny and a yellow duckling with two toddlers.',
                 visual_world='A moonlit meadow with soft stars.',
-                description='A gentle new story about friends dancing under the moon in a meadow.',
+                description='A gentle new story about friends dancing under the moon in a meadow.', chorus=HOOK,
                 story_summary='Bunny and duckling dance under the moon with toddlers.'),
                 sections=[[dict(lyric=f'Bunny hops to the moon {i}', visual=f'Bunny and toddlers hopping {i}')
                            for i in range(verse_count)]])
@@ -68,7 +85,12 @@ class MakeSongTests(unittest.TestCase):
         self.assertEqual(self.requested['verse_count'], 20)
         self.assertEqual(self.song['duration'], 240)
         self.assertEqual([s['section'] for s in self.song['scenes'][:5]], ['chorus'] * 4 + ['verse'])
-        self.assertEqual(self.song['scenes'][0]['lyric'], REFRAIN)
+        self.assertEqual(self.song['scenes'][0]['lyric'], HOOK[0])
+        self.assertEqual(self.song['hook'], HOOK[0])
+        self.assertIn('"hoppy hoppy hop hop"', self.song['prompt'])
+        self.assertNotIn('dudi', self.song['prompt'].lower())
+        self.assertIn('button ending', self.song['prompt'])
+        self.assertIn('130 BPM', self.song['prompt'])
         self.assertEqual(self.song['song_form'], kids_rhymes.SONG_FORM)
         self.assertIn('Starts instantly', self.song['prompt'])
 
@@ -87,7 +109,7 @@ class MakeSongTests(unittest.TestCase):
         enum = schema(self.song)['properties']['thumbnail']['properties']['scene_index']['enum']
         self.assertEqual(enum, [0])
         chapters = chapter_text(self.song).splitlines()
-        self.assertEqual(chapters[0], '0:00 Dudi Dudi Dam Dam dance chorus')
+        self.assertEqual(chapters[0], '0:00 Hoppy hoppy hop hop dance chorus')
         self.assertTrue(chapters[1].startswith('0:20 Verse 1: Bunny hops to the moon'))
         self.assertEqual(len(chapters), 6)
 

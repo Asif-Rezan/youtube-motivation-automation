@@ -46,13 +46,17 @@ jobs:
           sections = [s['section'] for s in song['scenes']]
           assert song['duration'] == 240 and len(sections) == 48, song['duration']
           assert sections[:4] == ['chorus'] * 4 and sections[4] == 'verse', sections[:8]
+          from rhyme_writer import hook_reason
+          assert hook_reason(song['chorus']) is None, song['chorus']
+          assert 'dudi' not in song['lyrics'].lower()
+          print('EPISODE HOOK:', json.dumps(song['chorus']))
           package = song['packaging']
           assert package['thumbnail']['scene_index'] == 0
           for kind in ('video', 'shorts'):
               assert not lookalike(package[kind]['title']), package[kind]['title']
           assert '0:20 Verse 1:' in package['video']['description']
           print(json.dumps({'title': package['video']['title'],
-                            'description': package['video']['description'],
+                            'description': package['video']['description'], 'chorus': song['chorus'],
                             'tags': package['video']['tags'],
                             'thumbnail_focus': package['thumbnail']['focus']}, indent=2, ensure_ascii=False))
           PY

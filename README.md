@@ -2,7 +2,7 @@
 
 | Version | Commit / tag | What it is |
 |---|---|---|
-| v2 retention (current) | this PR | 4-minute chorus-first verse-chorus song, opening scene = thumbnail, punch-in hook motion, two dance moves per scene, consistent lighting, SEO titles without sound-alike names, real chapters |
+| v2 retention (current) | this PR | 4-minute chorus-first verse-chorus song, opening scene = thumbnail, punch-in hook motion, two dance moves per scene, consistent lighting, SEO titles without sound-alike names, real chapters; 130 BPM bouncy kids-pop groove, a NEW Qwen-written chorus hook every episode (no fixed Dudi refrain), short energetic final chorus with a button ending |
 | v1 baseline | tag `v1-pre-retention-2026-11-07` (commit `c1b61b2`) | 10-minute song with the refrain after every line, 8-step ACE-Step, best-scene thumbnail |
 
 Why v2: video `r2gjHCPxpEU` kept 80% of viewers at 0:06, 36% at 0:24 and 8% at 1:55

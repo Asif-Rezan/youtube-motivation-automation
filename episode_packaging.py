@@ -44,7 +44,8 @@ def chapter_text(song):
             words=' '.join(scene['lyric'].split()[:6]).rstrip('.!?')
             rows.append(f"{scene['start']//60}:{scene['start']%60:02d} Verse {verse}: {words[:1].upper()+words[1:]}")
         elif not rows:
-            rows.append('0:00 Dudi Dudi Dam Dam dance chorus')
+            hook=song.get('hook') or 'Dudi Dudi Dam Dam'
+            rows.append('0:00 '+hook[:1].upper()+hook[1:].rstrip('.!?')+' dance chorus')
     return '\n'.join(rows) if len(rows)>=3 else ''
 
 
@@ -145,14 +146,15 @@ def generate_package(song, history=(), seed_offset=0):
     identity=source_identity(song)
     facts={k:song.get(k) for k in ('title','description','story_summary','visual_identity','duration')}
     from rhyme_writer import chorus_line, CHORUS
-    facts['verse_lyrics']=[s['lyric'] for s in song['scenes'] if not chorus_line(s['lyric'])]
-    facts['chorus']=list(CHORUS)
+    chorus=song.get('chorus') or list(CHORUS)
+    facts['verse_lyrics']=[s['lyric'] for s in song['scenes'] if not chorus_line(s['lyric'],chorus)]
+    facts['chorus']=chorus
     facts['scenes']=[dict(index=s['index'],lyric=s['lyric'],action=s.get('visual_action',s['prompt'])[:180]) for s in candidate_scenes(song)]
     prompt=(
         'Create an original truthful YouTube title/thumbnail package for this English kids nursery rhyme. '
         'Use only the supplied lyrics, cast, setting and actions. No invented animals, lessons, events, '
         'educational guarantees, views, popularity, trend/search-volume claims or celebrity/cartoon brands. '
-        'The sung Dudi chorus is intentional. Public metadata must differ between episodes. '
+        'The sung chorus hook is this episode\'s own and may appear in the title. Public metadata must differ between episodes. '
         'SEO title rules: write three distinct title candidates of 45-70 characters. Start with the main '
         'search phrase parents type, built from the real animal and action, e.g. "Baby Bunny Dance Song for Kids". '
         'Then a pipe and a broad phrase such as Nursery Rhymes, Kids Songs or Toddler Dance, optionally '

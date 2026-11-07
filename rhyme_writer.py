@@ -5,22 +5,45 @@ import re
 from pathlib import Path
 from lyrics_cpu import MODEL_ID, request_story, StoryGenerationError, LYRIC_WORD_PATTERN
 
-VERSION='qwen-kids-original-v6-verse-chorus'
+VERSION='qwen-kids-original-v7-episode-hook'
 REFRAIN='dudi dudi dam dam dudi dudi dam'
-# Fixed channel chorus: the arranger sings it between four-line verses.
+# Legacy fixed chorus (v6 episodes). New episodes get their own hook from Qwen.
 CHORUS=(REFRAIN,'clap your hands and dance with me',REFRAIN,'jump up high and spin around')
+# Other channels' hooks and our old one: a new episode hook must not sound like them.
+BORROWED_HOOKS=('dudi dudi','dodi dodi','duri duri','duty duty','dum dum','dam dam','baby shark','wheels on the bus','twinkle twinkle','old macdonald','johny johny')
 
 
 def normalized(text):
     return ' '.join(re.findall(r'[a-z]+',text.lower()))
 
 
-def chorus_line(text):
-    return normalized(text) in {normalized(line) for line in CHORUS}
+def chorus_line(text, chorus=CHORUS):
+    return normalized(text) in {normalized(line) for line in chorus}
 
 
 def verse_lines(song):
-    return [normalized(s['lyric']) for s in song['scenes'] if not chorus_line(s['lyric'])]
+    chorus=song.get('chorus') or CHORUS
+    return [normalized(s['lyric']) for s in song['scenes'] if not chorus_line(s['lyric'],chorus)]
+
+
+def hook_reason(chorus, history=()):
+    """A four-line call-and-response hook: line 1 = line 3, short, chantable and new."""
+    lines=[normalized(line) for line in chorus]
+    if len(lines)!=4 or lines[0]!=lines[2]:
+        return 'hook_must_repeat_line_one_as_line_three'
+    if any(not 3<=len(line.split())<=8 for line in lines):
+        return 'hook_word_count'
+    if lines[1]==lines[3]:
+        return 'hook_action_lines_identical'
+    words=lines[0].split()
+    if len(set(words))>len(words)-1:
+        return 'hook_needs_repeated_sound'
+    if any(borrowed in ' '.join(lines) for borrowed in BORROWED_HOOKS):
+        return 'borrowed_hook'
+    for entry in history[-30:]:
+        if normalized(entry.get('hook',''))==lines[0]:
+            return 'repeated_hook'
+    return None
 
 
 def novelty_reason(lines, history):
@@ -89,14 +112,17 @@ def write_rhyme(day, identity, seconds, history, draft_path=None, verse_count=No
         'title':{'type':'string','minLength':8,'maxLength':65},
         'story_summary':{'type':'string','minLength':40,'maxLength':400},
         'description':{'type':'string','minLength':80,'maxLength':650},
-        'chapters':{'type':'array','minItems':chapters,'maxItems':chapters,'items':{'type':'string','minLength':20,'maxLength':180}}}}
+        'chapters':{'type':'array','minItems':chapters,'maxItems':chapters,'items':{'type':'string','minLength':20,'maxLength':180}},
+        'chorus':{'type':'array','minItems':4,'maxItems':4,'items':{'type':'string','minLength':10,'maxLength':60,'pattern':LYRIC_WORD_PATTERN}}}}
+    outline_schema['required'].append('chorus')
+    hooks=[h.get('hook','') for h in history[-30:] if h.get('hook')]
     # If a complete candidate is too similar, rewrite it with another seed.
     for attempt in range(state.get('attempt',0),3):
         if not state.get('outline'):
             state=dict(writer_version=VERSION,run_id=identity,duration=seconds,attempt=attempt,sections=[])
             save()  # Preserve identity and retry state even if the first response fails.
             state['outline']=request_json(outline_schema,
-                f'Create a NEW {seconds//60}-minute nursery rhyme episode for Dudi Dum TV on {day}. '
+                f'Create a NEW {seconds//60}-minute nursery rhyme episode for Dudi Dam TV on {day}. '
                 f'Creative identity {identity}; variation {attempt}. Invent a distinct adventure and choose a NEW cast led by one or two adorable baby animals with rounded soft bodies, expressive eyes, appealing pastel colors and distinct cute features. Add two cute human toddlers aged 2-4 in colorful clothes as equally visible playmates. Every scene must include both human babies and animals together, never only an animal. Preserve the soft, whimsical animal-story atmosphere. Vary animal species and the child appearance and clothing between episodes. '
                 f'Write {chapters} connected chapter ideas with a beginning, discoveries and a happy ending. '
                 'Keep characters under 320 characters and visual_world under 240 characters, including spaces. '
@@ -105,7 +131,27 @@ def write_rhyme(day, identity, seconds, history, draft_path=None, verse_count=No
                 'Teach gentle movement, kindness, colors or nature through concrete playful actions. '
                 'English title must name the actual new adventure, not a run ID. Write a concise 2-3 sentence description, 40-65 words and under 600 characters, describing this particular story. '
                 'Avoid scary situations, danger, commercial brands, adult themes, requests to subscribe and copying existing songs. '
+                'chorus is this episode\'s OWN catchy dance hook, sung four times as often as any verse, so toddlers chant it after one listen. '
+                'Exactly 4 lines of 3-8 words: line 1 is a playful repeated nonsense or animal sound phrase that fits this cast and story '
+                '(examples of the pattern only, never copy them: "boing boing boing boing bouncy bee", "splishy splashy splishy splash"), '
+                'line 2 a simple dance action, line 3 identical to line 1, line 4 a different dance action. '
+                'Bouncy trochaic rhythm with strong beats, easy to clap to. Never reuse another song\'s hook or these recent hooks: '+json.dumps(hooks)+'. '
                 'Do not repeat these recent titles or story premises: '+json.dumps(recent),base+attempt*100)
+            for fix in range(3):
+                reason=hook_reason(state['outline']['chorus'],history)
+                if not reason:
+                    break
+                print(json.dumps({'phase':'repair episode hook','attempt':fix+1,'reason':reason}),flush=True)
+                state['outline']['chorus']=request_json(
+                    {'type':'object','additionalProperties':False,'required':['chorus'],'properties':{'chorus':outline_schema['properties']['chorus']}},
+                    'Rewrite only the 4-line dance chorus for this kids episode: '+json.dumps(state['outline'])+
+                    f'. Problem to fix: {reason}. Rules: 3-8 words per line; line 1 a fun repeated sound phrase (some word repeated) '
+                    'matching the cast; line 2 a dance action; line 3 exactly equal to line 1; line 4 a different dance action. '
+                    'No existing song hooks and none of: '+json.dumps(hooks+list(BORROWED_HOOKS)),
+                    base+attempt*100+fix+1)['chorus']
+            else:
+                raise StoryGenerationError('Qwen episode hook repair exhausted',code='lyrics_hook_validation',retryable=True,
+                    details={'reason':reason})
             save()
         outline=state['outline']
         prior=[row['lyric'] for section in state['sections'] for row in section]
@@ -133,7 +179,7 @@ def write_rhyme(day, identity, seconds, history, draft_path=None, verse_count=No
                     +json.dumps(outline)+'. Current chapter: '+outline['chapters'][chapter]+'. '
                     'Each line occupies five seconds: aim for 4-8 simple singable words, NEVER more than 12. Use single spaces and plain English words without apostrophes or hyphens. Count words before returning JSON. '
                     'The arranger groups your lines into four-line verses, each followed by a dance chorus: '
-                    +json.dumps(list(CHORUS))+'. Do not put any chorus line in your output; the arranger inserts it. '
+                    +json.dumps(outline['chorus'])+'. Do not put any chorus line in your output; the arranger inserts it. '
                     'Make every four consecutive lines a small complete verse that rhymes or repeats a fun sound. '
                     'Every verse line must be different. Develop this chapter rather than repeating earlier verses. '
                     'For each line, visual describes the same action and setting, featuring the episode characters with their exact appearance from the outline. Describe BOTH human toddlers and cute baby animals at the beginning of every visual. Keep both babies and animals equally prominent with separate full bodies, hands and feet visible, playing or dancing together. Never describe a solo animal composition. Alternate playful dancing, waving and little steps with concrete animal-led discoveries; do not make every scene jump. Name the visible subjects, action, relevant props and setting explicitly. Describe one small event: noticing something, reacting, approaching it and sharing a happy response. Avoid static posing. Use varied dance poses and playful actions rather than repeating one pose. Match the lyric literally where possible, and vary locations as the chapter develops. '
@@ -150,7 +196,7 @@ def write_rhyme(day, identity, seconds, history, draft_path=None, verse_count=No
                     line=normalized(row['lyric'])
                     words=len(line.split())
                     reason=('word_count' if not 4<=words<=12 else
-                            'reserved_refrain' if chorus_line(line) else
+                            'reserved_refrain' if chorus_line(line,outline['chorus']) else
                             'duplicate_line' if line in seen else None)
                     if reason:
                         rejected.append({'lyric':row['lyric'],'visual':row['visual']})

@@ -8,7 +8,7 @@ from pathlib import Path
 import subprocess
 
 from rhyme_writer import write_rhyme, REFRAIN, CHORUS
-SONG_FORM = 'chorus-first-verse-chorus-v1'
+SONG_FORM = 'chorus-first-verse-chorus-v2-episode-hook'
 MIN_SECONDS, MAX_SECONDS, DEFAULT_SECONDS = 180, 300, 240
 
 
@@ -78,6 +78,7 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
     written = write_rhyme(day, identity, seconds, history, draft_path, verse_count=verse_count)
     outline = written['outline']
     lighting = episode_lighting(outline)
+    chorus = tuple(outline.get('chorus') or CHORUS)
     rows = iter([row for section in written['sections'] for row in section])
     scenes = []
     for kind, count in form:
@@ -88,7 +89,7 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
                 lyric, dance = row['lyric'], False
                 motion_text = row['lyric']+' '+row['visual']
             else:
-                row, lyric, dance = {}, CHORUS[j % len(CHORUS)], True
+                row, lyric, dance = {}, chorus[j % len(chorus)], True
                 # Chorus words pick literal moves: clapping, then jumping and spinning.
                 motion_text = 'Two human toddlers and cute baby animals dancing together, '+lyric
             motion_text += ' at 130 BPM'
@@ -98,13 +99,21 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
     outline=written['outline']
     song = dict(title=outline['title'], lyrics='\n'.join(scene['lyric'] for scene in scenes),duration=seconds,
         song_form=SONG_FORM, lighting=lighting,
-        prompt='Joyful kids dance song with a catchy verse-chorus structure. Starts instantly on the first beat with the full high-energy chorus, no instrumental intro. Cute sweet adult female singing voice, clear English diction, playful dudi dudi dam dam chorus, C major, 130 BPM, bouncy ukulele, bright xylophone, steady handclaps and gentle bass. Continuous lively instrumental backing under every vocal line, no silent breaks, no stop-start pauses, no shouting.',
+        chorus=list(chorus), hook=chorus[0],
+        prompt=('Upbeat bouncy kids pop dance song, 130 BPM, 4/4, strong steady groove toddlers can clap and jump to. '
+            'Starts instantly on the first beat with the full high-energy chorus, no instrumental intro. '
+            'Punchy kick drum on every beat, snappy snare and loud handclaps on 2 and 4, bouncy staccato bass, '
+            'bright marimba and glockenspiel riff answering each vocal line, cheerful ukulele strums. '
+            'Short simple repetitive sing-along melody; the chorus hook "'+chorus[0]+'" is a catchy chant with call-and-response kids backing vocals. '
+            'Cute sweet adult female lead voice, clear English diction, C major. '
+            'Continuous lively backing under every line, no silent breaks, no slow ballad sections, no shouting. '
+            'Ends with a short energetic final chorus and a crisp button ending with a cymbal hit, no long fade-out.'),
         description=outline['description'],story_summary=outline['story_summary'],
         visual_identity=dict(characters=outline.get('characters',''), world=outline.get('visual_world','')),
         lyric_writer=dict(backend='local-qwen-cpu',version=written['writer_version'],novelty_checked=True),
         vocal_gender='female',song_date=day,scenes=scenes,bpm=130,
         audio_mastering='continuous-kids-mix-v2',
-        tags=['Dudi Dam TV','kids rhymes','nursery rhymes','Dudi Dudi Dam Dam','kids dance'])
+        tags=['Dudi Dam TV','kids rhymes','nursery rhymes','kids dance song',chorus[0][:40]])
     validate_storyboard(song)
     return song
 
@@ -135,10 +144,16 @@ def metadata_tags(song):
 def tagged_lyrics(scenes):
     """ACE-Step section tags so the chorus is sung as the energetic hook."""
     lines, previous = [], None
-    for scene in scenes:
+    last = max((i for i, s in enumerate(scenes) if s.get('section') == 'verse'), default=None)
+    for i, scene in enumerate(scenes):
         section = scene.get('section')
         if section and section != previous:
-            lines.append('[Chorus - high energy]' if section == 'chorus' else '[Verse]')
+            if section == 'verse':
+                lines.append('[Verse]')
+            elif last is not None and i > last:
+                lines.append('[Final Chorus - big energetic finish]')
+            else:
+                lines.append('[Chorus - high energy]')
         previous = section
         lines.append(scene['lyric'])
     return '\n'.join(lines)
