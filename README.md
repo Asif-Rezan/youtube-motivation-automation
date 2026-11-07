@@ -41,7 +41,7 @@ upstream distills for 8 steps.
 
 New episodes keep cute baby animals as the leads, with a small child playmate
 in the original soft, pastel 3D storybook style. Shared refrains get separate
-dancing compositions and varied gentle movement guided by the new 120-BPM request. Image model, image
+dancing compositions and varied gentle movement guided by the new 130-BPM request. Image model, image
 size, step counts and guidance are unchanged. See [cast and dance details](docs/toddler-animal-dance.md).
 
 ## Lyric word-bound recovery
@@ -212,7 +212,7 @@ The default upload is private without a publication timestamp. After YouTube ret
 
 Every five-second lyric scene now has continuous 25 fps camera motion: gentle alternating horizontal pan, a slow push-in, a small rhythmic pulse and vertical sway. Translucent bubbles drift independently along the edges for foreground depth. A 0.28-second dissolve uses the previous scene's actual final frame, so scene changes do not add time or shift the soundtrack. The original song is muxed once after the silent clips are joined.
 
-This gives still illustrations a lively storybook presentation; it does not rig character limbs or lip-sync mouths. Motion follows the requested tempo (120 BPM for new episodes, 100 for older ones) as a visual guide, not measured audio beats. Full videos remain 1920×1080 and 8–12 minutes, with a new illustration every five seconds. Rendering is split into small clips to bound memory. `render-state.json` fingerprints the renderer version and inputs so an old static video is regenerated automatically.
+This gives still illustrations a lively storybook presentation; it does not rig character limbs or lip-sync mouths. Motion follows the requested tempo (130 BPM for new episodes, 100 for older ones) as a visual guide, not measured audio beats. Full videos remain 1920×1080 and 8–12 minutes, with a new illustration every five seconds. Rendering is split into small clips to bound memory. `render-state.json` fingerprints the renderer version and inputs so an old static video is regenerated automatically.
 
 For a local short preview without model inference or publishing, run `python preview_motion.py image1.png image2.png --audio song.wav --output output/motion-preview.mp4`. Preview images/audio are supplied locally and are never used as a production fallback.
 

@@ -91,18 +91,18 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
                 row, lyric, dance = {}, CHORUS[j % len(CHORUS)], True
                 # Chorus words pick literal moves: clapping, then jumping and spinning.
                 motion_text = 'Two human toddlers and cute baby animals dancing together, '+lyric
-            motion_text += ' at 120 BPM'
+            motion_text += ' at 130 BPM'
             scenes.append(dict(index=i,start=i*5,end=(i+1)*5,lyric=lyric,section=kind,
                 prompt=scene_prompt(row,outline,dance,lighting,CHORUS_POSES[i % len(CHORUS_POSES)] if dance else None),
                 cast_style='cute-babies-and-animals-together-v4',visual_action=motion_text,story_action=plan_scene(motion_text,i)))
     outline=written['outline']
     song = dict(title=outline['title'], lyrics='\n'.join(scene['lyric'] for scene in scenes),duration=seconds,
         song_form=SONG_FORM, lighting=lighting,
-        prompt='Joyful kids dance song with a catchy verse-chorus structure. Starts instantly on the first beat with the full high-energy chorus, no instrumental intro. Cute sweet adult female singing voice, clear English diction, playful dudi dudi dam dam chorus, C major, 120 BPM, bouncy ukulele, bright xylophone, steady handclaps and gentle bass. Continuous lively instrumental backing under every vocal line, no silent breaks, no stop-start pauses, no shouting.',
+        prompt='Joyful kids dance song with a catchy verse-chorus structure. Starts instantly on the first beat with the full high-energy chorus, no instrumental intro. Cute sweet adult female singing voice, clear English diction, playful dudi dudi dam dam chorus, C major, 130 BPM, bouncy ukulele, bright xylophone, steady handclaps and gentle bass. Continuous lively instrumental backing under every vocal line, no silent breaks, no stop-start pauses, no shouting.',
         description=outline['description'],story_summary=outline['story_summary'],
         visual_identity=dict(characters=outline.get('characters',''), world=outline.get('visual_world','')),
         lyric_writer=dict(backend='local-qwen-cpu',version=written['writer_version'],novelty_checked=True),
-        vocal_gender='female',song_date=day,scenes=scenes,bpm=120,
+        vocal_gender='female',song_date=day,scenes=scenes,bpm=130,
         audio_mastering='continuous-kids-mix-v2',
         tags=['Dudi Dam TV','kids rhymes','nursery rhymes','Dudi Dudi Dam Dam','kids dance'])
     validate_storyboard(song)

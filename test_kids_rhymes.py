@@ -49,16 +49,16 @@ class KidsTests(unittest.TestCase):
             self.assertEqual(len(song['scenes']),seconds//5)
             self.assertEqual(song['vocal_gender'],'female')
             validate_duration(seconds)
-            self.assertEqual(song['bpm'],120)
-            self.assertIn('120 BPM',song['prompt'])
+            self.assertEqual(song['bpm'],130)
+            self.assertIn('130 BPM',song['prompt'])
             self.assertIn('Continuous lively instrumental backing',song['prompt'])
         for seconds in (179,301):
             with self.assertRaises(ValueError):
                 self.song(seconds)
             with self.assertRaises(ValueError):
                 validate_duration(seconds)
-            self.assertEqual(song['bpm'],120)
-            self.assertIn('120 BPM',song['prompt'])
+            self.assertEqual(song['bpm'],130)
+            self.assertIn('130 BPM',song['prompt'])
             self.assertIn('Continuous lively instrumental backing',song['prompt'])
 
     def test_mismatched_storyboard_rejected(self):
