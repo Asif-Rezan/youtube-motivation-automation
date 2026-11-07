@@ -54,7 +54,49 @@ def validate_package(package, song):
     return package
 
 
-def generate_package(song, history=()):
+TAG_BUDGET = 450
+
+
+def repair_package(package, recent=()):
+    """Fix deterministic slips locally instead of re-asking the model.
+
+    Only reorders or drops model-written values; never invents public text.
+    """
+    for kind in ('video','shorts'):
+        meta=package.get(kind)
+        if not isinstance(meta,dict) or not isinstance(meta.get('tags'),list):
+            continue
+        seen,tags,used=set(),[],0
+        for tag in meta['tags']:
+            if not isinstance(tag,str):
+                continue
+            tag=' '.join(tag.split())
+            key=tag.casefold()
+            if not tag or key in seen or used+len(tag)+2>TAG_BUDGET:
+                continue
+            seen.add(key);tags.append(tag);used+=len(tag)+2
+        meta['tags']=tags
+    candidates=package.get('title_candidates')
+    video=package.get('video')
+    if isinstance(candidates,list) and isinstance(video,dict):
+        title=video.get('title')
+        if title not in candidates or title in recent:
+            fresh=[c for c in candidates if isinstance(c,str) and c not in recent]
+            if fresh:
+                video['title']=fresh[0]
+    return package
+
+
+def packaging_issue(error):
+    """Safe diagnostic: locally authored messages, or schema location only."""
+    if isinstance(error,ValidationError):
+        return {'constraint':error.validator,'path':[str(p) for p in error.absolute_path]}
+    if isinstance(error,KeyError):
+        return {'constraint':'missing_field'}
+    return {'constraint':'semantic','reason':str(error)}
+
+
+def generate_package(song, history=(), seed_offset=0):
     from rhyme_writer import request_json
     from lyrics_cpu import StoryGenerationError
     identity=source_identity(song)
@@ -87,16 +129,20 @@ def generate_package(song, history=()):
         'Avoid these recent public titles: '+json.dumps([h.get('public_title',h.get('title','')) for h in history[-20:]])+
         '\nActual episode: '+json.dumps(facts,ensure_ascii=False))
     recent={h.get('public_title',h.get('title','')) for h in history}
+    # Stage-level retries pass a new offset so they don't replay identical seeds.
+    base=(int(identity[:8],16)+seed_offset*104729) % (2**31-10000)
     for attempt in range(3):
-        result=request_json(schema(song),prompt,int(identity[:8],16) % (2**31-10000)+attempt,
-                            budget=2800)
+        result=request_json(schema(song),prompt,base+attempt,budget=2800)
         result.update(version=VERSION,source_sha256=identity)
         try:
+            repair_package(result,recent)
             validate_package(result,song)
             if result['video']['title'] in recent:
                 raise ValueError('Public title repeats an earlier episode')
             return result
         except (ValueError,KeyError,ValidationError) as error:
+            print(json.dumps({'check':'episode packaging retry','attempt':attempt+1,
+                **packaging_issue(error)}),flush=True)
             prompt += '\nRepair the package: '+str(error)
     raise StoryGenerationError('Episode packaging validation exhausted; saved lyrics retained',
                                code='episode_packaging',retryable=True)

@@ -13,7 +13,7 @@ from music_cpu import generate
 import os
 
 
-def prepare(run_id, stage='all', check_history=False, vocal_gender='female'):
+def prepare(run_id, stage='all', check_history=False, vocal_gender='female', retry=0):
     if vocal_gender not in ('auto', 'male', 'female'):
         raise ValueError('Vocal choice must be auto, male or female')
     if not re.fullmatch(r'[a-zA-Z0-9_-]{1,80}', run_id):
@@ -58,7 +58,7 @@ def prepare(run_id, stage='all', check_history=False, vocal_gender='female'):
         if song.get('packaging'):
             validate_package(song['packaging'],song)
         else:
-            song['packaging']=generate_package(song,history)
+            song['packaging']=generate_package(song,history,seed_offset=retry)
             temp=root/'song.packaged.tmp'
             temp.write_text(json.dumps(song,ensure_ascii=False,indent=2))
             temp.replace(root/'song.json')
@@ -110,7 +110,7 @@ def prepare_with_retries(run_id, stage='all', check_history=False, vocal_gender=
     from lyrics_cpu import StoryGenerationError
     for attempt in range(3):
         try:
-            result=prepare(run_id,stage,check_history=check_history,vocal_gender=vocal_gender)
+            result=prepare(run_id,stage,check_history=check_history,vocal_gender=vocal_gender,retry=attempt)
             failure=Path('output')/run_id/'failure.json'
             if failure.exists():
                 try:

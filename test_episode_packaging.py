@@ -52,7 +52,40 @@ class EpisodePackagingTests(unittest.TestCase):
     def test_invalid_semantic_output_retries_then_reports_safe_failure(self):
         from lyrics_cpu import StoryGenerationError
         song=self.song();bad=fixture_package(song)
-        bad['video']['tags']=['x'*40+str(i) for i in range(15)]
+        bad['video']['tags']=['spam']*6
         with patch('rhyme_writer.request_json',return_value=bad) as model:
-            with self.assertRaises(StoryGenerationError):generate_package(song)
+            with patch('builtins.print') as log:
+                with self.assertRaises(StoryGenerationError):generate_package(song)
         self.assertEqual(model.call_count,3)
+        retries=[c.args[0] for c in log.call_args_list if 'episode packaging retry' in c.args[0]]
+        self.assertEqual(len(retries),3)
+        self.assertIn('minItems',retries[0])
+
+    def test_fixable_slips_are_repaired_without_another_model_call(self):
+        song=self.song();package=fixture_package(song)
+        package['video']['title']='Not one of the candidates at all'
+        package['video']['tags']=['Kids Song','kids song']+['x'*39+str(i) for i in range(13)]
+        with patch('rhyme_writer.request_json',return_value=package) as model:
+            result=generate_package(song)
+        model.assert_called_once()
+        self.assertIn(result['video']['title'],result['title_candidates'])
+        tags=result['video']['tags']
+        self.assertEqual(len({t.casefold() for t in tags}),len(tags))
+        self.assertLessEqual(sum(len(t)+2 for t in tags),450)
+
+    def test_title_used_before_switches_to_fresh_candidate(self):
+        song=self.song();package=fixture_package(song)
+        used=package['video']['title']
+        with patch('rhyme_writer.request_json',return_value=package) as model:
+            result=generate_package(song,[{'public_title':used}])
+        model.assert_called_once()
+        self.assertNotEqual(result['video']['title'],used)
+
+    def test_stage_retry_uses_different_seeds(self):
+        song=self.song()
+        seeds=[]
+        for offset in (0,1):
+            with patch('rhyme_writer.request_json',return_value=fixture_package(song)) as model:
+                generate_package(song,seed_offset=offset)
+            seeds.append(model.call_args.args[2])
+        self.assertNotEqual(seeds[0],seeds[1])
