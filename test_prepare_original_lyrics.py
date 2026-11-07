@@ -11,13 +11,13 @@ from rhyme_writer import VERSION
 
 def fixture_song():
     scenes=[]
-    for i in range(96):
+    for i in range(48):
         # Test data only; each original line remains distinguishable after normalization.
         suffix=chr(97+(i//2)//26)+chr(97+(i//2)%26)
         scenes.append(dict(index=i,start=i*5,end=(i+1)*5,
             lyric=REFRAIN if i%2 else f'Little {suffix} ducklings gather purple daisies',prompt='Friendly duckling and bunny exploring a bright flower garden'))
     return dict(title='A Brand New Daisy Adventure',description='Friendly ducklings discover bright flowers and learn to care for a gentle garden.',
-        prompt='Female nursery rhyme',duration=480,vocal_gender='female',story_summary='A duck and bunny plant daisies together.',
+        prompt='Female nursery rhyme',duration=240,vocal_gender='female',story_summary='A duck and bunny plant daisies together.',
         lyric_writer={'version':VERSION},scenes=scenes,lyrics='\n'.join(s['lyric'] for s in scenes))
 
 class PrepareOriginalTests(unittest.TestCase):
@@ -34,7 +34,7 @@ class PrepareOriginalTests(unittest.TestCase):
                 writer.assert_called_once()
                 key,entries=store.save.call_args.args
                 self.assertEqual(key,'lyrics-history.json')
-                self.assertEqual(len(entries[0]['verse_lines']),48)
+                self.assertEqual(len(entries[0]['verse_lines']),24)
                 self.assertEqual(entries[0]['run'],'original-test')
                 saved=json.loads(Path('output/original-test/song.json').read_text())
                 self.assertEqual(saved['lyric_writer']['version'],VERSION)

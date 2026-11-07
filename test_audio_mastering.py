@@ -75,7 +75,7 @@ class MusicGapRetryTests(unittest.TestCase):
         from audio_mastering import VERSION
         fixture=test_kids_rhymes.KidsTests();fixture.setUp()
         try:
-            song=fixture.song(600)
+            song=fixture.song(240)
         finally:
             fixture.doCleanups()
         with tempfile.TemporaryDirectory() as tmp:
@@ -87,7 +87,7 @@ class MusicGapRetryTests(unittest.TestCase):
             def master(parts,path,seconds):path.write_bytes(b'final mix')
             with patch('music_cpu.generate_segment',side_effect=generate) as model,patch('audio_mastering.verify_continuity',side_effect=[AudioGapError('gap'),None,None,None,None,None]),patch('audio_mastering.master_parts',side_effect=master),patch('pipeline.duration',return_value=120),patch('kids_rhymes.subprocess.run',side_effect=normalize):
                 kids_rhymes.generate_music(song,target,state,Mock())
-            self.assertEqual(model.call_count,6)
+            self.assertEqual(model.call_count,3)
             self.assertEqual(model.call_args_list[0].args[1],model.call_args_list[1].args[1])
             self.assertEqual(state['parts']['0']['continuity_retries'],1)
             self.assertEqual(state['mastering_version'],VERSION)

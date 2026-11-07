@@ -3,7 +3,9 @@ import hashlib
 import json
 from jsonschema import Draft202012Validator, ValidationError
 
-VERSION = 'episode-seo-packaging-v1'
+VERSION = 'episode-seo-packaging-v2-opening-thumbnail'
+# Titles that imitate other channels' songs attract viewers who expect that song.
+LOOKALIKE_TITLES = ('dodi dodi','duri duri','duty duty','dum dum')
 
 
 def metadata_schema():
@@ -22,6 +24,44 @@ def candidate_scenes(song):
     return [song['scenes'][i] for i in sorted(indexes)]
 
 
+def thumbnail_scenes(song):
+    # Verse-chorus episodes open on the thumbnail scene, so the first frames match the click.
+    if song.get('song_form'):
+        return [0]
+    return [s['index'] for s in candidate_scenes(song)]
+
+
+def chapter_text(song):
+    """Real YouTube chapters from the storyboard sections (each at least 20 seconds)."""
+    rows,verse=[],0
+    scenes=song.get('scenes',[])
+    for i,scene in enumerate(scenes):
+        section=scene.get('section')
+        if not section or (i and scenes[i-1].get('section')==section):
+            continue
+        if section=='verse':
+            verse+=1
+            words=' '.join(scene['lyric'].split()[:6]).rstrip('.!?')
+            rows.append(f"{scene['start']//60}:{scene['start']%60:02d} Verse {verse}: {words[:1].upper()+words[1:]}")
+        elif not rows:
+            hook=song.get('hook') or 'Dudi Dudi Dam Dam'
+            rows.append('0:00 '+hook[:1].upper()+hook[1:].rstrip('.!?')+' dance chorus')
+    return '\n'.join(rows) if len(rows)>=3 else ''
+
+
+def add_chapters(package, song):
+    chapters=chapter_text(song)
+    video=package.get('video')
+    if not chapters or not isinstance(video,dict) or not isinstance(video.get('description'),str):
+        return package
+    if chapters in video['description']:
+        return package
+    room=1800-len(chapters)-2
+    body=video['description'][:room].rstrip()
+    video['description']=body+'\n\n'+chapters
+    return package
+
+
 def schema(song):
     return {'type':'object','additionalProperties':False,
         'required':['title_candidates','video','shorts','thumbnail'],
@@ -30,7 +70,7 @@ def schema(song):
                                 'items':{'type':'string','minLength':10,'maxLength':100}},
             'video':metadata_schema(),'shorts':metadata_schema(),
             'thumbnail':{'type':'object','additionalProperties':False,'required':['scene_index','focus'],
-                         'properties':{'scene_index':{'type':'integer','enum':[s['index'] for s in candidate_scenes(song)]},
+                         'properties':{'scene_index':{'type':'integer','enum':thumbnail_scenes(song)},
                                        'focus':{'type':'string','minLength':15,'maxLength':180}}}}}
 
 
@@ -57,6 +97,10 @@ def validate_package(package, song):
 TAG_BUDGET = 450
 
 
+def lookalike(title):
+    return isinstance(title,str) and any(word in title.casefold() for word in LOOKALIKE_TITLES)
+
+
 def repair_package(package, recent=()):
     """Fix deterministic slips locally instead of re-asking the model.
 
@@ -80,8 +124,8 @@ def repair_package(package, recent=()):
     video=package.get('video')
     if isinstance(candidates,list) and isinstance(video,dict):
         title=video.get('title')
-        if title not in candidates or title in recent:
-            fresh=[c for c in candidates if isinstance(c,str) and c not in recent]
+        if title not in candidates or title in recent or lookalike(title):
+            fresh=[c for c in candidates if isinstance(c,str) and c not in recent and not lookalike(c)]
             if fresh:
                 video['title']=fresh[0]
     return package
@@ -101,26 +145,33 @@ def generate_package(song, history=(), seed_offset=0):
     from lyrics_cpu import StoryGenerationError
     identity=source_identity(song)
     facts={k:song.get(k) for k in ('title','description','story_summary','visual_identity','duration')}
-    facts['verse_lyrics']=[s['lyric'] for s in song['scenes'] if s['lyric'] != 'dudi dudi dam dam dudi dudi dam']
-    facts['refrain']='dudi dudi dam dam dudi dudi dam'
+    from rhyme_writer import chorus_line, CHORUS
+    chorus=song.get('chorus') or list(CHORUS)
+    facts['verse_lyrics']=[s['lyric'] for s in song['scenes'] if not chorus_line(s['lyric'],chorus)]
+    facts['chorus']=chorus
     facts['scenes']=[dict(index=s['index'],lyric=s['lyric'],action=s.get('visual_action',s['prompt'])[:180]) for s in candidate_scenes(song)]
     prompt=(
         'Create an original truthful YouTube title/thumbnail package for this English kids nursery rhyme. '
         'Use only the supplied lyrics, cast, setting and actions. No invented animals, lessons, events, '
         'educational guarantees, views, popularity, trend/search-volume claims or celebrity/cartoon brands. '
-        'The sung Dudi refrain is intentional. Public metadata must differ between episodes. '
-        'Write three distinct concise title candidates, ideally 45-75 characters. Front-load the actual '
-        'story action or animal keyword, and naturally include a relevant search phrase such as Kids Dance Song '
-        'or Nursery Rhyme. Avoid stuffing all keywords, ALL CAPS or clickbait. Choose the strongest honest '
-        'title-thumbnail pair for video.title, exactly one of title_candidates. '
-        'Write a unique video description: first two sentences describe the actual episode and its viewer '
-        'payoff, then a short natural summary of real actions; mention the Dudi refrain and AI-made music '
-        'and illustrations. No unrelated song names, fabricated timestamps, subscription requests or spam. '
-        'Generate 5-15 distinct relevant tags, mixing actual story/animal terms and broad kids rhyme terms; '
-        'each at most 40 characters, combined under 450 characters. Tags are secondary discovery metadata. '
+        'The sung chorus hook is this episode\'s own and may appear in the title. Public metadata must differ between episodes. '
+        'SEO title rules: write three distinct title candidates of 45-70 characters. Start with the main '
+        'search phrase parents type, built from the real animal and action, e.g. "Baby Bunny Dance Song for Kids". '
+        'Then a pipe and a broad phrase such as Nursery Rhymes, Kids Songs or Toddler Dance, optionally '
+        '"| Dudi Dam TV" at the end. Never use other channels\' song names or sound-alikes such as '
+        'Dodi Dodi, Duri Duri, Duty Duty or Dum Dum. No ALL CAPS, emoji spam or clickbait. Choose the '
+        'strongest honest title-thumbnail pair for video.title, exactly one of title_candidates. '
+        'SEO description rules: the first 150 characters repeat the main search phrase naturally and say '
+        'what children see and do; then 2-4 short sentences summarizing the real story, cast and dance moves, '
+        'a line that music and illustrations are AI-made, and finally exactly three relevant hashtags such as '
+        '#KidsSongs #NurseryRhymes and one animal hashtag. Do not write timestamps; real chapters are added. '
+        'No unrelated song names, subscription requests, keyword lists or spam. '
+        'Generate 8-15 distinct tags: the main search phrase, animal plus song/dance variants, toddler and '
+        'nursery rhyme terms, and Dudi Dam TV; each at most 40 characters, combined under 450 characters. '
         'For shorts, write a separate title, description and tags based ONLY on scenes 0-7 (first 40 seconds), '
         'not later events. A short may use #Shorts once. '
-        'For thumbnail, choose one actual scene_index with a clear appealing baby-and-animal interaction. '
+        'For thumbnail, use scene_index 0 when it is the only allowed value: the video opens on that exact '
+        'dance scene, so the thumbnail must show the same cast, setting, lighting and colors. '
         'Write a compact focus describing the existing characters/emotion and real prop/action to emphasize; '
         'do not introduce a new cast, outfit, environment or disconnected disco-party scene. '
         'Aim for readable large faces, clear silhouettes, one focal interaction, color contrast and simple '
@@ -139,6 +190,10 @@ def generate_package(song, history=(), seed_offset=0):
             validate_package(result,song)
             if result['video']['title'] in recent:
                 raise ValueError('Public title repeats an earlier episode')
+            for kind in ('video','shorts'):
+                if lookalike(result[kind]['title']):
+                    raise ValueError('Title imitates another channel song name; use this episode story')
+            add_chapters(result,song)
             return result
         except (ValueError,KeyError,ValidationError) as error:
             print(json.dumps({'check':'episode packaging retry','attempt':attempt+1,

@@ -15,25 +15,25 @@ from test_episode_packaging import fixture_package
 class ThumbnailReferenceTests(unittest.TestCase):
     def song(self):
         fixture=test_kids_rhymes.KidsTests();fixture.setUp()
-        try:return fixture.song(480)
+        try:return fixture.song(240)
         finally:fixture.doCleanups()
 
     def test_thumbnail_references_its_own_episode_scene_not_external_pool(self):
-        song=self.song();song['packaging']=fixture_package(song,anchor=19)
+        song=self.song();song.pop('song_form');song['packaging']=fixture_package(song,anchor=18)
         plans=image_plan(song);thumbnail=plans[-1]
-        self.assertEqual(thumbnail['reference_scene'],'scene-019')
+        self.assertEqual(thumbnail['reference_scene'],'scene-018')
         self.assertNotIn('reference_image',thumbnail)
-        self.assertIn(song['scenes'][19]['prompt'],thumbnail['prompt'])
-        self.assertEqual(plan_shard(thumbnail,len(plans)-1,16),19%16)
+        self.assertIn(song['scenes'][18]['prompt'],thumbnail['prompt'])
+        self.assertEqual(plan_shard(thumbnail,len(plans)-1,16),18%16)
         self.assertTrue(all('reference_scene' not in p for p in plans[:-1]))
         with patch.dict(os.environ,IMAGE_VARIANT='portrait'):
             self.assertTrue(all('reference_scene' not in p for p in image_plan(song)))
 
     def test_sharded_thumbnail_waits_for_local_anchor_and_retries_use_cache(self):
-        song=self.song();song['packaging']=fixture_package(song,anchor=19)
+        song=self.song();song.pop('song_form');song['packaging']=fixture_package(song,anchor=18)
         def worker(prompt,target,**kwargs):
             if 'reference_image' in kwargs:
-                self.assertEqual(kwargs['reference_image'].name,'scene-019-source.png')
+                self.assertEqual(kwargs['reference_image'].name,'scene-018-source.png')
                 self.assertTrue(kwargs['reference_image'].exists())
             Image.new('RGB',(32,18),'pink').save(target)
         with tempfile.TemporaryDirectory() as tmp,patch('image_cpu.generate',side_effect=worker) as generate:
