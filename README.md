@@ -401,3 +401,30 @@ visibility. Landscape walking, portrait running and a single travelling hop were
 rendered/fully decoded into a 15-second review at
 `output/travelling-motion/review/motion-review.mp4`. Apply to new generation runs;
 no production generation was started by this update.
+
+
+### 2026-11-10 — movement needs a purpose and target
+
+Supersedes the previous generic cast traverse (`5357334`). Movement intent is now
+explicit in the saved story plan: approach a waiting friend to greet/share/help,
+follow a leading friend, or approach the renderer's visible ball. Approaching
+assigns one mover and one stationary receiver using left/right cutout geometry;
+the mover stops at a safe gap, then transitions to a greeting pose. Followers
+start after the spatial leader. Ordinary dance and unmotivated walking do not
+send the whole cast sideways. Missing/ambiguous targets do not invent a partner.
+
+Verse visual instructions request the actor, destination and reason, retaining
+the lyric meaning. Chorus movement alternates gathering to join the dance,
+local dancing, and following a friend along the garden path. Image prompts stage
+approaching friends with a clear walkway. Clip metadata records purpose, mover/
+receiver roles and route displacement. Expensive extraction layers are reused;
+the animation version invalidates old motion clips for new renders.
+
+Validation: 219 local unit/regression tests passed, including target-directed
+motion, stationary receivers, safe stopping distance, delayed followers without
+crossing, no drift without a purpose, singleton/ambiguous-target handling, and
+fixed-camera proof. A 15-second decoded review shows approach/share, follow, and
+ball-seeking at `output/purposeful-motion/review/motion-review.mp4`. Its first
+example uses extra starting separation on the saved art for clarity. This remains
+2D cutout animation, not new handover/pickup synthesis or skeletal 3D running.
+No production video was generated or published by this update.

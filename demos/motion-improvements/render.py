@@ -9,15 +9,15 @@ import time
 from PIL import Image,ImageOps,ImageDraw
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]))
-from scene_actions import actor_parts,compose_scene,plan_scene,actor_profile
+from scene_actions import actor_parts,compose_scene,plan_scene,actor_profile,stage_scene
 
 
 def render(assets,output,baseline=None):
     output.mkdir(parents=True,exist_ok=True)
     root=next(assets.glob('*/characters'))
-    configurations=[('landscape-cast','scene-112-source',(1024,576),'walk and clap dance 130 BPM'),
-                    ('portrait-cast','scene-112-source',(576,1024),'run and dance 130 BPM'),
-                    ('landscape-single','scene-000-source',(1024,576),'hop dance 130 BPM')]
+    configurations=[('landscape-cast','scene-112-source',(1024,576),'left friend walks toward waiting friend to share a leaf 130 BPM'),
+                    ('portrait-cast','scene-112-source',(576,1024),'friends run to follow the leader along the garden path 130 BPM'),
+                    ('landscape-single','scene-000-source',(1024,576),'walk to fetch the ball 130 BPM')]
     report=[]
     clips=[]
     contact=Image.new('RGB',(960,540*len(configurations)),'white')
@@ -38,6 +38,10 @@ def render(assets,output,baseline=None):
         parts=actor_parts(fg)
         if 'cast' in name and len(parts)<2:
             raise RuntimeError('Multi-character fixture did not preserve both actors')
+        if row==0:
+            subject,bbox,rig=parts[0]
+            shift=min(round(size[0]*.14),bbox[0]-round(size[0]*.03))
+            parts[0]=(subject,(bbox[0]-shift,bbox[1],bbox[2]-shift,bbox[3]),rig)
         plan=plan_scene(prompt,row)
         frames=[]
         measurements={}
@@ -51,7 +55,10 @@ def render(assets,output,baseline=None):
         proc=subprocess.Popen(args,stdin=subprocess.PIPE)
         started=time.perf_counter()
         for frame in range(125):
-            im=compose_scene(bg,parts,plan,frame/25)
+            im=compose_scene(bg,parts,plan,frame/25,camera=row!=0)
+            labels=('Approach waiting friend to share leaf','Follow the leader along the path','Approach the visible ball')
+            draw=ImageDraw.Draw(im);draw.rectangle((0,0,size[0],30),fill=(25,35,55))
+            draw.text((10,7),labels[row],fill='white')
             proc.stdin.write(im.tobytes())
             if frame in (0,35,65,100,124):
                 im.save(output/f'{name}-{frame:03d}.jpg')
@@ -65,7 +72,8 @@ def render(assets,output,baseline=None):
         for column,im in enumerate(frames):
             im=ImageOps.contain(im,(480,500));contact.paste(im,(column*480,row*540+30))
             ImageDraw.Draw(contact).text((column*480+8,row*540+8),f'{name}: {"start" if column==0 else "end"}',fill='black')
-        report.append(dict(scene=name,dimensions=size,actors=len(parts),profiles=[actor_profile(plan,i,len(parts)) for i in range(len(parts))],
+        report.append(dict(scene=name,dimensions=size,actors=len(parts),intent=plan.get('intent'),purpose=plan.get('purpose'),
+                           roles=[{k:v for k,v in local.items() if k in ('role','target_actor','route_dx','route_start','route_end','prop_target')} for local,_ in stage_scene(plan,parts,size)],profiles=[actor_profile(plan,i,len(parts)) for i in range(len(parts))],
                            render_seconds=round(elapsed,2),**measurements))
         # Review reel uses landscape framing with the portrait clip contained.
         reel=output/f'{name}-reel.mp4'

@@ -49,16 +49,21 @@ def episode_lighting(outline):
     return 'bright sunny daytime'
 from scene_actions import plan_scene
 
-def scene_prompt(row,outline,dance=False,lighting=None,pose=None):
+def scene_prompt(row,outline,dance=False,lighting=None,pose=None,motion=None):
     """Restore the original soft animal-led look, with children as companions."""
     cast=outline.get('characters','')
     animals=list(dict.fromkeys(re.findall(r'\b(bunny|rabbit|hare|duckling|duck|chick|puppy|dog|kitten|cat|turtle|elephant|panda|lamb|fox|bear|deer|calf|penguin|squirrel)\b',cast,re.I)))[:2]
     subjects=' and '.join('baby '+animal.lower() for animal in animals) or 'cute baby animal friends'
     action = ((pose or CHORUS_POSES[0]) if dance
               else 'All play together. ' + row['visual'])
+    staging=''
+    if motion and motion.get('intent')=='approach_friend':
+        staging='The leftmost friend starts a few steps apart from the waiting friend on the right, facing that friend across a clear walkway. '
+    elif motion and motion.get('intent')=='follow_friend':
+        staging='The friends form a spaced line following the same garden path, with a clear leading friend. '
     return ('Cute colorful 3D storybook cartoon. Two cute human toddlers in colorful clothes '
         'beside adorable '+subjects+'. Both babies and animals equally prominent, '
-        'separate full bodies, smiling faces, visible hands and feet. '+action+' '
+        'separate full bodies, smiling faces, visible hands and feet. '+action+' '+staging+
         'Keep the group inside the central two-thirds of the frame, with open ground on both sides for walking and running. '
         'Feet meet the same visible ground plane, never floating above the path. '
         'Dreamy natural flower garden, soft light, rounded shapes, pastel colors. '
@@ -94,10 +99,15 @@ def make_song(day, history, draft_path=None, generation_id=None, vocal_gender_ov
                 row, lyric, dance = {}, chorus[j % len(chorus)], True
                 # Chorus words pick literal moves: clapping, then jumping and spinning.
                 motion_text = 'Two human toddlers and cute baby animals dancing together, '+lyric
+                if j % 4 == 0:
+                    motion_text += '. The left friend walks toward the waiting friend to join the dance'
+                elif j % 4 == 2:
+                    motion_text += '. Friends follow the leader along the garden dance path'
             motion_text += ' at 130 BPM'
+            motion=plan_scene(motion_text,i)
             scenes.append(dict(index=i,start=i*5,end=(i+1)*5,lyric=lyric,section=kind,
-                prompt=scene_prompt(row,outline,dance,lighting,CHORUS_POSES[i % len(CHORUS_POSES)] if dance else None),
-                cast_style='cute-babies-and-animals-together-v4',visual_action=motion_text,story_action=plan_scene(motion_text,i)))
+                prompt=scene_prompt(row,outline,dance,lighting,CHORUS_POSES[i % len(CHORUS_POSES)] if dance else None,motion=motion),
+                cast_style='cute-babies-and-animals-together-v4',visual_action=motion_text,story_action=motion))
     outline=written['outline']
     song = dict(title=outline['title'], lyrics='\n'.join(scene['lyric'] for scene in scenes),duration=seconds,
         song_form=SONG_FORM, lighting=lighting,

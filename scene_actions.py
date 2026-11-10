@@ -9,7 +9,7 @@ import re
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
 
-VERSION = 'scene-stories-v12-travelling-choreography'
+VERSION = 'scene-stories-v13-purposeful-interactions'
 OPENING_SCENES = 3  # first 15 seconds
 BODY_VARIANTS = ('wave', 'waist', 'step', 'hop', 'tummy', 'jelly', 'clap', 'penguin')
 SWITCH_AT = 2.5
@@ -21,8 +21,33 @@ def smooth(value):
     return value * value * (3 - 2 * value)
 
 
+def movement_intent(prompt):
+    """Only choose spatial goals grounded in literal scene actions."""
+    text=prompt.lower()
+    words=set(re.findall(r'[a-z]+',text))
+    if re.search(r'\b(in place|stay still|stand still|both friends wait)\b',text):
+        return None,None
+    friend_goal=bool(words & {'friend','friends','companion','companions','buddy','buddies','leader'} or {'left','right'}<=words or 'each other' in text)
+    if words & {'sleep','sleeping','rest','resting'} and not words & {'walk','walks','walking','run','runs','running','approach','approaches','toward','towards'}:
+        return None,None
+    if friend_goal and words & {'follow','follows','following','lead','leads','leading','chase','chases','chasing'}:
+        return 'follow_friend','follow the leading friend'
+    if words & {'ball'} and words & {'fetch','fetches','fetching','collect','collects','kick','roll','rolling','catch'}:
+        return 'approach_ball','reach the visible ball'
+    reasons=[({'share','shares','sharing','give','gives','giving','offer','offers','offering','bring','brings'},'share with the waiting friend'),
+             ({'help','helps','helping'},'help the waiting friend'),
+             ({'greet','greets','greeting','hello','meet','meets','meeting','join','joins','joining'},'greet or join the waiting friend')]
+    for cues,reason in reasons:
+        if friend_goal and words & cues:
+            return 'approach_friend',reason
+    if words & {'friend','friends','companion','companions'} and words & {'toward','towards','approach','approaches','approaching'}:
+        return 'approach_friend','reach the waiting friend'
+    return None,None
+
+
 def plan_scene(prompt, index=0):
     words = set(re.findall(r'[a-z]+', prompt.lower()))
+    intent,purpose=movement_intent(prompt)
     if words & {'run','runs','running','walk','walks','walking','chase','chasing','dance','dances','dancing','clap','claps','clapping','bounce','bounces','bouncing','wiggle','wiggling','twirl','twirling','stomp','stomping','tummy','belly','jelly','penguin','peekaboo','leader','bob','flop','spin','spinning','rotate','rotation','balloons','fireflies','ripple'}:
         kind, prop, action = 'dance', None, 'dance'
     elif words & {'sleep', 'sleepy', 'sleeping', 'bed', 'night', 'moon'}:
@@ -66,7 +91,14 @@ def plan_scene(prompt, index=0):
     locomotion=('run' if words & {'run','runs','running','chase','chasing'} else
                 'walk' if words & {'walk','walks','walking'} else
                 'hop' if variant in ('hop','jelly','ripple_hop') else 'side_step') if kind=='dance' else None
+    if intent:
+        locomotion=locomotion or ('hop' if words & {'hop','hopping','jump','jumping'} else 'walk')
+        if intent in ('approach_friend','follow_friend'):
+            prop=None
+    else:
+        locomotion=None  # No unexplained drift for ordinary dance or standing.
     return dict(version=VERSION, kind=kind, prop=prop, action=action, dance_variant=variant,beat_seconds=60/bpm,
+                intent=intent,purpose=purpose,
                 locomotion=locomotion,
                 beat_origin=index*5, switch_at=switch_at,
                 second_variant=second, opening=index<OPENING_SCENES,
@@ -174,6 +206,10 @@ def draw_prop(canvas, plan, t, anchor, travel):
     y=anchor[1] + h*.025*math.sin(t*4)
     size=max(5,round(min(w,h)*.025))
     d=ImageDraw.Draw(canvas)
+    if plan.get('prop_target') and plan['prop']=='ball':
+        x,y=plan['prop_target']
+        d.ellipse((x-size,y-size,x+size,y+size),fill=(255,181,78,255),outline=(232,120,106,255),width=2)
+        return
     if plan['prop']=='butterfly':
         flap=.22+.78*abs(math.sin(t*12))
         wing=max(2,round(size*flap))
@@ -375,7 +411,9 @@ def draw_environment_effect(canvas, plan, t):
 
 def travel_offset(size, bounds, plan, t):
     """One smooth on-ground path, constrained by the complete cast's free room."""
-    if not plan.get('locomotion'):
+    if 'route_dx' in plan:
+        return plan['route_dx']*smooth((t-plan.get('route_start',.7))/(plan.get('route_end',3.4)-plan.get('route_start',.7)))
+    if not plan.get('locomotion') or plan.get('intent')!='follow_friend':
         return 0.
     w,h=size
     left,top,right,bottom=bounds
@@ -386,6 +424,55 @@ def travel_offset(size, bounds, plan, t):
     running=plan['locomotion']=='run'
     distance=min(room,w*(.32 if running else .25))
     return direction*distance*smooth((t-.2)/(3.3 if running else 4.2))
+
+
+def stage_scene(plan, parts, size):
+    """Assign geometry-based roles; do not guess names/species from cutouts."""
+    w,h=size
+    routes=[]
+    for i,part in enumerate(parts):
+        profile=actor_profile(plan,i,len(parts))
+        local=dict(plan,route_dx=0.,role='participant',target_actor=None)
+        if plan.get('intent'):
+            profile=dict(actor_profile(dict(plan,action='dance'),i,len(parts)),movement='wait')
+            local['role']='waiting_friend'
+        routes.append((local,profile))
+    intent=plan.get('intent')
+    if intent=='approach_friend' and len(parts)>=2:
+        # Nearest spatial neighbor is reliable; semantic identity is not inferred.
+        mover,target=parts[0][1],parts[1][1]
+        gap=max(0,target[0]-mover[2]-max(8,w*.025))
+        local,profile=routes[0]
+        local.update(route_dx=gap,role='approaching_friend',target_actor=1,
+                     dance_variant='step',second_variant='wave',switch_at=3.4)
+        profile.update(movement='dance',variant='step')
+    elif intent=='follow_friend' and parts:
+        bounds=(min(x[1][0] for x in parts),min(x[1][1] for x in parts),
+                max(x[1][2] for x in parts),max(x[1][3] for x in parts))
+        base=dict(plan);base.pop('route_dx',None)
+        distance=travel_offset(size,bounds,base,5.)
+        order=list(range(len(parts))) if distance<0 else list(reversed(range(len(parts))))
+        for rank,i in enumerate(order):
+            local,profile=routes[i]
+            lag=rank*plan.get('beat_seconds',.6)*.5
+            local.update(route_dx=distance,route_start=.5+lag,route_end=3.3+lag,
+                         role='leader' if rank==0 else 'follower',target_actor=None if rank==0 else order[rank-1])
+            profile.update(movement='dance',variant='step')
+    elif intent=='approach_ball' and parts:
+        box=parts[0][1]
+        left=max(w*.025,box[0]-w*.25)
+        right=min(w*.975,parts[1][1][0]-w*.03 if len(parts)>1 else w*.975)
+        side=1 if right-box[2]>box[0]-left else -1
+        room=max(0,right-box[2] if side>0 else box[0]-left)
+        distance=max(0,room-w*.055)*.75
+        target_x=(box[2] if side>0 else box[0])+side*(distance+w*.04)
+        for local,_ in routes:
+            local['prop_target']=(target_x,box[3]-h*.025)
+        local,profile=routes[0]
+        local.update(route_dx=side*distance,role='ball_seeker',prop='ball',dance_variant='step',
+                     second_variant='wave',switch_at=3.4)
+        profile.update(movement='dance',variant='step')
+    return routes
 
 
 def travel_feet(size,bounds,plan,t,delay=0.):
@@ -419,7 +506,7 @@ def compose_frame(bg, subject, bbox, plan, t, rig=None, camera=True, prop=True, 
     plan=dict(plan,direction=direction)
     movement=profile['movement']
     # Group members stay within their own space instead of sliding together.
-    travel=direction*min(w*.10,room_right if direction>0 else room_left) if movement=='approach' else 0
+    travel=0.  # Spatial movement comes from a grounded interaction route only.
     route_bounds=profile.get('route_bounds',bbox)
     if movement=='dance':
         travel=travel_offset(bg.size,route_bounds,plan,t)
@@ -501,9 +588,11 @@ def compose_scene(bg, parts, plan, t, camera=True, environment=True):
     if not parts:
         canvas=background_motion(bg,t) if environment else bg.copy()
         return apply_camera(canvas,(0,0,*bg.size),plan,t) if camera else canvas.convert('RGB')
+    routes=stage_scene(plan,parts,bg.size)
     if len(parts)==1 and camera and environment:
         subject,bbox,rig=parts[0]
-        return compose_frame(bg,subject,bbox,plan,t,rig)
+        local,profile=routes[0]
+        return compose_frame(bg,subject,bbox,local,t,rig,profile=profile)
     canvas=background_motion(bg,t) if environment else bg.copy()
     if environment and plan['kind']=='dance':
         canvas=draw_environment_effect(canvas,plan,t)
@@ -514,11 +603,15 @@ def compose_scene(bg, parts, plan, t, camera=True, environment=True):
     bottom=max(p[1][3] for p in parts)
     # Painter's order follows the feet, independent of animation timing/order.
     for i,(subject,bbox,rig) in sorted(enumerate(parts),key=lambda item:item[1][1][3]):
-        canvas=compose_frame(canvas,subject,bbox,plan,t,rig,camera=False,prop=False,
-            profile=dict(actor_profile(plan,i,len(parts)),route_bounds=(left,top,right,bottom)))
-    draw_prop(canvas,plan,t,((left+right)/2,top+(bottom-top)*.35),w*.10)
-    shift=travel_offset(bg.size,(left,top,right,bottom),plan,t)
-    bounds=(max(0,left+shift),max(0,top),min(w,right+shift),min(h,bottom))
+        local,profile=routes[i]
+        canvas=compose_frame(canvas,subject,bbox,local,t,rig,camera=False,prop=False,
+            profile=dict(profile,route_bounds=(left,top,right,bottom)))
+    prop_plan=routes[0][0]
+    draw_prop(canvas,prop_plan,t,((left+right)/2,top+(bottom-top)*.35),w*.10)
+    shifts=[travel_offset(bg.size,(left,top,right,bottom),local,t) for local,_ in routes]
+    moving_left=min(p[1][0]+dx-p[0].width*.04 for p,dx in zip(parts,shifts))
+    moving_right=max(p[1][2]+dx+p[0].width*.04 for p,dx in zip(parts,shifts))
+    bounds=(max(0,moving_left),max(0,top),min(w,moving_right),min(h,bottom))
     return apply_camera(canvas,bounds,plan,t) if camera else canvas.convert('RGB')
 
 

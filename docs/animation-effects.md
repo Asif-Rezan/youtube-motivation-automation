@@ -13,14 +13,27 @@ Camera pushes/pans ease in and out with cast bounds enforced. There is no hard m
 Animation cache versions invalidate old rendered clips while preserving existing segmentation and background layers. These effects apply to new generation runs using the updated code; already uploaded videos and in-progress runs pinned to an older commit are unchanged.
 
 
-## Travelling choreography
+## Purposeful travelling choreography
 
-Dance roots now move across available ground instead of remaining at one point.
-Walk/run/chase prompts select matching paths; side-step and hop variants also
-travel. Cast members share a bounded ground route to preserve their spacing and
-order. The camera follows their new bounds. Frame-filling artwork has limited
-travel room; future image prompts request open ground on both sides.
+Spatial travel now requires a grounded scene intent. The leftmost friend approaches
+the nearest waiting friend on the right to greet, join, help or share, stopping at
+a safe gap. The waiting friend does not drift with the mover. Following uses a
+spatial leader with delayed followers, preserving order. Ball-seeking routes aim
+at the known ball overlay rendered by this engine and stop nearby.
 
-During walking, stance feet compensate the body's horizontal motion in world
-space, then advance during the swing phase. Running adds a faster traverse and
-small flight cycle. This remains cutout/mesh animation, not anatomical 3D gait.
+Ordinary dance, generic walking without a destination, sleeping and ambiguous
+non-character goals do not trigger whole-group travel. New verse visuals request
+a visible target and reason; chorus phrases alternate gathering to start the
+dance, local dancing and following a leader along the dance path. New image
+prompts stage approaching friends a few steps apart, facing one another.
+
+Roles use detected left/right cutout geometry, not inferred character names or
+species. A single silhouette cannot approach an invisible friend; a cast already
+close together is not pulled apart to manufacture travel. Very tight framing
+limits follow routes. Camera bounds cover each moving or waiting actor.
+
+Walking feet compensate body travel during stance, then advance during swing.
+This remains cutout/mesh animation: no synthesized handover, object pickup,
+anatomical 3D gait or lip-sync is claimed. The preview's first layout uses extra
+starting separation for a clear approach example; production uses its generated
+artwork's actual positions and available gap.
