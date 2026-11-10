@@ -33,6 +33,12 @@ jobs:
           python-version: '3.12'
           cache: pip
       - run: pip install -r requirements.txt -r requirements-lyrics.txt
+      - name: Install FFmpeg for media regression tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version
+          ffprobe -version
       - run: python -m unittest -v
       - name: Write lyrics, storyboard and SEO package with the real CPU model
         run: python -u prepare_music.py --run-id "$SONG_RUN_ID" --stage lyrics

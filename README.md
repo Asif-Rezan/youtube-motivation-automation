@@ -439,3 +439,8 @@ Small gaps now use bounded repair: at most 3.5 seconds per gap, at most 5% total
 Every rejected attempt is retained separately. On resume, saved rejected candidates are revalidated with the new repair policy before expensive inference; good parts remain reusable. Checkpoints include the quality window, last failure, and mastering report. Continuous mastering consumes native parts before prefix truncation so useful audio overrun remains available. Existing v1/v2 song manifests remain supported.
 
 Rollback source before this repair: `517f41087194bf2e20556e3e5a0a90fa37c3279a`. Validation includes a real FFmpeg reproduction of the reported 0.87-second gap, exact output duration and pitch checks, excessive-gap rejection, and saved-part recovery without inference.
+
+
+### 2026-11-10 — generation test dependency fix
+
+Run `42771179403` stopped before lyric generation because the new real-video dissolve regression invoked FFmpeg in the lyrics job, which had not installed it. Full generation and episode-preview lyrics jobs now install and verify both FFmpeg and ffprobe before tests. The media integration test skips on local environments without those optional system tools, matching the audio tests; production CI installs them so the test executes. The previous local suite passed because the development machine already had FFmpeg.
