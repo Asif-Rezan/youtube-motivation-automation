@@ -18,7 +18,7 @@ jobs:
     env:
       SONG_RUN_ID: scene-story-41316394479
       SOURCE_RUN: '41316394479'
-      UPLOAD_MODE: scheduled
+      UPLOAD_MODE: public
       YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
       EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID || vars.EXPECTED_CHANNEL_ID || 'UCztvMrNCT34DO3DtzLPgWaw' }}
       DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
@@ -94,7 +94,7 @@ jobs:
       run_id: scene-story-41316394479
       prepared_music: false
       prepared_portraits: false
-      upload_mode: scheduled
+      upload_mode: public
     secrets: inherit
   facebook:
     name: Optional Facebook episode publication
