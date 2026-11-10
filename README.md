@@ -428,3 +428,14 @@ ball-seeking at `output/purposeful-motion/review/motion-review.mp4`. Its first
 example uses extra starting separation on the saved art for clarity. This remains
 2D cutout animation, not new handover/pickup synthesis or skeletal 3D running.
 No production video was generated or published by this update.
+
+
+### 2026-11-10 — music silence repair and checkpoint recovery
+
+Run `42747638218` failed after three ACE-Step quality attempts: part 1 had an internal silence at 5.01–5.88 seconds. The previous mastering validator rejected every internal gap of at least 0.65 seconds.
+
+Small gaps now use bounded repair: at most 3.5 seconds per gap, at most 5% total internal silence, and at least 90% active audio. Removed sections receive 5 ms fades; pitch-preserving tempo compensation restores the planned duration within the existing 10% budget. Final audio must pass strict silence and duration verification before replacing the output. Larger gaps still fail quality validation and regenerate only the affected part, at most three attempts. This cannot guarantee a valid model performance on every attempt.
+
+Every rejected attempt is retained separately. On resume, saved rejected candidates are revalidated with the new repair policy before expensive inference; good parts remain reusable. Checkpoints include the quality window, last failure, and mastering report. Continuous mastering consumes native parts before prefix truncation so useful audio overrun remains available. Existing v1/v2 song manifests remain supported.
+
+Rollback source before this repair: `517f41087194bf2e20556e3e5a0a90fa37c3279a`. Validation includes a real FFmpeg reproduction of the reported 0.87-second gap, exact output duration and pitch checks, excessive-gap rejection, and saved-part recovery without inference.

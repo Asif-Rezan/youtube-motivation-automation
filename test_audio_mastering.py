@@ -92,7 +92,7 @@ class MusicGapRetryTests(unittest.TestCase):
             self.assertEqual(state['parts']['0']['continuity_retries'],1)
             self.assertEqual(state['mastering_version'],VERSION)
             self.assertEqual(target.read_bytes(),b'final mix')
-            self.assertTrue((root/'part-000.rejected-gap.wav').exists())
+            self.assertTrue((root/'part-000.rejected-gap-1.wav').exists())
 
 
 @unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'),'FFmpeg runtime required')
@@ -102,7 +102,7 @@ class BoundaryRepairTests(unittest.TestCase):
         t=np.arange(40*rate)/rate
         signal=.03*np.sin(2*np.pi*440*t)
         signal[(t<leading)|(t>40-trailing)]=0
-        if internal:signal[(t>=15.466083)&(t<16.857417)]=0
+        if internal:signal[(t>=15.466083)&(t<19.5)]=0
         with wave.open(str(path),'wb') as audio:
             audio.setnchannels(1);audio.setsampwidth(2);audio.setframerate(rate)
             audio.writeframes((signal*32767).astype('<i2').tobytes())
@@ -155,3 +155,63 @@ class BoundaryRepairTests(unittest.TestCase):
             self.assertTrue(state['audio_ready'])
             self.assertEqual(state['recovered_candidate'],'saved-valid.wav')
             self.assertEqual(state['recovery_rejections'][0]['code'],'unreadable_candidate')
+
+
+@unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'),'FFmpeg runtime required')
+class InternalSilenceRepairTests(unittest.TestCase):
+    def source(self,path,seconds,gaps):
+        rate=22050;t=np.arange(round(seconds*rate))/rate
+        data=.03*np.sin(2*np.pi*440*t)
+        for a,b in gaps:data[(t>=a)&(t<b)]=0
+        with wave.open(str(path),'wb') as out:
+            out.setnchannels(1);out.setsampwidth(2);out.setframerate(rate)
+            out.writeframes((data*32767).astype('<i2').tobytes())
+
+    def test_reported_120_second_failure_is_repaired_and_strictly_verified(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);source=root/'source.wav'
+            self.source(source,120,[(5.01,5.88)])
+            window=verify_continuity(source,120)
+            self.assertAlmostEqual(window['internal_trim_seconds'],.87,delta=.01)
+            with self.assertRaises(AudioGapError):
+                verify_continuity(source,120,allow_internal_repair=False)
+            result=master_parts([source],root/'repaired.wav',120)
+            self.assertAlmostEqual(result['tempo_compensation'],119.13/120,delta=.001)
+            strict=verify_continuity(root/'repaired.wav',120,allow_edge_trim=False)
+            self.assertEqual(strict['internal_trim_seconds'],0)
+            with wave.open(str(root/'repaired.wav')) as audio:
+                self.assertAlmostEqual(audio.getnframes()/audio.getframerate(),120,delta=.1)
+                samples=np.frombuffer(audio.readframes(audio.getnframes()),dtype='<i2').reshape(-1,2)[:,0]
+            # Pitch remains near 440 Hz despite restoring the removed duration.
+            chunk=samples[44100:88200];spectrum=np.abs(np.fft.rfft(chunk))
+            self.assertAlmostEqual(np.argmax(spectrum),440,delta=3)
+
+    def test_large_single_gap_and_excessive_total_gaps_are_not_repaired(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            for gaps in ([(80.73,87.52)],[(20,23.1),(60,63.1)]):
+                self.source(root/'bad.wav',120,gaps)
+                with self.assertRaises(AudioGapError):verify_continuity(root/'bad.wav',120)
+
+
+class SavedPartRecoveryTests(unittest.TestCase):
+    def test_rejected_candidate_is_reused_without_cpu_inference(self):
+        import test_kids_rhymes,kids_rhymes
+        fixture=test_kids_rhymes.KidsTests();fixture.setUp()
+        try:song=fixture.song(240)
+        finally:fixture.doCleanups()
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            for i in range(1):(root/f'part-{i:03d}.wav').write_bytes(b'good')
+            (root/'part-001.rejected-gap.wav').write_bytes(b'repairable')
+            def normalize(args,**kwargs):shutil.copyfile(args[args.index('-i')+1],args[-1])
+            def master(parts,path,seconds):path.write_bytes(b'validated master')
+            state={}
+            with patch('pipeline.duration',return_value=120),patch('audio_mastering.verify_continuity',return_value={'internal_trim_seconds':2.96}), \
+                 patch('audio_mastering.master_parts',side_effect=master),patch('kids_rhymes.subprocess.run',side_effect=normalize), \
+                 patch('worker_limits.run_worker',side_effect=AssertionError('Unexpected AI inference')) as inference:
+                kids_rhymes.generate_music(song,root/'song.wav',state,Mock())
+            inference.assert_not_called()
+            self.assertEqual(state['parts']['1']['recovered_candidate'],'part-001.rejected-gap.wav')
+            self.assertTrue(state['parts']['1']['audio_ready'])
+            self.assertEqual((root/'song.wav').read_bytes(),b'validated master')

@@ -6,6 +6,7 @@ import os
 import re
 from pathlib import Path
 import subprocess
+import shutil
 
 from rhyme_writer import write_rhyme, REFRAIN, CHORUS
 SONG_FORM = 'chorus-first-verse-chorus-v2-episode-hook'
@@ -181,7 +182,7 @@ def generate_music(song, target, state, save):
         validate_duration(duration(target))
         return
     # ACE-Step documents up to 600 seconds per request. Short independent parts
-    # keep 8-12 minute episodes within that contract, with no audio looping.
+    # keep episodes within that contract, with no audio looping.
     parts = []
     scenes = song['scenes']
     for i in range(0, len(scenes), 24):
@@ -189,11 +190,26 @@ def generate_music(song, target, state, save):
         part = dict(song, duration=len(group)*5, lyrics=tagged_lyrics(group), _segment=True)
         path = target.parent / f'part-{i//24:03d}.wav'
         part_state = state.setdefault('parts', {}).setdefault(str(i//24), {})
+        if continuous and not path.exists():
+            for candidate in sorted(path.parent.glob(path.stem+'.rejected*.wav'),reverse=True):
+                try:
+                    window=verify_continuity(candidate,part['duration'])
+                except (AudioGapError,subprocess.CalledProcessError,OSError,ValueError):
+                    continue
+                shutil.copyfile(candidate,path)
+                part_state.update(recovered_candidate=candidate.name,quality_window=window)
+                save()
+                print(json.dumps({'phase':'recovered saved music candidate','part':i//24,
+                    'candidate':candidate.name}),flush=True)
+                break
         for attempt in range(3 if continuous else 1):
             generate_segment(part,path,part_state,save)
             try:
                 if continuous:
-                    verify_continuity(path,part['duration'])
+                    part_state['quality_window']=verify_continuity(path,part['duration'])
+                    part_state.update(audio_ready=True,generation_started=False)
+                    part_state.pop('last_quality_error',None)
+                    save()
                 break
             except AudioGapError as error:
                 print(json.dumps({'phase':'retry invalid music part','part':i//24,
@@ -201,10 +217,15 @@ def generate_music(song, target, state, save):
                 part_state['last_quality_error']=dict(code=error.code,detail=str(error))
                 part_state.update(audio_ready=False,continuity_retries=attempt+1)
                 save()
-                path.replace(path.with_suffix('.rejected-gap.wav'))
+                path.replace(path.with_suffix(f'.rejected-gap-{attempt+1}.wav'))
                 if attempt==2:
-                    raise
+                    raise AudioGapError(f'Music part {i//24} failed three quality attempts ({error.code}); saved parts retained. '+str(error),code=error.code) from error
         parts.append(path)
+    if continuous:
+        state['mastering']=master_parts(parts,target,song['duration'])
+        state.update(audio_ready=True,mastering_version=VERSION)
+        save()
+        return
     # Normalize every part to the planned boundary, refusing short generations.
     normalized = []
     for i, path in enumerate(parts):
@@ -214,11 +235,6 @@ def generate_music(song, target, state, save):
         dest = target.parent / f'normalized-{i:03d}.wav'
         subprocess.run(['ffmpeg', '-y', '-i', str(path), '-t', str(requested), '-ar', '44100', '-ac', '2', str(dest)], check=True, capture_output=True)
         normalized.append(dest)
-    if continuous:
-        master_parts(normalized,target,song['duration'])
-        state.update(audio_ready=True,mastering_version=VERSION)
-        save()
-        return
     listing = target.parent/'audio-parts.txt'
     listing.write_text(''.join(f"file '{p.name}'\n" for p in normalized))
     temporary = target.with_suffix('.tmp.wav')
