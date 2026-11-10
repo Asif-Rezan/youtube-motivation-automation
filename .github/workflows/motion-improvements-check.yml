@@ -3,6 +3,8 @@ on:
   push:
     branches: [main]
     paths:
+      - motion_video.py
+      - test_animation_polish.py
       - scene_actions.py
       - character_motion.py
       - test_scene_actions.py

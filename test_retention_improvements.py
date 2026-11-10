@@ -140,7 +140,7 @@ class MakeSongTests(unittest.TestCase):
 
 
 class OpeningMotionTests(unittest.TestCase):
-    def test_opening_scenes_cut_in_at_the_half_beat(self):
+    def test_opening_camera_push_is_smooth_and_stronger_than_later_scenes(self):
         from scene_actions import plan_scene, camera_viewport
         plan = plan_scene('Two toddlers and bunnies dancing together, clap your hands at 120 BPM', 0)
         later = plan_scene('Two toddlers and bunnies dancing together, clap your hands at 120 BPM', 10)
@@ -149,8 +149,8 @@ class OpeningMotionTests(unittest.TestCase):
         bounds = (700, 300, 1100, 900)
         before = camera_viewport((1920, 1080), bounds, plan, 2.4)
         after = camera_viewport((1920, 1080), bounds, plan, 2.6)
-        # A hard punch-in: the visible width drops sharply across the cut.
-        self.assertGreater((before[2] - before[0]) - (after[2] - after[0]), 150)
+        # The old hard cut is replaced by a continuous push.
+        self.assertLess(abs((before[2]-before[0])-(after[2]-after[0])),25)
         calm = camera_viewport((1920, 1080), bounds, later, 2.6)
         self.assertGreater(calm[2] - calm[0], after[2] - after[0])
 

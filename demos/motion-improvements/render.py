@@ -15,9 +15,9 @@ from scene_actions import actor_parts,compose_scene,plan_scene,actor_profile
 def render(assets,output,baseline=None):
     output.mkdir(parents=True,exist_ok=True)
     root=next(assets.glob('*/characters'))
-    configurations=[('landscape-cast','scene-112-source',(1024,576)),
-                    ('portrait-cast','scene-112-source',(576,1024)),
-                    ('landscape-single','scene-000-source',(1024,576))]
+    configurations=[('landscape-cast','scene-112-source',(1024,576),'clap dance 130 BPM'),
+                    ('portrait-cast','scene-112-source',(576,1024),'step dance 130 BPM'),
+                    ('landscape-single','scene-000-source',(1024,576),'hop dance 130 BPM')]
     report=[]
     clips=[]
     contact=Image.new('RGB',(960,540*len(configurations)),'white')
@@ -25,7 +25,7 @@ def render(assets,output,baseline=None):
     if baseline:
         spec=importlib.util.spec_from_file_location('previous_motion',baseline)
         previous=importlib.util.module_from_spec(spec);spec.loader.exec_module(previous)
-    for row,(name,scene,size) in enumerate(configurations):
+    for row,(name,scene,size,prompt) in enumerate(configurations):
         folder=root/scene
         bg=Image.open(folder/'background.png').convert('RGBA')
         fg=Image.open(folder/'foreground.png').convert('RGBA')
@@ -38,7 +38,7 @@ def render(assets,output,baseline=None):
         parts=actor_parts(fg)
         if 'cast' in name and len(parts)<2:
             raise RuntimeError('Multi-character fixture did not preserve both actors')
-        plan=plan_scene('children and animal friends discover a butterfly',row)
+        plan=plan_scene(prompt,row)
         frames=[]
         measurements={}
         for label,engine in [('updated',compose_scene)]+([('previous',previous.compose_scene)] if previous else []):
@@ -73,7 +73,9 @@ def render(assets,output,baseline=None):
             '-an','-c:v','libx264','-preset','fast','-crf','20','-pix_fmt','yuv420p',str(reel)],check=True)
         clips.append(reel)
     contact.save(output/'contact.jpg')
-    listing=output/'clips.txt';listing.write_text(''.join(f"file '{p.name}'\n" for p in clips))
+    from motion_video import transition_clip
+    joined=[clips[0]]+[transition_clip(a,b,output/('transition-'+b.name),960,540) for a,b in zip(clips,clips[1:])]
+    listing=output/'clips.txt';listing.write_text(''.join(f"file '{p.name}'\n" for p in joined))
     subprocess.run(['ffmpeg','-y','-v','error','-f','concat','-safe','1','-i',str(listing),'-c','copy','-movflags','+faststart',str(output/'motion-review.mp4')],check=True)
     (output/'validation.json').write_text(json.dumps(dict(passed=True,source_run=41316394479,scenes=report),indent=2))
     print(json.dumps(report,indent=2))

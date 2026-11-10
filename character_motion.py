@@ -14,7 +14,7 @@ import subprocess
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps
 
-VERSION = 'dudi-layered-characters-v16-opening-hook'
+VERSION = 'dudi-layered-characters-v17-grounded-beat-dance'
 # Extraction has not changed; retain verified expensive clean plates.
 LAYER_VERSION = 'dudi-layered-characters-v11-tempo-aware-dance'
 FPS, SECONDS = 25, 5
@@ -201,9 +201,9 @@ def render_clip(source,target,width=1920,height=1080,index=0,prompt=''):
         'story_plan':plan,'camera_motion':'continuous-safe-zoom-pan','background_motion':'sky-parallax-foliage-sway',
         'actor_profiles':[actor_profile(plan,i,len(parts)) for i in range(len(parts))],
         'story_plan_version':plan['version'],'actor_count':len(parts),'face_rigs':[part[2] for part in parts],
-        'facial_motion':False,
-        'body_motion':'gentle-local-arms-legs-waist' if plan['action']=='dance' else None,
-        'facial_note':'Original face preserved; blink and smile deformation disabled'})
+        'facial_motion':any(part[2] for part in parts),
+        'body_motion':'beat-synced-grounded-steps-blended-poses' if plan['action']=='dance' else None,
+        'facial_note':'Original expression preserved; conservative eye-pair blink only'})
     return target
 
 

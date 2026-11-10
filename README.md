@@ -2,7 +2,7 @@
 
 | Version | Commit / tag | What it is |
 |---|---|---|
-| v2 retention (current) | this PR | 4-minute chorus-first verse-chorus song, opening scene = thumbnail, punch-in hook motion, two dance moves per scene, consistent lighting, SEO titles without sound-alike names, real chapters; 130 BPM bouncy kids-pop groove, a NEW Qwen-written chorus hook every episode (no fixed Dudi refrain), short energetic final chorus with a button ending |
+| v2 retention (current) | this PR | 4-minute chorus-first verse-chorus song, opening scene = thumbnail, smooth beat-grid hook motion, two dance moves per scene, consistent lighting, SEO titles without sound-alike names, real chapters; 130 BPM bouncy kids-pop groove, a NEW Qwen-written chorus hook every episode (no fixed Dudi refrain), short energetic final chorus with a button ending |
 | v1 baseline | tag `v1-pre-retention-2026-11-07` (commit `c1b61b2`) | 10-minute song with the refrain after every line, 8-step ACE-Step, best-scene thumbnail |
 
 Why v2: video `r2gjHCPxpEU` kept 80% of viewers at 0:06, 36% at 0:24 and 8% at 1:55
@@ -25,10 +25,11 @@ upstream distills for 8 steps.
   ACE-Step `[Chorus - high energy]` / `[Verse]` tags and "starts instantly, no intro" in the caption.
 - **Thumbnail = first frames:** the package must pick scene 0 for the thumbnail, and the scene-0
   clip is animated from `thumbnail-source.png`, so viewers see exactly what they clicked.
-- **Faster opening:** the first three clips (15 s) cut from a wide shot to a punch-in at 2.5 s,
-  with a livelier pan and 1.5x larger dance moves.
-- **More dance:** each dance scene switches to a second move at 2.5 s; chorus scenes rotate
-  eight dance poses; every scene and the thumbnail share one lighting/time of day.
+- **Smooth opening:** the first three clips use an eased, cast-safe push-in with a gentle
+  pan; there is no sudden mid-shot punch-in or whole-sprite dance rotation.
+- **Beat-grid dance:** pose changes blend near the middle on the requested BPM grid;
+  dancers share the episode clock, with repeating four-scene chorus choreography and
+  small individual energy differences. Every scene and thumbnail share one lighting/time of day.
 - **Structure:** four-line verses alternate with the fixed channel chorus
   (`dudi dudi dam dam dudi dudi dam`, `clap your hands and dance with me`, ...).
 - **SEO:** titles start with the real search phrase (animal + action + "Song for Kids"), never
@@ -349,3 +350,30 @@ and explicitly scheduled uploads remain resumable without duplicate uploads.
 This code update does not start a new generation or change existing scheduled videos.
 
 Validation: 204 local unit/regression tests passed, including direct YouTube defaults, absence of scheduling calls, Facebook feed/Reel public requests and read-back, and duplicate-safe retries. Actionlint and whitespace checks passed. The legacy scene-story recovery upload mode was aligned to public as well. Live publication is not claimed from these checks.
+
+
+### 2026-11-10 — grounded animation and smooth transitions
+
+Replaced the mid-shot camera jump and general floating bounce with bounded eased
+camera motion, planted-foot dance, alternating foot swings and explicit hops only.
+Pose changes cross-blend on the requested BPM grid (130 BPM for new episodes),
+including a continuous musical phase across five-second scenes. Ripple dancers
+follow half-beat offsets. This follows the requested tempo, not audio beat tracking.
+
+A conservative blink is enabled only for a single detected eye pair with safe
+opaque, low-texture surrounding pixels. Mouth/expression artwork stays original;
+ambiguous faces receive no guessed eyelids. This remains CPU cutout animation,
+not skeletal 3D motion, new emotion synthesis or word-level lip sync.
+
+A 160 ms held-frame dissolve at each incoming shot keeps every clip exactly five
+seconds, preserves the first thumbnail frame and does not shift the song/lyrics.
+Transitions encode sequentially with only two inputs, retain verified cached clips,
+and add some CPU encoding work. Animation versions invalidate old motion clips
+and final renders while retaining expensive segmentation/inpainting layers.
+
+Validation: 209 unit/regression tests and actionlint passed, including a real
+FFmpeg fade/125-frame/5-second check and transition cache reuse. Three saved-artwork
+clips (landscape cast, portrait cast, single animal) were rendered and fully decoded,
+plus a 15-second review reel with transitions. Local sample:
+`output/animation-polish/review/motion-review.mp4`. No new production generation
+was dispatched; new runs use the updated animation.
