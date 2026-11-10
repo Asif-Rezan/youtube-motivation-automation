@@ -11,3 +11,16 @@ Dancers share the requested musical beat phase across scenes; energy differences
 Camera pushes/pans ease in and out with cast bounds enforced. There is no hard mid-shot punch-in. Final assembly blends the outgoing held frame into each incoming shot over 160 ms while preserving five seconds per scene and the original audio timeline. Only two clips decode at once, and verified transition renders are cached.
 
 Animation cache versions invalidate old rendered clips while preserving existing segmentation and background layers. These effects apply to new generation runs using the updated code; already uploaded videos and in-progress runs pinned to an older commit are unchanged.
+
+
+## Travelling choreography
+
+Dance roots now move across available ground instead of remaining at one point.
+Walk/run/chase prompts select matching paths; side-step and hop variants also
+travel. Cast members share a bounded ground route to preserve their spacing and
+order. The camera follows their new bounds. Frame-filling artwork has limited
+travel room; future image prompts request open ground on both sides.
+
+During walking, stance feet compensate the body's horizontal motion in world
+space, then advance during the swing phase. Running adds a faster traverse and
+small flight cycle. This remains cutout/mesh animation, not anatomical 3D gait.

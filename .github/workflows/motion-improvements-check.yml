@@ -5,6 +5,8 @@ on:
     paths:
       - motion_video.py
       - test_animation_polish.py
+      - test_travelling_motion.py
+      - kids_rhymes.py
       - scene_actions.py
       - character_motion.py
       - test_scene_actions.py

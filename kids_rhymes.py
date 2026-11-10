@@ -59,6 +59,8 @@ def scene_prompt(row,outline,dance=False,lighting=None,pose=None):
     return ('Cute colorful 3D storybook cartoon. Two cute human toddlers in colorful clothes '
         'beside adorable '+subjects+'. Both babies and animals equally prominent, '
         'separate full bodies, smiling faces, visible hands and feet. '+action+' '
+        'Keep the group inside the central two-thirds of the frame, with open ground on both sides for walking and running. '
+        'Feet meet the same visible ground plane, never floating above the path. '
         'Dreamy natural flower garden, soft light, rounded shapes, pastel colors. '
         +outline.get('visual_world','Dreamy natural flower garden')+'. '+cast+'. '
         'The two human babies stay visible alongside the animals, no solo animal portrait, '

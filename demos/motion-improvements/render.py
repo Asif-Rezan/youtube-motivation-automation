@@ -15,8 +15,8 @@ from scene_actions import actor_parts,compose_scene,plan_scene,actor_profile
 def render(assets,output,baseline=None):
     output.mkdir(parents=True,exist_ok=True)
     root=next(assets.glob('*/characters'))
-    configurations=[('landscape-cast','scene-112-source',(1024,576),'clap dance 130 BPM'),
-                    ('portrait-cast','scene-112-source',(576,1024),'step dance 130 BPM'),
+    configurations=[('landscape-cast','scene-112-source',(1024,576),'walk and clap dance 130 BPM'),
+                    ('portrait-cast','scene-112-source',(576,1024),'run and dance 130 BPM'),
                     ('landscape-single','scene-000-source',(1024,576),'hop dance 130 BPM')]
     report=[]
     clips=[]

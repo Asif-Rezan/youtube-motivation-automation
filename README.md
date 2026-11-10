@@ -377,3 +377,27 @@ clips (landscape cast, portrait cast, single animal) were rendered and fully dec
 plus a 15-second review reel with transitions. Local sample:
 `output/animation-polish/review/motion-review.mp4`. No new production generation
 was dispatched; new runs use the updated animation.
+
+
+### 2026-11-10 — characters travel through the scene
+
+The prior polish still kept dance roots fixed. New choreography now moves the
+whole cast along an eased ground path: walk/run/chase cues choose locomotion,
+ordinary dance uses travelling side-steps, and hop scenes advance across the
+scene. Running uses a quicker path with a small flight/bounce cycle. Available
+room around the entire cast limits travel; very tight framing may still restrict
+movement. Shared cast displacement preserves actor order instead of letting
+companions cross through each other. Camera bounds follow the moving cast.
+
+Foot deformations compensate root travel during stance, advancing the swing
+foot between placements; transparent stride padding avoids clipping toes at the
+sprite edge. Scene prompts reserve ground space on both sides. Faces/proportions,
+existing music and five-second scene timing remain intact. This is travelling
+2D cutout animation, not a new skeletal/3D running model.
+
+Validation: 214 unit/regression tests passed, including fixed-camera displacement,
+frame bounds, preserved cast order, world-space stance holds and moving-cast
+visibility. Landscape walking, portrait running and a single travelling hop were
+rendered/fully decoded into a 15-second review at
+`output/travelling-motion/review/motion-review.mp4`. Apply to new generation runs;
+no production generation was started by this update.

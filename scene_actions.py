@@ -7,9 +7,9 @@ import hashlib
 import math
 import re
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageOps
 
-VERSION = 'scene-stories-v11-grounded-beat-dance'
+VERSION = 'scene-stories-v12-travelling-choreography'
 OPENING_SCENES = 3  # first 15 seconds
 BODY_VARIANTS = ('wave', 'waist', 'step', 'hop', 'tummy', 'jelly', 'clap', 'penguin')
 SWITCH_AT = 2.5
@@ -23,7 +23,7 @@ def smooth(value):
 
 def plan_scene(prompt, index=0):
     words = set(re.findall(r'[a-z]+', prompt.lower()))
-    if words & {'dance','dances','dancing','clap','claps','clapping','bounce','bounces','bouncing','wiggle','wiggling','twirl','twirling','stomp','stomping','tummy','belly','jelly','penguin','peekaboo','leader','bob','flop','spin','spinning','rotate','rotation','balloons','fireflies','ripple'}:
+    if words & {'run','runs','running','walk','walks','walking','chase','chasing','dance','dances','dancing','clap','claps','clapping','bounce','bounces','bouncing','wiggle','wiggling','twirl','twirling','stomp','stomping','tummy','belly','jelly','penguin','peekaboo','leader','bob','flop','spin','spinning','rotate','rotation','balloons','fireflies','ripple'}:
         kind, prop, action = 'dance', None, 'dance'
     elif words & {'sleep', 'sleepy', 'sleeping', 'bed', 'night', 'moon'}:
         kind, prop, action = 'rest', 'star', 'settle'
@@ -63,7 +63,11 @@ def plan_scene(prompt, index=0):
         variant=('step','wave','clap','sway')[index % 4]
         second=('wave','clap','step','waist')[index % 4]
     switch_at=beat_seconds*round((index*5+SWITCH_AT)/beat_seconds)-index*5
+    locomotion=('run' if words & {'run','runs','running','chase','chasing'} else
+                'walk' if words & {'walk','walks','walking'} else
+                'hop' if variant in ('hop','jelly','ripple_hop') else 'side_step') if kind=='dance' else None
     return dict(version=VERSION, kind=kind, prop=prop, action=action, dance_variant=variant,beat_seconds=60/bpm,
+                locomotion=locomotion,
                 beat_origin=index*5, switch_at=switch_at,
                 second_variant=second, opening=index<OPENING_SCENES,
                 direction=1 if index % 2 == 0 else -1,
@@ -272,11 +276,14 @@ def foot_swing(t, beat_seconds=.6, phase=0., side=-1):
     return max(0.,math.sin(2*math.pi*t/beat_seconds+phase+(math.pi if side>0 else 0)))**2
 
 
-def dance_body_motion(subject, t, phase=0., variant='hop', beat_seconds=.6, second=None, energy=1., switch_at=SWITCH_AT, protect=.65):
+def dance_body_motion(subject, t, phase=0., variant='hop', beat_seconds=.6, second=None, energy=1., switch_at=SWITCH_AT, protect=.65, foot_offsets=None):
     """Blend lower-body poses continuously while preserving original head pixels."""
     ramp=smooth(t/.4)*smooth((5-t)/.35)
     if variant in ('balloons','fireflies','ripple_hop') or ramp==0:
         return subject.copy()
+    if foot_offsets is not None and max(abs(v) for v in foot_offsets)>.1:
+        padding=math.ceil(max(abs(v) for v in foot_offsets))+2
+        subject=ImageOps.expand(subject,border=(padding,0,padding,0),fill=(0,0,0,0))
     w,h=subject.size
     mix=smooth((t-switch_at+.2)/.4) if second in GAINS else 0.
     beat=2*math.pi*t/beat_seconds+phase
@@ -295,14 +302,25 @@ def dance_body_motion(subject, t, phase=0., variant='hop', beat_seconds=.6, seco
             dx+=w*.045*side*arms*(.5-.5*math.cos(beat))
         foot=smooth((v-.82)/.16)
         swing=foot_swing(t,beat_seconds,phase,side)
-        dx=dx*(1-foot)+w*.018*side*leg_gain*swing*foot
+        foot_x=w*.018*side*leg_gain*swing
+        if foot_offsets is not None:
+            # Inverse-mesh displacement compensates body travel during stance.
+            # The planted foot stays in world space instead of skating along.
+            foot_x=foot_offsets[1 if side>0 else 0]
+        dx=dx*(1-foot)+foot_x*foot
         dy=dy*(1-foot)+h*.06*leg_gain*swing*foot
         gate=smooth((v-.65)/.08)
         return dx*gate,dy*gate
     def point(x,y):
         u,v=x/w,y/h
         first=offset(u,v,variant);last=offset(u,v,second or variant)
-        return (x+energy*ramp*((1-mix)*first[0]+mix*last[0]),
+        # Root-travel compensation must not be attenuated with actor energy.
+        dx=energy*ramp*((1-mix)*first[0]+mix*last[0])
+        if foot_offsets is not None:
+            foot=smooth((v-.82)/.16)*smooth((v-.65)/.08)
+            correction=foot_offsets[1 if u>.5 else 0]*foot
+            dx+=correction*(1-energy*ramp)
+        return (x+dx,
                 y+energy*ramp*((1-mix)*first[1]+mix*last[1]))
     for y in range(0,h,12):
         for x in range(0,w,12):
@@ -355,6 +373,38 @@ def draw_environment_effect(canvas, plan, t):
     return Image.alpha_composite(canvas.convert('RGBA'),layer)
 
 
+def travel_offset(size, bounds, plan, t):
+    """One smooth on-ground path, constrained by the complete cast's free room."""
+    if not plan.get('locomotion'):
+        return 0.
+    w,h=size
+    left,top,right,bottom=bounds
+    margin=w*.025
+    rooms=(max(0,left-margin),max(0,w-right-margin))
+    direction=1 if rooms[1]>rooms[0] else -1
+    room=rooms[1] if direction>0 else rooms[0]
+    running=plan['locomotion']=='run'
+    distance=min(room,w*(.32 if running else .25))
+    return direction*distance*smooth((t-.2)/(3.3 if running else 4.2))
+
+
+def travel_feet(size,bounds,plan,t,delay=0.):
+    """World-space stance holds, smoothly advancing the swing foot each stride."""
+    beat=plan.get('beat_seconds',.6)
+    current=travel_offset(size,bounds,plan,t)
+    offsets=[]
+    for side in (0,.5):
+        fraction=((t-delay+plan.get('beat_origin',0))/beat+side)%1
+        if fraction<.5:
+            before=travel_offset(size,bounds,plan,t-(fraction+.5)*beat)
+            after=travel_offset(size,bounds,plan,t+(.5-fraction)*beat)
+            anchor=before+(after-before)*smooth(fraction*2)
+        else:
+            anchor=travel_offset(size,bounds,plan,t-(fraction-.5)*beat)
+        offsets.append(current-anchor)
+    return tuple(offsets)
+
+
 def compose_frame(bg, subject, bbox, plan, t, rig=None, camera=True, prop=True, profile=None):
     profile=profile or actor_profile(plan,0,1)
     local_t=max(0,t-profile['delay'])
@@ -370,17 +420,24 @@ def compose_frame(bg, subject, bbox, plan, t, rig=None, camera=True, prop=True, 
     movement=profile['movement']
     # Group members stay within their own space instead of sliding together.
     travel=direction*min(w*.10,room_right if direction>0 else room_left) if movement=='approach' else 0
+    route_bounds=profile.get('route_bounds',bbox)
+    if movement=='dance':
+        travel=travel_offset(bg.size,route_bounds,plan,t)
     lift=state['hop']*min(h*.055,max(0,bbox[1]*.35))
+    if movement=='dance' and plan.get('locomotion')=='run':
+        lift+=min(h*.018,bbox[1]*.15)*math.sin(2*math.pi*(local_t+plan.get('beat_origin',0))/plan['beat_seconds'])**2*smooth(local_t/.4)*smooth((5-t)/.4)
     angle=0.
     if movement=='sway':
         angle=2.2*math.sin(local_t*2.4+profile['phase'])*smooth(local_t/.45)
     # Keep original sprite proportions: never squeeze, stretch or rotate dancers.
     actor=face_motion(subject,rig,state)
     if movement=='dance':
-        actor=dance_body_motion(actor,local_t,profile['phase'],local_plan['dance_variant'],local_plan.get('beat_seconds',.6),
+        body_variant='step' if local_plan['dance_variant'] in ('balloons','fireflies') and plan.get('locomotion') else local_plan['dance_variant']
+        actor=dance_body_motion(actor,local_t,profile['phase'],body_variant,local_plan.get('beat_seconds',.6),
                                 second=plan.get('second_variant'),energy=profile.get('energy',1.),
                                 switch_at=plan.get('switch_at',SWITCH_AT),
-                                protect=max(.65,min(.9,max((b[3] for b in rig['eyes']),default=0)+.1)) if rig else .65)
+                                protect=max(.65,min(.9,max((b[3] for b in rig['eyes']),default=0)+.1)) if rig else .65,
+                                foot_offsets=travel_feet(bg.size,route_bounds,plan,t,profile['delay']) if plan.get('locomotion') else None)
     if angle:
         actor=actor.rotate(angle,Image.Resampling.BICUBIC,expand=True)
     actor.thumbnail((w,h),Image.Resampling.BICUBIC)
@@ -401,9 +458,8 @@ def compose_frame(bg, subject, bbox, plan, t, rig=None, camera=True, prop=True, 
         draw_prop(canvas,plan,t,(cx,face_y),travel)
     if not camera:
         return canvas
-    bounds=(max(0,bbox[0]-subject.width*.04),max(0,bbox[1]-h*.08),
-            min(w,bbox[2]+max(0,travel)+subject.width*.04),bbox[3])
-    bounds=(min(bounds[0],bbox[0]+min(0,travel)),bounds[1],bounds[2],bounds[3])
+    bounds=(max(0,x-subject.width*.04),max(0,y-h*.08),
+            min(w,x+actor.width+subject.width*.04),min(h,y+actor.height))
     return apply_camera(canvas,bounds,plan,t)
 
 
@@ -459,9 +515,10 @@ def compose_scene(bg, parts, plan, t, camera=True, environment=True):
     # Painter's order follows the feet, independent of animation timing/order.
     for i,(subject,bbox,rig) in sorted(enumerate(parts),key=lambda item:item[1][1][3]):
         canvas=compose_frame(canvas,subject,bbox,plan,t,rig,camera=False,prop=False,
-            profile=actor_profile(plan,i,len(parts)))
+            profile=dict(actor_profile(plan,i,len(parts)),route_bounds=(left,top,right,bottom)))
     draw_prop(canvas,plan,t,((left+right)/2,top+(bottom-top)*.35),w*.10)
-    bounds=(max(0,left),max(0,top),min(w,right),min(h,bottom))
+    shift=travel_offset(bg.size,(left,top,right,bottom),plan,t)
+    bounds=(max(0,left+shift),max(0,top),min(w,right+shift),min(h,bottom))
     return apply_camera(canvas,bounds,plan,t) if camera else canvas.convert('RGB')
 
 
