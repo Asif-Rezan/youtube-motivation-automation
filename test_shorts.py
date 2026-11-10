@@ -126,6 +126,26 @@ class ShortsTests(unittest.TestCase):
             ensure_uploaded_tags(client,video,state,save)
         self.assertEqual(client.videos.return_value.update.call_count,2)
 
+    def test_empty_tag_readback_requires_exact_update_response_for_same_video(self):
+        from upload_settings import ensure_uploaded_tags, tags_verified
+        state={'video_id':'same','tag_repair_attempts':2,'upload_body':{'snippet':{
+            'title':'Saved Short','categoryId':'10','tags':['kids rhyme','Shorts']}}}
+        video={'id':'same','snippet':{'tags':[]}}
+        client,save=Mock(),Mock()
+        self.assertFalse(tags_verified(video,state['upload_body']['snippet']['tags']))
+        client.videos.return_value.update.return_value.execute.return_value={
+            'id':'same','snippet':{'tags':['Kids Rhyme','shorts']}}
+        self.assertTrue(ensure_uploaded_tags(client,video,state,save))
+        self.assertFalse(ensure_uploaded_tags(client,video,state,save))
+        self.assertEqual(client.videos.return_value.update.call_count,1)
+        receipt=state['tag_verification_receipt']
+        self.assertTrue(tags_verified(video,['kids rhyme','Shorts'],receipt))
+        self.assertFalse(tags_verified({'id':'other','snippet':{}},['kids rhyme','Shorts'],receipt))
+        self.assertFalse(tags_verified({'id':'same','snippet':{'tags':['wrong']}},['kids rhyme','Shorts'],receipt))
+        self.assertFalse(tags_verified(video,['changed requested tags'],receipt))
+        self.assertIn('tag_readback_warning',state)
+        client.videos.return_value.insert.assert_not_called()
+
     def test_landscape_or_missing_illustrations_cannot_fall_back_to_blur(self):
         info = {'format':{'duration':'40'}, 'streams':[{'codec_type':'audio'}]}
         with tempfile.TemporaryDirectory() as tmp, patch('shorts.probe', return_value=info):

@@ -201,9 +201,10 @@ def publish(client, root, song, state, save, upload_thumbnail=True, metadata_kin
                 id=state['video_id']).execute()['items'][0]
         from upload_settings import ensure_uploaded_tags
         if ensure_uploaded_tags(client, video, state, save):
+            time.sleep(20)  # Allow metadata propagation before another list read.
             continue  # Read back the repaired metadata on the same upload.
         phase = verified_phase(video, state['upload_body'], required('EXPECTED_CHANNEL_ID'),
-                               state.get('synthetic_disclosure_receipt'))
+                               state.get('synthetic_disclosure_receipt'), tag_receipt=state.get('tag_verification_receipt'))
         if phase:
             state['phase'] = phase
             save()

@@ -444,3 +444,8 @@ Rollback source before this repair: `517f41087194bf2e20556e3e5a0a90fa37c3279a`. 
 ### 2026-11-10 — generation test dependency fix
 
 Run `42771179403` stopped before lyric generation because the new real-video dissolve regression invoked FFmpeg in the lyrics job, which had not installed it. Full generation and episode-preview lyrics jobs now install and verify both FFmpeg and ffprobe before tests. The media integration test skips on local environments without those optional system tools, matching the audio tests; production CI installs them so the test executes. The previous local suite passed because the development machine already had FFmpeg.
+
+
+### 2026-11-10 — existing Short tag verification recovery
+
+Run `42772778281` completed generation, but Short verification failed after `videos.list` returned no tags immediately after two metadata updates. The upload ID remains checkpointed; recovery must verify/update that same ID. Updates now retain the returned video ID/tags and create a receipt only when both exactly match the requested metadata (normalized case/spacing). Empty later list readback may use that exact receipt, with a saved warning. Acknowledgment without matching returned tags, another video ID, changed requested tags or nonempty conflicting tags cannot pass. Core channel, title, description, visibility, HD processing and disclosures remain strictly checked. A 20-second settling interval follows each update; the two-update budget persists across reruns, with one migration for old exhausted checkpoints.
