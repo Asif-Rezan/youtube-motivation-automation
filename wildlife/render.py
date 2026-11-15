@@ -11,7 +11,7 @@ import numpy as np
 
 from .episodes import EPISODES, PREVIEW
 from .visuals import frames
-from .thumbnail import render_thumbnail
+from .thumbnail import episode_cue, render_thumbnail
 
 
 FPS = 24
@@ -167,7 +167,7 @@ def assemble(episode, package, timeline, work, output, preview, manifest=None):
     else:
         idea = manifest['idea']
         render_thumbnail(beats,output/'thumbnail.jpg',label=idea['thumbnail_text'],
-                         species=idea['species'],habitat=idea['habitat'])
+                         species=idea['species'],habitat=idea['habitat'],cue=episode_cue(episode))
         (output/'episode-plan.json').write_text(json.dumps(manifest,indent=2)+'\n')
     for label, kind, suffix in [('video', 'visual', 'mp4'), ('voice', 'voice', 'wav')]:
         (work/f'{label}.txt').write_text(''.join(
