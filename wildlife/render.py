@@ -152,7 +152,7 @@ def render_scene(beats, timeline, index, work, preview, manifest=None):
     if manifest is not None:
         idea = manifest['idea']
         artwork = {'species':idea['species'],'habitat':idea['habitat']}
-    encode_visuals(beat, seconds, size, work/f'visual-{index:02}.mp4',**artwork)
+    encode_visuals(beat, seconds, size, work/f'visual-{index:02}.mp4',disclose=index == 0,**artwork)
     print(json.dumps({'chapter':beat.label,'rendered':True,'seconds':seconds}),flush=True)
 
 

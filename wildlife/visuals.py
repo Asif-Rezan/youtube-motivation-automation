@@ -237,7 +237,57 @@ def animal_sprite(colour, frame, grazing, species, scale=1):
     return sprite
 
 
-def frames(size, beat, duration, fps, *, species='goats', habitat='grassland island', overlay=True):
+def draw_scene_overlay(image, beat, population_icon, count_font, disclosure_font, show_disclosure):
+    """Use visual cues to signal what's happening without covering the scene."""
+    w,h = image.size
+    scale = w/1280
+    x,y = .032*w,.055*h
+    draw = ImageDraw.Draw(image)
+
+    def points(coordinates):
+        return [(x+u*scale,y+v*scale) for u,v in coordinates]
+
+    def ellipse(box, colour):
+        draw.ellipse(points((box[:2],box[2:])),fill=colour)
+
+    dark = '#194a59'
+    pale = '#f9edce'
+    draw.rounded_rectangle((x,y,x+82*scale,y+74*scale),radius=round(15*scale),fill=dark,
+                           outline='#a4d7d1',width=max(1,round(2*scale)))
+    if beat.forage <= .3:
+        ellipse((29,23,53,47),'#ffd068')
+        for index in range(8):
+            angle = index*TAU/8
+            rays = [(41+r*math.cos(angle),35+r*math.sin(angle)) for r in (17,23)]
+            draw.line(points(rays),fill='#ffd068',width=max(1,round(2*scale)))
+        draw.line(points(((22,56),(35,53),(43,56),(58,53))),
+                  fill='#dbb67b',width=max(1,round(2*scale)))
+    elif beat.action == 'walk':
+        for u,v in ((24,47),(37,37),(49,25)):
+            ellipse((u,v,u+9,v+13),pale)
+            ellipse((u+10,v-4,u+17,v+7),pale)
+    else:
+        draw.line(points(((40,55),(43,31),(52,21))),fill='#d7edb1',width=max(2,round(3*scale)))
+        polygon(draw,points(((43,41),(27,40),(22,28),(36,29))), '#b9e177')
+        polygon(draw,points(((46,37),(51,23),(66,23),(62,34))), '#91c772')
+
+    count = f'{beat.population:,}'
+    right = round(w*.965)
+    padding = round(12*scale)
+    text_width = math.ceil(draw.textlength(count,font=count_font))
+    left = right-text_width-population_icon.width-3*padding
+    draw.rounded_rectangle((left,round(y),right,round(y+74*scale)),
+                           radius=round(15*scale),fill=dark,outline='#a4d7d1',
+                           width=max(1,round(2*scale)))
+    image.paste(population_icon,(left+padding,round(y+(74*scale-population_icon.height)/2)),population_icon)
+    draw.text((right-padding,round(y+37*scale)),count,anchor='rm',font=count_font,fill=pale)
+    if show_disclosure:
+        draw.text((round(w*.032),round(h*.945)),'ILLUSTRATIVE SIMULATION',
+                  font=disclosure_font,fill='#ffffff',stroke_width=max(1,round(scale)),
+                  stroke_fill='#28352d')
+
+
+def frames(size, beat, duration, fps, *, species='goats', habitat='grassland island', overlay=True, disclose=False):
     world = Island(size, beat.camera, beat.forage, seed=177, habitat=habitat)
     kind = {'goats':'goat','deer':'deer','rabbits':'rabbit'}[species]
     figures = world.actors(beat.population, seed=903)
@@ -248,8 +298,9 @@ def frames(size, beat, duration, fps, *, species='goats', habitat='grassland isl
         sprite = animal_sprite(coat,phase,grazing,kind,pixels/120)
         return sprite.transpose(Image.Transpose.FLIP_LEFT_RIGHT) if flip else sprite
     w, h = size
-    title_font = ImageFont.truetype(str(FONT), round(w*.034))
-    small = ImageFont.truetype(str(FONT), round(w*.017))
+    count_font = ImageFont.truetype(str(FONT),round(w*.035))
+    disclosure_font = ImageFont.truetype(str(FONT),round(w*.015))
+    population_icon = animal_sprite(0,0,False,kind,w*.00038)
     for index in range(round(duration*fps)):
         t = index/fps
         image = world.base.copy()
@@ -297,15 +348,6 @@ def frames(size, beat, duration, fps, *, species='goats', habitat='grassland isl
             image = image.resize(size,Image.Resampling.BILINEAR,
                                  box=(margin+pan,vertical,w-margin+pan,h-vertical))
             draw = ImageDraw.Draw(image)
-        if not overlay:
-            yield image
-            continue
-        x, y = round(w*.035), round(h*.055)
-        label = beat.label.upper()
-        draw.text((x,y),label,font=title_font,fill='#fff4d9',stroke_width=max(2,w//390),stroke_fill='#252422')
-        draw.text((x,y+round(w*.059)), 'ILLUSTRATIVE SIMULATION', font=small, fill='#ffffff',
-                  stroke_width=1,stroke_fill='#28352d')
-        counter = f'{beat.population:,} {species.upper()}'
-        draw.text((round(w*.963), y),counter,anchor='rt',font=title_font,fill='#fff4d9',
-                  stroke_width=max(2,w//390),stroke_fill='#252422')
+        if overlay:
+            draw_scene_overlay(image,beat,population_icon,count_font,disclosure_font,disclose and t<3)
         yield image
