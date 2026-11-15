@@ -24,10 +24,11 @@ def height(x, y):
 
 
 class Island:
-    def __init__(self, size, camera, forage, seed):
+    def __init__(self, size, camera, forage, seed, habitat):
         self.width, self.screen_height = size
         self.camera = camera
         self.foraging = forage
+        self.habitat = habitat
         angles = {'aerial': (.88, .05, 0.75), 'shore': (.29, -.23, 1.32),
                   'pasture': (.48, .22, 1.14)}
         self.tilt, self.turn, scale = angles[camera]
@@ -77,7 +78,14 @@ class Island:
                 points.append((x,y,z))
             rings.append(points)
         base = ['#d9b76e','#e6c37e','#d6b16a','#cba767']
-        green = ['#769343','#849f48','#94a64e','#a5ab55','#6e873d']
+        green = {
+            'wooded island': ['#345e36','#487747','#58844a','#6e914c','#57793e'],
+            'marsh island': ['#568874','#638f76','#7b9b6c','#77a072','#629568'],
+            'coastal dunes': ['#839477','#a4a675','#a9a96d','#c3b885','#8f9e72'],
+            'rocky island': ['#5d6451','#747d63','#848775','#92967c','#798267'],
+        }.get(self.habitat,['#769343','#849f48','#94a64e','#a5ab55','#6e873d'])
+        if self.habitat == 'rocky island':
+            base = ['#9c9884','#afab99','#89877c','#b8ad95']
         triangles = []
         for ring, (inner, outer) in enumerate(zip(rings,rings[1:])):
             for i in range(48):
@@ -114,7 +122,7 @@ class Island:
         return result
 
 
-def goat_sprite(colour, frame, grazing):
+def animal_sprite(colour, frame, grazing, species):
     """Faceted body, muzzle, horns, and individually animated legs."""
     coat, light, shadow = (('#eee2bf','#fff5da','#b4a488') if colour == 0
                             else ('#746456','#a79277','#443c36'))
@@ -131,22 +139,36 @@ def goat_sprite(colour, frame, grazing):
     polygon(draw, [(24,56),(40,53),(75,53),(87,49),(76,62),(38,64)],shadow)
     polygon(draw, [(26,43),(13,31),(10,34),(20,48)],coat)
     n = 19 if grazing else 0
+    if species == "rabbit":
+        n += 12
     polygon(draw, [(72,45),(82,28+n),(96,26+n),(93,48+n),(81,55)],coat)
     polygon(draw, [(82,28+n),(91,18+n),(104,21+n),(112,31+n),(109,39+n),
                    (94,40+n),(86,35+n)],light)
     polygon(draw, [(101,28+n),(112,31+n),(109,39+n),(102,39+n)],shadow)
     polygon(draw, [(89,24+n),(77,20+n),(78,26+n),(87,30+n)],shadow)
-    for x, y in [(92,20+n),(99,21+n)]:
-        polygon(draw, [(x-3,y+2),(x-5,y-7),(x-12,y-15),(x-5,y-13),(x+1,y-5),(x+3,y+1)],
-                '#73634f')
+    if species == 'rabbit':
+        for x, y in [(91,20+n),(99,21+n)]:
+            polygon(draw, [(x-4,y+4),(x-9,y-20),(x-5,y-25),(x,y-21),(x+4,y+4)], light)
+            polygon(draw, [(x-3,y),(x-6,y-18),(x-4,y-20),(x+1,y)], '#c78a86')
+    elif species == 'deer':
+        for x, y in [(91,18+n),(100,19+n)]:
+            draw.line((x,y,x-3,y-18,x-9,y-24),fill='#62513c',width=3)
+            draw.line((x-3,y-14,x+4,y-22),fill='#62513c',width=2)
+        for x,y in [(37,42),(47,40),(57,41),(67,44)]:
+            draw.ellipse((x,y,x+3,y+3),fill='#fff2ce')
+    else:
+        for x, y in [(92,20+n),(99,21+n)]:
+            polygon(draw, [(x-3,y+2),(x-5,y-7),(x-12,y-15),(x-5,y-13),(x+1,y-5),(x+3,y+1)],
+                    '#73634f')
     draw.ellipse((97,25+n,100,28+n),fill='#241c13')
     return sprite
 
 
-def frames(size, beat, duration, fps):
-    world = Island(size, beat.camera, beat.forage, seed=177)
+def frames(size, beat, duration, fps, *, species='goats', habitat='grassland island'):
+    world = Island(size, beat.camera, beat.forage, seed=177, habitat=habitat)
+    kind = {'goats':'goat','deer':'deer','rabbits':'rabbit'}[species]
     figures = world.actors(beat.population, seed=903)
-    sprites = {(coat, phase, grazing): goat_sprite(coat, phase, grazing)
+    sprites = {(coat, phase, grazing): animal_sprite(coat, phase, grazing, kind)
                for coat in range(2) for phase in range(12) for grazing in (False, True)}
     w, h = size
     title_font = ImageFont.truetype(str(FONT), round(w*.043))
@@ -161,6 +183,8 @@ def frames(size, beat, duration, fps):
             sway = .51 * math.sin(t*.72+angle) if walking else .10 * math.sin(t*.77+angle)
             px, py = world.project(x+sway, y, height(x+sway,y))
             proportion = (.47 if beat.camera == 'aerial' else .91) * world.scale / 110 * scale
+            if kind == "rabbit":
+                proportion *= .68
             phase = int((t*10 + angle*2) % 12) if walking else 0
             graze = not walking and math.sin(t*.91+angle) > -.16
             placed.append((py, px, proportion, coat, phase, graze, math.cos(t*.72+angle) < 0 and walking))
@@ -184,7 +208,7 @@ def frames(size, beat, duration, fps):
         draw.text((x,y),label,font=title_font,fill='#fff4d9',stroke_width=max(2,w//390),stroke_fill='#252422')
         draw.text((x,y+round(w*.059)), 'ILLUSTRATIVE SIMULATION', font=small, fill='#ffffff',
                   stroke_width=1,stroke_fill='#28352d')
-        counter = f'{beat.population:,} GOATS'
+        counter = f'{beat.population:,} {species.upper()}'
         draw.text((round(w*.963), y),counter,anchor='rt',font=title_font,fill='#fff4d9',
                   stroke_width=max(2,w//390),stroke_fill='#252422')
         yield image

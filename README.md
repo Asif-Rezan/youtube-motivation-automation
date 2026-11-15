@@ -12,9 +12,11 @@ topic-specific description, and relevant tags. Full videos get chapters based on
 The run summary shows the exact title, description, and tags.
 The full workflow publishes to the configured YouTube channel and Facebook Page. It verifies
 both publications and deletes the temporary MP4 and thumbnail from private Drive, retaining
-publication receipts for deduplication. The daily schedule runs at 03:00 Asia/Dhaka, using the
-first outstanding catalog episode. A fully published catalog is skipped until a new episode
-is added. Preview runs export artifacts without publishing. The previous nursery-rhyme schedule
+publication receipts for deduplication. The daily schedule runs at 03:00 Asia/Dhaka. It resumes unfinished AI episodes or uses Qwen
+to generate a fresh wildlife premise, script, SEO metadata, and twenty scene directions.
+Python renders low-poly backgrounds, animal motion, and the population overlay. SSD-1B
+creates new thumbnail artwork before Python adds the headline. Each plan is checkpointed on Drive to
+keep retries stable. The legacy Goat Island preview remains available for comparison. The previous nursery-rhyme schedule
 is removed, and its existing manual and recovery paths are available.
 
 To render locally with FFmpeg, CPU PyTorch and `requirements-wildlife.txt` installed:

@@ -10,8 +10,8 @@ on:
       episode:
         description: Select the wildlife episode
         type: choice
-        options: [goat-island]
-        default: goat-island
+        options: [auto, goat-island]
+        default: auto
       preview:
         description: Render a 30-second preview
         type: boolean
@@ -22,19 +22,20 @@ concurrency:
   group: dudi-dam-tv-publish
   cancel-in-progress: false
 env:
-  EPISODE: ${{ inputs.episode || 'goat-island' }}
+  EPISODE: ${{ inputs.episode || 'auto' }}
   PREVIEW: ${{ inputs.preview || false }}
   HF_HUB_DISABLE_XET: '1'
   OMP_NUM_THREADS: '2'
 jobs:
   prepare:
-    name: Validate episode and plan scenes
+    name: Generate new wildlife idea, script and SEO metadata
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 90
     outputs:
       scenes: ${{ steps.plan.outputs.scenes }}
       next: ${{ steps.plan.outputs.next }}
       episode: ${{ steps.plan.outputs.episode }}
+      ai: ${{ steps.plan.outputs.ai }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,6 +44,9 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt
+      - name: Install the Qwen CPU runtime
+        if: inputs.preview != true && env.EPISODE == 'auto'
+        run: pip install -r requirements-lyrics.txt
       - id: plan
         shell: bash
         env:
@@ -51,22 +55,33 @@ jobs:
         run: |
           episode="$EPISODE"
           next=render
-          if [[ "$PREVIEW" != true ]]; then
-            if [[ "$GITHUB_EVENT_NAME" == schedule ]]; then episode=; fi
-            selected=$(python -m wildlife.publication select --episode "$episode" | tail -n1)
+          ai=false
+          mkdir -p output/wildlife-plan
+          if [[ "$PREVIEW" == true ]]; then
+            episode=goat-island
+            echo null > output/wildlife-plan/plan.json
+          else
+            selected=$(python -u -m wildlife.publication select --episode "$episode" | tee /dev/stderr | tail -n1)
             episode=$(jq -er '.episode' <<< "$selected")
             next=$(jq -er '.next' <<< "$selected")
+            ai=$(jq -r '.ai' <<< "$selected")
           fi
           echo "episode=$episode" >> "$GITHUB_OUTPUT"
           echo "next=$next" >> "$GITHUB_OUTPUT"
+          echo "ai=$ai" >> "$GITHUB_OUTPUT"
           if [[ "$next" == render ]]; then
-            args=(--episode "$episode")
+            args=(--episode "$episode" --manifest output/wildlife-plan/plan.json)
             if [[ "$PREVIEW" == true ]]; then args+=(--preview); fi
             scenes=$(python -m wildlife.render "${args[@]}" --stage plan)
             echo "scenes=$scenes" >> "$GITHUB_OUTPUT"
-          elif [[ "$next" == complete ]]; then
-            echo "All configured episodes already have verified publication and cleanup receipts." >> "$GITHUB_STEP_SUMMARY"
           fi
+      - uses: actions/upload-artifact@v4
+        if: steps.plan.outputs.next == 'render'
+        with:
+          name: wildlife-plan
+          path: output/wildlife-plan/plan.json
+          if-no-files-found: error
+          retention-days: 7
   audio:
     name: Generate and master narration
     needs: prepare
@@ -90,9 +105,13 @@ jobs:
           sudo apt-get install -y ffmpeg espeak-ng
           pip install 'torch==2.7.1' --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements-wildlife.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: wildlife-plan
+          path: output/wildlife-plan
       - shell: bash
         run: |
-          args=(--episode "$EPISODE")
+          args=(--episode "$EPISODE" --manifest output/wildlife-plan/plan.json)
           if [[ "$PREVIEW" == true ]]; then args+=(--preview); fi
           python -u -m wildlife.render "${args[@]}" --stage audio
       - uses: actions/upload-artifact@v4
@@ -111,7 +130,7 @@ jobs:
       matrix:
         scene: ${{ fromJSON(needs.prepare.outputs.scenes || '[]') }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 45
     env:
       EPISODE: ${{ needs.prepare.outputs.episode }}
     steps:
@@ -124,11 +143,15 @@ jobs:
       - run: |
           if ! command -v ffmpeg; then sudo apt-get update && sudo apt-get install -y ffmpeg; fi
           pip install 'Pillow>=11,<13' 'numpy>=1.26,<3'
+      - uses: actions/download-artifact@v4
+        with:
+          name: wildlife-plan
+          path: output/wildlife-plan
       - shell: bash
         env:
           SCENE_INDEX: ${{ matrix.scene }}
         run: |
-          args=(--episode "$EPISODE")
+          args=(--episode "$EPISODE" --manifest output/wildlife-plan/plan.json)
           if [[ "$PREVIEW" == true ]]; then args+=(--preview); fi
           python -u -m wildlife.render "${args[@]}" --stage scene --index "$SCENE_INDEX"
       - uses: actions/upload-artifact@v4
@@ -137,9 +160,37 @@ jobs:
           path: output/wildlife-parts/visual-*.mp4
           if-no-files-found: error
           retention-days: 7
+  thumbnail:
+    name: Generate episode thumbnail artwork
+    needs: prepare
+    if: needs.prepare.outputs.next == 'render' && needs.prepare.outputs.ai == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          pip install 'torch==2.7.1' --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-images-cpu.txt 'Pillow>=11,<13'
+      - uses: actions/download-artifact@v4
+        with:
+          name: wildlife-plan
+          path: output/wildlife-plan
+      - run: python -u -m wildlife.art --manifest output/wildlife-plan/plan.json --output output/wildlife-parts/thumbnail-art.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wildlife-thumbnail-art
+          path: output/wildlife-parts/thumbnail-art.png
+          if-no-files-found: error
+          retention-days: 7
   assemble:
     name: Assemble 1080p video, thumbnail and metadata
-    needs: [prepare, audio, scenes]
+    needs: [prepare, audio, scenes, thumbnail]
+    if: always() && !cancelled() && needs.audio.result == 'success' && needs.scenes.result == 'success' && (needs.prepare.outputs.ai != 'true' || needs.thumbnail.result == 'success')
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
@@ -163,9 +214,18 @@ jobs:
         with:
           name: wildlife-narration
           path: output/wildlife-parts
+      - uses: actions/download-artifact@v4
+        with:
+          name: wildlife-plan
+          path: output/wildlife-plan
+      - uses: actions/download-artifact@v4
+        if: needs.prepare.outputs.ai == 'true'
+        with:
+          name: wildlife-thumbnail-art
+          path: output/wildlife-parts
       - shell: bash
         run: |
-          args=(--episode "$EPISODE")
+          args=(--episode "$EPISODE" --manifest output/wildlife-plan/plan.json)
           if [[ "$PREVIEW" == true ]]; then args+=(--preview); fi
           python -u -m wildlife.render "${args[@]}" --stage assemble
           jq -r '"## " + .title + "\n\n" + .description + "\n\n**Tags** " + (.tags | join(", "))' output/wildlife/metadata.json >> "$GITHUB_STEP_SUMMARY"

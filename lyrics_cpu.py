@@ -17,6 +17,9 @@ GGUF_SHA256 = '3605803b982cb64aead44f6c1b2ae36e3acdb41d8e46c8a94c6533bc4c67e597'
 CONTEXT_TOKENS = 16384
 # A small, bounded word grammar is safe to retain; large prose bounds are not.
 LYRIC_WORD_PATTERN = r'^[A-Za-z]+( [A-Za-z]+){3,11}[.!?]?$'
+_NARRATION_WORD = r"[A-Za-z0-9][A-Za-z0-9,.;:!?'-]*"
+WILDLIFE_NARRATION_PATTERN = ('^' + _NARRATION_WORD + '( ' + _NARRATION_WORD +
+                             r"){71,89} [A-Za-z0-9][A-Za-z0-9'-]*[.!?]$")
 _model = None
 
 
@@ -126,7 +129,7 @@ def request_story(endpoint, payload):
         if isinstance(node, dict):
             node.pop('minLength', None)
             node.pop('maxLength', None)
-            if node.get('pattern') != LYRIC_WORD_PATTERN:
+            if node.get('pattern') not in (LYRIC_WORD_PATTERN, WILDLIFE_NARRATION_PATTERN):
                 node.pop('pattern', None)
             for value in node.values():
                 remove_string_bounds(value)
@@ -190,7 +193,10 @@ def request_story(endpoint, payload):
                 if issue=='maxLength':
                     correction += f' Write this field in no more than {max(1,int(bound*.65))} characters including spaces. Characters are not words.'
             if issue == 'pattern':
-                correction += ' Every lyric must have 4 to 12 plain English words, single spaces, no apostrophes or hyphens. Aim for 6 words.'
+                if payload.get('wildlife_narration'):
+                    correction += ' Each narrative uses 73 to 91 plain English words with a final punctuation mark.'
+                else:
+                    correction += ' Every lyric must have 4 to 12 plain English words, single spaces, no apostrophes or hyphens. Aim for 6 words.'
             if issue == 'incomplete_output':
                 correction += ' Shorten prose and lyric lines so the entire JSON fits the output budget.'
             messages.append({'role': 'user', 'content': correction +

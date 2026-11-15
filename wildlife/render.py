@@ -74,26 +74,31 @@ def music_bed(target, seconds):
         output.writeframes((signal*32767).astype('<i2').tobytes())
 
 
-def encode_visuals(scene, seconds, size, target):
+def encode_visuals(scene, seconds, size, target, **art):
     width, height = size
     command = ['ffmpeg','-v','error','-y','-f','rawvideo','-pixel_format','rgb24',
                '-video_size',f'{width}x{height}','-framerate',str(FPS),'-i','pipe:0',
                '-an','-c:v','libx264','-preset','fast','-threads','4','-crf','18',
                '-pix_fmt','yuv420p',str(target)]
     with subprocess.Popen(command, stdin=subprocess.PIPE) as proc:
-        for frame in frames(size, scene, seconds, FPS):
+        for frame in frames(size, scene, seconds, FPS, **art):
             proc.stdin.write(frame.tobytes())
         proc.stdin.close()
         if proc.wait():
             raise RuntimeError(f'Visual encoding failed for {scene.label}')
 
 
-def thumbnail(episode, target):
-    with Image.open(ROOT/'assets'/'wildlife'/f'{episode}.jpg') as original:
-        image = original.convert('RGB')
+def thumbnail(episode, target, *, artwork=None, label='AFTER THE BOOM'):
+    from PIL import ImageOps
+    source = artwork or ROOT/'assets'/'wildlife'/f'{episode}.jpg'
+    with Image.open(source) as original:
+        image = ImageOps.fit(original.convert('RGB'),(1280,720),Image.Resampling.LANCZOS)
     draw = ImageDraw.Draw(image)
-    label = 'AFTER THE BOOM'
-    font = ImageFont.truetype(str(FONT), 143)
+    label = label.upper()
+    for size in range(143,50,-2):
+        font = ImageFont.truetype(str(FONT),size)
+        if draw.textlength(label,font=font) <= 1150:
+            break
     draw.text((640,18), label, font=font, anchor='mt', fill='#fff5dc', stroke_width=10,
               stroke_fill='#211b18')
     image.save(target, quality=92, optimize=True)
@@ -101,10 +106,16 @@ def thumbnail(episode, target):
         raise RuntimeError('Thumbnail is larger than 2 MiB')
 
 
-def plan_episode(episode, preview):
-    package, beats = EPISODES[episode]
-    if preview:
-        beats = PREVIEW
+def plan_episode(episode, preview, manifest=None):
+    if manifest is None:
+        package, beats = EPISODES[episode]
+        if preview:
+            beats = PREVIEW
+    else:
+        from .generate import decode
+        package, beats = decode(manifest,episode)
+        if preview:
+            raise ValueError('AI daily episodes are rendered at full length')
     package.validate()
     timeline = []
     elapsed = 0
@@ -141,22 +152,31 @@ def render_audio(beats, timeline, work):
         raw.unlink(missing_ok=True)
 
 
-def render_scene(beats, timeline, index, work, preview):
+def render_scene(beats, timeline, index, work, preview, manifest=None):
     if not 0 <= index < len(beats):
         raise ValueError('Scene index is outside the episode')
     work.mkdir(parents=True, exist_ok=True)
     beat, seconds = beats[index], timeline[index]['seconds']
     size = (1280,720) if preview else (1920,1080)
-    encode_visuals(beat, seconds, size, work/f'visual-{index:02}.mp4')
+    artwork = {}
+    if manifest is not None:
+        idea = manifest['idea']
+        artwork = {'species':idea['species'],'habitat':idea['habitat']}
+    encode_visuals(beat, seconds, size, work/f'visual-{index:02}.mp4',**artwork)
     print(json.dumps({'chapter':beat.label,'rendered':True,'seconds':seconds}),flush=True)
 
 
-def assemble(episode, package, timeline, work, output, preview):
+def assemble(episode, package, timeline, work, output, preview, manifest=None):
     if any(not (work/f'{kind}-{i:02}.{suffix}').is_file()
            for kind,suffix in [('visual','mp4'),('voice','wav')] for i in range(len(timeline))):
         raise ValueError('Missing planned wildlife scene or narration artifact')
     output.mkdir(parents=True, exist_ok=True)
-    thumbnail(episode,output/'thumbnail.jpg')
+    if manifest is None:
+        thumbnail(episode,output/'thumbnail.jpg')
+    else:
+        thumbnail(episode,output/'thumbnail.jpg',artwork=work/'thumbnail-art.png',
+                  label=manifest['idea']['thumbnail_text'])
+        (output/'episode-plan.json').write_text(json.dumps(manifest,indent=2)+'\n')
     for label, kind, suffix in [('video', 'visual', 'mp4'), ('voice', 'voice', 'wav')]:
         (work/f'{label}.txt').write_text(''.join(
             f"file '{kind}-{i:02}.{suffix}'\n" for i in range(len(timeline))))
@@ -182,27 +202,32 @@ def assemble(episode, package, timeline, work, output, preview):
         'music_bpm':BPM,'chapters':timeline},indent=2))
 
 
-def render(episode, output, preview=False):
-    package, beats, timeline = plan_episode(episode, preview)
+def render(episode, output, preview=False, manifest=None):
+    package, beats, timeline = plan_episode(episode, preview, manifest)
     output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='wildlife-',dir=output) as scratch:
         work = Path(scratch)
         render_audio(beats, timeline, work)
         for index in range(len(beats)):
-            render_scene(beats, timeline, index, work, preview)
-        assemble(episode, package, timeline, work, output, preview)
+            render_scene(beats, timeline, index, work, preview, manifest)
+        if manifest is not None:
+            from .art import make_art
+            make_art(manifest,work/'thumbnail-art.png')
+        assemble(episode, package, timeline, work, output, preview, manifest)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--episode',choices=EPISODES,default='goat-island')
+    parser.add_argument('--episode',default='goat-island')
     parser.add_argument('--output',type=Path,default=Path('output/wildlife'))
     parser.add_argument('--preview',action='store_true')
     parser.add_argument('--stage',choices=('all','plan','audio','scene','assemble'),default='all')
     parser.add_argument('--work',type=Path,default=Path('output/wildlife-parts'))
     parser.add_argument('--index',type=int)
+    parser.add_argument('--manifest',type=Path)
     args=parser.parse_args()
-    package, beats, timeline = plan_episode(args.episode,args.preview)
+    manifest = json.loads(args.manifest.read_text()) if args.manifest else None
+    package, beats, timeline = plan_episode(args.episode,args.preview,manifest)
     if args.stage == 'plan':
         print(json.dumps(list(range(len(beats)))))
     elif args.stage == 'audio':
@@ -210,8 +235,8 @@ if __name__ == '__main__':
     elif args.stage == 'scene':
         if args.index is None:
             parser.error('--stage scene requires --index')
-        render_scene(beats,timeline,args.index,args.work,args.preview)
+        render_scene(beats,timeline,args.index,args.work,args.preview,manifest)
     elif args.stage == 'assemble':
-        assemble(args.episode,package,timeline,args.work,args.output,args.preview)
+        assemble(args.episode,package,timeline,args.work,args.output,args.preview,manifest)
     else:
-        render(args.episode,args.output,args.preview)
+        render(args.episode,args.output,args.preview,manifest)
