@@ -1,1 +1,1 @@
-First full wildlife generation on main with validated title, description and tags.
+Generate and publish the 20-scene wildlife episode on YouTube and Facebook.

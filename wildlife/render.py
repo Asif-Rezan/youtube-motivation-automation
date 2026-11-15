@@ -101,55 +101,80 @@ def thumbnail(episode, target):
         raise RuntimeError('Thumbnail is larger than 2 MiB')
 
 
-def render(episode, output, preview=False):
+def plan_episode(episode, preview):
+    package, beats = EPISODES[episode]
+    if preview:
+        beats = PREVIEW
+    package.validate()
+    timeline = []
+    elapsed = 0
+    for beat in beats:
+        speech = len(beat.narration.split())*60/WORDS_PER_MINUTE
+        seconds = 10 if preview else math.ceil((speech+1.5)*FPS)/FPS
+        timeline.append({'chapter':beat.label,'start':round(elapsed,3),
+                         'seconds':seconds,'population':beat.population,'forage':beat.forage})
+        elapsed += seconds
+    if not preview and (len(beats) != 20 or not 600 <= elapsed <= 900):
+        raise ValueError('A full wildlife episode needs 20 scenes and a 10–15 minute runtime')
+    return package, beats, timeline
+
+
+def render_audio(beats, timeline, work):
     import torch
     from kokoro import KPipeline
 
-    packaging, beats = EPISODES[episode]
-    packaging.validate()
-    if preview:
-        beats = PREVIEW
-    output.mkdir(parents=True, exist_ok=True)
-    thumbnail(episode,output/'thumbnail.jpg')
-    size = (1280,720) if preview else (1920,1080)
+    work.mkdir(parents=True, exist_ok=True)
     torch.set_num_threads(2)
     speech = KPipeline(lang_code='a',device='cpu',repo_id='hexgrad/Kokoro-82M')
-    with tempfile.TemporaryDirectory(prefix='wildlife-',dir=output) as scratch:
-        work = Path(scratch)
-        timeline = []
-        for index, beat in enumerate(beats):
-            raw, voice = work/'voice-raw.wav', work/f'voice-{index:02}.wav'
-            visual = work/f'visual-{index:02}.mp4'
+    raw = work/'voice-raw.wav'
+    try:
+        for index, (beat, entry) in enumerate(zip(beats, timeline)):
+            seconds = entry['seconds']
             read_voice(speech,beat.narration,raw)
-            voice_seconds = len(beat.narration.split())*60/WORDS_PER_MINUTE
-            seconds = 10 if preview else math.ceil((voice_seconds+1.5)*FPS)/FPS
-            desired = min(voice_seconds,seconds-1)
+            desired = min(len(beat.narration.split())*60/WORDS_PER_MINUTE,seconds-1)
             pitch = 2**(SEMITONES/12)
             tempo = duration(raw)/(desired*pitch)
+            voice = work/f'voice-{index:02}.wav'
             ffmpeg('-i',raw,'-af',f'asetrate={RATE*pitch:.7f},aresample={RATE},atempo={tempo:.7f},'
                    'highpass=f=75,adelay=300,apad','-t',f'{seconds:.6f}',voice)
-            encode_visuals(beat,seconds,size,visual)
-            timeline.append({'chapter':beat.label,'start':round(sum(x['seconds'] for x in timeline),3),
-                             'seconds':seconds,'population':beat.population,'forage':beat.forage})
-            print(json.dumps({'chapter':beat.label,'rendered':True,'seconds':seconds}),flush=True)
-        for label, files in [('video', sorted(work.glob('visual-*.mp4'))),
-                             ('voice', sorted(work.glob('voice-[0-9][0-9].wav')))]:
-            (work/f'{label}.txt').write_text(''.join(f"file '{file.name}'\n" for file in files))
-        music = work/'music.wav'
-        music_bed(music,sum(item['seconds'] for item in timeline))
-        target = output/'video.mp4'
-        ffmpeg('-f','concat','-safe','0','-i',work/'video.txt','-f','concat','-safe','0','-i',work/'voice.txt',
-               '-i',music,'-filter_complex',
-               '[1:a]loudnorm=I=-16:TP=-2:LRA=7,aresample=48000,asplit[v][sc];'
-               '[2:a]volume=0.34,aresample=48000[m];[m][sc]sidechaincompress='
-               'threshold=0.025:ratio=4:attack=22:release=260[bed];[v][bed]amix=inputs=2:'
-               'duration=first:normalize=0,alimiter=limit=0.93[a]',
-               '-map','0:v','-map','[a]','-c:v','copy','-c:a','aac','-b:a','192k',
-               '-movflags','+faststart','-shortest',target)
-        ffmpeg('-xerror','-i',target,'-f','null','-')
+    finally:
+        raw.unlink(missing_ok=True)
+
+
+def render_scene(beats, timeline, index, work, preview):
+    if not 0 <= index < len(beats):
+        raise ValueError('Scene index is outside the episode')
+    work.mkdir(parents=True, exist_ok=True)
+    beat, seconds = beats[index], timeline[index]['seconds']
+    size = (1280,720) if preview else (1920,1080)
+    encode_visuals(beat, seconds, size, work/f'visual-{index:02}.mp4')
+    print(json.dumps({'chapter':beat.label,'rendered':True,'seconds':seconds}),flush=True)
+
+
+def assemble(episode, package, timeline, work, output, preview):
+    if any(not (work/f'{kind}-{i:02}.{suffix}').is_file()
+           for kind,suffix in [('visual','mp4'),('voice','wav')] for i in range(len(timeline))):
+        raise ValueError('Missing planned wildlife scene or narration artifact')
+    output.mkdir(parents=True, exist_ok=True)
+    thumbnail(episode,output/'thumbnail.jpg')
+    for label, kind, suffix in [('video', 'visual', 'mp4'), ('voice', 'voice', 'wav')]:
+        (work/f'{label}.txt').write_text(''.join(
+            f"file '{kind}-{i:02}.{suffix}'\n" for i in range(len(timeline))))
+    music = work/'music.wav'
+    music_bed(music,sum(item['seconds'] for item in timeline))
+    target = output/'video.mp4'
+    ffmpeg('-f','concat','-safe','0','-i',work/'video.txt','-f','concat','-safe','0','-i',work/'voice.txt',
+           '-i',music,'-filter_complex',
+           '[1:a]loudnorm=I=-16:TP=-2:LRA=7,aresample=48000,asplit[v][sc];'
+           '[2:a]volume=0.34,aresample=48000[m];[m][sc]sidechaincompress='
+           'threshold=0.025:ratio=4:attack=22:release=260[bed];[v][bed]amix=inputs=2:'
+           'duration=first:normalize=0,alimiter=limit=0.93[a]',
+           '-map','0:v','-map','[a]','-c:v','copy','-c:a','aac','-b:a','192k',
+           '-movflags','+faststart','-shortest',target)
+    ffmpeg('-xerror','-i',target,'-f','null','-')
     if abs(duration(target)-sum(x['seconds'] for x in timeline)) > .12:
         raise RuntimeError('Rendered duration differs from the narration timeline')
-    metadata = packaging.build(timeline, preview=preview)
+    metadata = package.build(timeline, preview=preview)
     (output/'metadata.json').write_text(json.dumps(metadata, indent=2) + '\n')
     (output/'episode.json').write_text(json.dumps({
         'title':metadata['title'],'illustrative_simulation':True,'preview':preview,
@@ -157,10 +182,36 @@ def render(episode, output, preview=False):
         'music_bpm':BPM,'chapters':timeline},indent=2))
 
 
+def render(episode, output, preview=False):
+    package, beats, timeline = plan_episode(episode, preview)
+    output.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='wildlife-',dir=output) as scratch:
+        work = Path(scratch)
+        render_audio(beats, timeline, work)
+        for index in range(len(beats)):
+            render_scene(beats, timeline, index, work, preview)
+        assemble(episode, package, timeline, work, output, preview)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--episode',choices=EPISODES,default='goat-island')
     parser.add_argument('--output',type=Path,default=Path('output/wildlife'))
     parser.add_argument('--preview',action='store_true')
+    parser.add_argument('--stage',choices=('all','plan','audio','scene','assemble'),default='all')
+    parser.add_argument('--work',type=Path,default=Path('output/wildlife-parts'))
+    parser.add_argument('--index',type=int)
     args=parser.parse_args()
-    render(args.episode,args.output,args.preview)
+    package, beats, timeline = plan_episode(args.episode,args.preview)
+    if args.stage == 'plan':
+        print(json.dumps(list(range(len(beats)))))
+    elif args.stage == 'audio':
+        render_audio(beats,timeline,args.work)
+    elif args.stage == 'scene':
+        if args.index is None:
+            parser.error('--stage scene requires --index')
+        render_scene(beats,timeline,args.index,args.work,args.preview)
+    elif args.stage == 'assemble':
+        assemble(args.episode,package,timeline,args.work,args.output,args.preview)
+    else:
+        render(args.episode,args.output,args.preview)

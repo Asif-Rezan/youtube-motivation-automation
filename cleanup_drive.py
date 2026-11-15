@@ -33,15 +33,17 @@ def verify_public(client, state):
                                 id=state['video_id']).execute(num_retries=3).get('items', [])
     if len(items) != 1:
         raise CleanupNotEligible('video_unavailable')
+    if state.get('wildlife') and not state.get('facebook_verified'):
+        raise CleanupNotEligible('wildlife_facebook_publication_pending')
     video = items[0]
     snippet, status = video.get('snippet', {}), video.get('status', {})
     song = state['song']
     # Uploads use owner-supplied fixed metadata; verify the durable upload body,
     # not the generated story title/tags. Older checkpoints retain the fallback.
     expected=state.get('upload_body',{}).get('snippet',{})
-    title=expected.get('title',song['title'])
-    description=expected.get('description',state.get('upload_description',upload_description(song)))
-    tags=expected.get('tags',metadata_tags(song))
+    title=expected['title'] if 'title' in expected else song['title']
+    description=expected.get('description') or state.get('upload_description') or upload_description(song)
+    tags=expected['tags'] if 'tags' in expected else metadata_tags(song)
     checks={'video_id':video.get('id')==state['video_id'],
             'channel_id':snippet.get('channelId')==required('EXPECTED_CHANNEL_ID'),
             'title':snippet.get('title')==title,
