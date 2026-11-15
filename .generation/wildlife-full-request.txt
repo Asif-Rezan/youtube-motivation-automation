@@ -1,1 +1,1 @@
-Start the full 4K wildlife generation after fixing repeated Qwen chapter labels, with current visuals and packaging.
+Resume the full 4K episode with the shared wildlife render dependencies installed.

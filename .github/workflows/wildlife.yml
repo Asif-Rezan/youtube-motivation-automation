@@ -94,7 +94,9 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: requirements-wildlife.txt
+          cache-dependency-path: |
+            requirements-wildlife.txt
+            requirements-wildlife-render.txt
       - name: Install CPU narration dependencies
         run: |
           sudo apt-get update
@@ -138,7 +140,7 @@ jobs:
           python-version: '3.12'
       - run: |
           if ! command -v ffmpeg; then sudo apt-get update && sudo apt-get install -y ffmpeg; fi
-          pip install 'Pillow>=11,<13' 'numpy>=1.26,<3'
+          pip install -r requirements-wildlife-render.txt
       - uses: actions/download-artifact@v4
         with:
           name: wildlife-plan
@@ -172,7 +174,7 @@ jobs:
           python-version: '3.12'
       - run: |
           if ! command -v ffmpeg; then sudo apt-get update && sudo apt-get install -y ffmpeg; fi
-          pip install 'Pillow>=11,<13' 'numpy>=1.26,<3'
+          pip install -r requirements-wildlife-render.txt
       - uses: actions/download-artifact@v4
         with:
           pattern: wildlife-scene-*
