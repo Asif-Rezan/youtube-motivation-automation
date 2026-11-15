@@ -1,9 +1,10 @@
-"""Low-poly island scenes projected from 3D coordinates and composited with animated goats."""
+"""Low-poly island scenes projected from 3D coordinates and composited with animated wildlife."""
 import math
 import random
 from pathlib import Path
+from functools import lru_cache
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageColor, ImageDraw, ImageFont
 
 
 FONT = Path(__file__).resolve().parents[1] / 'assets' / 'artwork' / 'Oswald.ttf'
@@ -21,6 +22,27 @@ def radius(angle):
 def height(x, y):
     return (.10 + 1.37 * math.exp(-((x+1.8)**2/6.5 + (y-.5)**2/3.0))
             + .48 * math.exp(-((x-2.6)**2/4.1 + (y-1.1)**2/2.3)))
+
+
+@lru_cache(maxsize=256)
+def shaded(colour, strength):
+    r,g,b = ImageColor.getrgb(colour)
+    return tuple(min(255,round(channel*strength)) for channel in (r,g,b))
+
+
+def terrain_light(x, y):
+    dx = (height(x+.08,y)-height(x-.08,y))/.16
+    dy = (height(x,y+.08)-height(x,y-.08))/.16
+    light = (.88 + .41*dx + .29*dy) / math.sqrt(1+dx*dx+dy*dy)
+    return min(1.15,max(.72,round(light,2)))
+
+
+def cloud(draw, x, y, width, height):
+    polygon(draw, [(x,y),(x+.19*width,y-.4*height),(x+.38*width,y-.82*height),
+                   (x+.63*width,y-height),(x+.83*width,y-.55*height),
+                   (x+width,y),(x+.52*width,y+.12*height)], '#ecf8f5')
+    polygon(draw, [(x,y),(x+.30*width,y-.18*height),(x+.78*width,y-.32*height),
+                   (x+width,y),(x+.52*width,y+.12*height)], '#cbe8ec')
 
 
 class Island:
@@ -54,15 +76,19 @@ class Island:
                 colour = (int(37+79*blend), int(146+55*blend), int(211+31*blend))
             else:
                 blend = (y-horizon) / max(1, screen_height-horizon)
-                colour = (int(20+10*blend), int(140+67*blend), int(182+23*blend))
+                colour = (int(16+9*blend), int(103+71*blend), int(153+36*blend))
             draw.line((0,y,width,y), fill=colour)
+        if horizon:
+            for x, y, w, h in ((.11,.13,.14,.031),(.62,.1,.17,.034),(.83,.18,.09,.018)):
+                cloud(draw,x*width,y*screen_height,w*width,h*screen_height)
         for _ in range(330):
             x = rng.randrange(width)
             y = rng.randrange(max(horizon, 1), screen_height)
             length = rng.randrange(3, max(4, width//27))
             polygon(draw, [(x,y),(x+length,y-2),(x+length*.84,y+1),(x+2,y+3)],
-                    rng.choice(['#46b6d4','#38a9cb','#51c1d7','#2799c7']))
-        for multiplier, colour in [(1.15, '#4bc6ce'), (1.07, '#79d7c7'), (1.025, '#b1e4c7')]:
+                    rng.choice(['#47acc6','#379fbe','#54b4c7','#278fb0']))
+        for multiplier, colour in [(1.15, '#45b8be'), (1.09, '#62c5c1'), (1.045, '#9cdbcc'),
+                                   (1.014, '#dfebce')]:
             polygon(draw, [self.project(5.9*radius(a)*math.cos(a)*multiplier,
                                         3.3*radius(a)*math.sin(a)*multiplier, -.03)
                            for a in [j*TAU/72 for j in range(72)]], colour)
@@ -91,8 +117,12 @@ class Island:
             for i in range(48):
                 j = (i+1)%48
                 for tri in [(inner[i], outer[i], outer[j]), (inner[i],outer[j],inner[j])]:
-                    colour = rng.choice(green if ring < 8 and rng.random() < self.foraging else base)
-                    triangles.append((sum(p[1] for p in tri), tri, colour))
+                    x,y,_ = (sum(values)/3 for values in zip(*tri))
+                    patch = .48 + .28*math.sin(x*1.7+y*.9) + .12*math.cos(y*2.9)
+                    lush = ring < 8 and patch + rng.uniform(-.14,.14) < self.foraging
+                    colour = shaded(rng.choice(green if lush else base),terrain_light(x,y))
+                    depth = x*math.sin(self.turn) + y*math.cos(self.turn)
+                    triangles.append((depth, tri, colour))
         for _, tri, colour in sorted(triangles, key=lambda t: -t[0]):
             polygon(draw, [self.project(*p) for p in tri], colour)
         for _ in range(230):
@@ -105,7 +135,41 @@ class Island:
                            (px+s,py-s*.35),(px+s*.6,py+s*.2)], '#4e7438')
             polygon(draw, [(px-s,py),(px-s*.35,py-s*.85),(px+s*.40,py-s),(px,py-s*.35)],
                     '#6d9149')
+        for _ in range(34 if self.habitat == 'rocky island' else 17):
+            x,y = rng.uniform(-5,5),rng.uniform(-2.5,2.5)
+            if (x/5.15)**2+(y/2.55)**2>.91:
+                continue
+            px,py=self.project(x,y,height(x,y))
+            s=self.scale*rng.uniform(.055,.16)
+            draw.ellipse((px-s*.72,py-s*.10,px+s*1.42,py+s*.27),fill='#807553')
+            polygon(draw,[(px-s,py),(px-s*.59,py-s*.79),(px+s*.24,py-s),
+                          (px+s*.86,py-s*.49),(px+s,py),(px+s*.11,py+s*.15)],'#b9b39a')
+            polygon(draw,[(px+s*.24,py-s),(px+s*.86,py-s*.49),(px+s,py),
+                          (px+s*.11,py+s*.15),(px+s*.14,py-s*.30)],'#88846f')
+        if self.habitat == 'wooded island':
+            for _ in range(52):
+                x,y = rng.uniform(-4.4,4.4),rng.uniform(-.4,2.1)
+                if (x/4.9)**2+(y/2.55)**2>.8 or rng.random() > self.foraging:
+                    continue
+                px,py=self.project(x,y,height(x,y))
+                s=self.scale*rng.uniform(.10,.19)
+                draw.ellipse((px-s*.25,py-s*.13,px+s*.85,py+s*.23),fill='#526b37')
+                draw.line((px,py,px,py-s*1.41),fill='#66543d',width=max(2,round(s*.14)))
+                polygon(draw,[(px-s,py-s*.55),(px-s*.58,py-s*1.66),(px,py-s*2.39),
+                              (px+s*.54,py-s*1.78),(px+s,py-s*.57)],'#31583b')
+                polygon(draw,[(px-s,py-s*.55),(px-s*.58,py-s*1.66),(px,py-s*2.39),
+                              (px+s*.22,py-s*.61)],'#557f49')
         return image
+
+    def water_glints(self):
+        rng = random.Random(81)
+        pixels = self.base.load()
+        for _ in range(100):
+            x = rng.randrange(self.width)
+            y = rng.randrange(self.screen_height//3,self.screen_height)
+            r,g,b = pixels[x,y]
+            if r < 60 and b > g and b-r > 95:
+                yield x,y,rng.uniform(.55,1.15),rng.random()*TAU
 
     def actors(self, count, seed):
         rng = random.Random(seed)
@@ -147,8 +211,8 @@ def animal_sprite(colour, frame, grazing, species, scale=1):
     poly([(22,44),(30,35),(44,31),(69,32),(83,39),(68,45),(37,46)],light)
     poly([(24,56),(40,53),(75,53),(87,49),(76,62),(38,64)],shadow)
     poly([(26,43),(13,31),(10,34),(20,48)],coat)
-    n = 19 if grazing else 0
-    if species == "rabbit":
+    n = round(19*grazing)
+    if species == 'rabbit':
         n += 12
     poly([(72,45),(82,28+n),(96,26+n),(93,48+n),(81,55)],coat)
     poly([(82,28+n),(91,18+n),(104,21+n),(112,31+n),(109,39+n),
@@ -177,41 +241,61 @@ def frames(size, beat, duration, fps, *, species='goats', habitat='grassland isl
     world = Island(size, beat.camera, beat.forage, seed=177, habitat=habitat)
     kind = {'goats':'goat','deer':'deer','rabbits':'rabbit'}[species]
     figures = world.actors(beat.population, seed=903)
-    from functools import lru_cache
+    glints = tuple(world.water_glints())
 
     @lru_cache(maxsize=768)
     def sprite_at(coat, phase, grazing, pixels, flip):
         sprite = animal_sprite(coat,phase,grazing,kind,pixels/120)
         return sprite.transpose(Image.Transpose.FLIP_LEFT_RIGHT) if flip else sprite
     w, h = size
-    title_font = ImageFont.truetype(str(FONT), round(w*.043))
+    title_font = ImageFont.truetype(str(FONT), round(w*.034))
     small = ImageFont.truetype(str(FONT), round(w*.017))
     for index in range(round(duration*fps)):
         t = index/fps
         image = world.base.copy()
         draw = ImageDraw.Draw(image)
+        for x,y,velocity,phase in glints:
+            crest = max(0,math.sin(t*velocity*2.3+phase))
+            if crest > .38:
+                length = round(w*.018*crest)
+                end = min(w-1,x+length)
+                pixels = world.base.getpixel((end,y))
+                if pixels[0] < 65 and pixels[2] > pixels[1]:
+                    draw.line((x,y,end,y),fill=('#5db9cc' if crest>.72 else '#3ea0bd'),
+                              width=max(1,w//1040))
         placed = []
         for x, y, angle, scale, coat in figures:
             walking = beat.action == 'walk'
-            sway = .51 * math.sin(t*.72+angle) if walking else .10 * math.sin(t*.77+angle)
-            px, py = world.project(x+sway, y, height(x+sway,y))
+            route = t*.47+angle
+            sway = .54 * math.sin(route) if walking else .07 * math.sin(t*.77+angle)
+            distance = .14 * math.cos(route) if walking else 0
+            px, py = world.project(x+sway,y+distance,height(x+sway,y+distance))
             proportion = (.47 if beat.camera == 'aerial' else .91) * world.scale / 110 * scale
             if kind == "rabbit":
                 proportion *= .68
             phase = int((t*10 + angle*2) % 12) if walking else 0
-            graze = not walking and math.sin(t*.91+angle) > -.16
-            placed.append((py, px, proportion, coat, phase, graze, math.cos(t*.72+angle) < 0 and walking))
-        for py, px, scale, coat, phase, graze, flip in sorted(placed):
+            graze = 0 if walking else round((.5+.5*math.sin(t*.91+angle))*4)/4
+            lift = (max(0,math.sin((phase/12)*TAU))*9*proportion
+                    if kind == 'rabbit' and walking else 0)
+            placed.append((py,px,proportion,coat,phase,graze,math.cos(route)<0 and walking,lift))
+        for py, px, scale, coat, phase, graze, flip, lift in sorted(placed):
             sprite = sprite_at(coat,phase,graze,max(12,round(120*scale)),flip)
             shadow = max(2, round(34*scale))
-            draw.ellipse((px-shadow, py-3, px+shadow, py+3),fill='#756a45')
-            image.paste(sprite, (round(px-sprite.width/2), round(py-sprite.height*.94)),sprite)
-        # Slow push-in across each shot keeps the island motion distinct from the HUD.
-        margin = round(w*.025*min(1,t/max(duration,1)))
+            px_safe, py_safe = min(w-1,max(0,round(px))), min(h-1,max(0,round(py)))
+            ground = world.base.getpixel((px_safe,py_safe))
+            shade = tuple(round(channel*.66) for channel in ground)
+            depth = max(2,round(5*scale))
+            draw.ellipse((px-shadow*.72,py-depth,px+shadow*1.28,py+depth),fill=shade)
+            image.paste(sprite,(round(px-sprite.width/2),round(py-sprite.height*.94-lift)),sprite)
+        # Ease the camera into each shot while keeping the overlay stationary.
+        progress = min(1,t/max(duration,1))
+        eased = progress*progress*(3-2*progress)
+        margin = round(w*.031*eased)
         if margin:
             vertical = round(margin*h/w)
-            image = image.resize(size, Image.Resampling.BILINEAR,
-                                 box=(margin,vertical,w-margin,h-vertical))
+            pan = round(margin*{'aerial':0,'shore':.58,'pasture':-.48}[beat.camera])
+            image = image.resize(size,Image.Resampling.BILINEAR,
+                                 box=(margin+pan,vertical,w-margin+pan,h-vertical))
             draw = ImageDraw.Draw(image)
         if not overlay:
             yield image
