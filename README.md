@@ -1,3 +1,25 @@
+# Wildlife simulation videos
+
+The **Wildlife simulation video** workflow renders narrated ecological thought experiments.
+The first episode follows two goats introduced to a hypothetical island. It uses a projected
+low-poly terrain, animated goat sprites, shoreline and aerial shots, and a population counter.
+The timeline contains illustrative scenario values and does not estimate a real herd.
+
+Run the workflow with the preview checkbox for a 30-second video or leave it unchecked for the
+full 1080p episode. The artifact contains the MP4, 1280 × 720 thumbnail, and chapter timeline.
+The previous nursery-rhyme schedule is removed. Its existing manual and recovery paths are available.
+
+To render locally with FFmpeg, CPU PyTorch and `requirements-wildlife.txt` installed:
+
+```bash
+python -m wildlife.render --episode goat-island --preview --output output/wildlife-preview
+python -m wildlife.render --episode goat-island --output output/wildlife-full
+```
+
+The renderer calibrates Kokoro narration to about 145 words per minute and lowers its pitch
+by one semitone. An original 102 BPM score sits beneath the narration. Both are generated
+locally from the episode script. The episode catalog is in `wildlife/episodes.py`.
+
 ## Version log (how to go back)
 
 | Version | Commit / tag | What it is |
@@ -94,7 +116,7 @@ Facebook integration setup and recovery: [docs/facebook-publishing.md](docs/face
 
 The existing destination is `UCztvMrNCT34DO3DtzLPgWaw`, preserved from the archived Ancient Humans workflow. All active workflows resolve `EXPECTED_CHANNEL_ID` from an existing secret, then an optional repository variable, then that original channel ID. The uploader still verifies that OAuth belongs to this exact destination. No new OAuth token is required for this migration.
 
-`PUBLISH_ENABLED=true` enables long/Short uploads, and `AUTOMATION_ENABLED=true` enables daily generation at 03:00 Asia/Dhaka. Uploaded videos use the reference automatic scheduling policy: first 06:00 America/New_York slot at least 72 hours after upload completion. These are repository Actions variables, not secrets. Explicit false disables the corresponding behavior. Existing token and Drive secrets are reused.
+`PUBLISH_ENABLED=true` enables uploads for manually requested legacy long videos and Shorts. Uploaded videos use the reference automatic scheduling policy: first 06:00 America/New_York slot at least 72 hours after upload completion. These are repository Actions variables, not secrets. Explicit false disables the corresponding behavior. Existing token and Drive secrets are reused.
 
 ## Shorts preview recovery and publication preflight
 
