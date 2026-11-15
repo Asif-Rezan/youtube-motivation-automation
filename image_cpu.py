@@ -14,7 +14,7 @@ class ImageSafetyBlocked(RuntimeError):
     """The model's safety checker rejected a generated image."""
 
 
-def safer_prompt(prompt, *, wildlife=False):
+def safer_prompt(prompt):
     """Keep the scene's setting and props while removing graphic/sexual details."""
     replacements = [
         (r'\b(?:bloodied|bloody|gory|gore|bleeding|bloodstains?)\b', 'dramatic'),
@@ -28,8 +28,6 @@ def safer_prompt(prompt, *, wildlife=False):
     for pattern, replacement in replacements:
         prompt = re.sub(pattern, replacement, prompt, flags=re.I)
     # Preserve the scene's visual anchor before the encoders' token limit.
-    if wildlife:
-        return prompt + ' Non-graphic wildlife documentary illustration.'
     return prompt + ' Gentle child-friendly storybook scene, no violence.'
 
 def recovery_prompt(prompt):
@@ -55,7 +53,7 @@ def negative_prompt():
 
 _pipeline = None
 
-def generate(prompt, path, seed, allow_text=False, width=None, height=None, steps=None, reference_image=None, strength=None, wildlife=False):
+def generate(prompt, path, seed, allow_text=False, width=None, height=None, steps=None, reference_image=None, strength=None):
     if allow_text:
         raise ValueError('Dudi Dam TV artwork must be text-free')
     if reference_image is None and strength is not None:
@@ -100,12 +98,8 @@ def generate(prompt, path, seed, allow_text=False, width=None, height=None, step
         reference_options=dict(image=initial_image,strength=float(strength))
     start = time.monotonic()
     image = None
-    if wildlife:
-        initial_prompt = safer_prompt(prompt,wildlife=True)
-        rewritten = safer_prompt(prompt + ' Unobstructed daylight scene with clear composition.',wildlife=True)
-    else:
-        initial_prompt = safer_prompt(prompt)
-        rewritten = recovery_prompt(prompt)
+    initial_prompt = safer_prompt(prompt)
+    rewritten = recovery_prompt(prompt)
     for attempt in range(10):
         # Five seeds per composition; keep input sanitization and output checks.
         candidate = initial_prompt if attempt < 5 else rewritten

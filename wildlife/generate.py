@@ -33,7 +33,7 @@ def enum(values):
 IDEA = obj(species=enum(SPECIES), habitat=enum(HABITATS), pressure=enum(PRESSURES),
            title=STRING, opening=STRING, description=STRING,
            tags={'type': 'array', 'items': STRING, 'minItems': 4, 'maxItems': 12},
-           thumbnail_prompt=STRING, thumbnail_text=STRING, arc=STRING)
+           thumbnail_text=STRING, arc=STRING)
 SCENE = obj(label=STRING, narration={'type':'string','pattern':WILDLIFE_NARRATION_PATTERN}, visual=STRING, population={'type':'integer','minimum':0,'maximum':9999},
             forage_percent={'type':'integer','enum':list(range(0,101,5))}, camera=enum(('shore','aerial','pasture')),
             action=enum(('walk','graze')))
@@ -59,13 +59,12 @@ def concept(idea):
 
 def validate_idea(idea):
     from jsonschema import validate
-    validate(idea, IDEA)
+    validate({key:value for key,value in idea.items() if key != 'thumbnail_prompt'}, IDEA)
     packaging(idea).validate()
     if not re.fullmatch(r"[A-Za-z0-9 -]{4,22}", idea['thumbnail_text']):
         raise ValueError('Thumbnail text must be 4–22 plain characters')
-    for field, minimum, maximum in [('thumbnail_prompt',35,240),('arc',40,700)]:
-        if not minimum <= len(idea[field]) <= maximum:
-            raise ValueError(f'Invalid {field} length')
+    if not 40 <= len(idea['arc']) <= 700:
+        raise ValueError('Invalid story arc length')
 
 
 def validate_scenes(scenes):
@@ -105,9 +104,8 @@ def build(episode, store):
             'combination not in the used list. Title 35–70 characters; start with the species, end in a '
             'curiosity-driven question, and make an accurate promise for the story. Opening 40–160 characters '
             'and naturally include the species. Write one short description paragraph, 6–10 distinct searchable '
-            'tags including the species, and a 2–4 word thumbnail hook within 22 characters. Describe a colorful '
-            'thumbnail with a close-up animal and a contrasting landscape, leaving clear sky at the top. '
-            'Thumbnail prompt under 200 characters. The arc must be hypothetical and explain defensible '
+            'tags including the species, and a 2–4 word thumbnail hook within 22 characters. '
+            'The arc must be hypothetical and explain defensible '
             'ecological mechanisms. Avoid implying that repeated browsing makes saplings grow faster '
             'or claiming unsupported benefits from a habitat loss. Keep the arc under 600 characters. '
             f'Used topics: {json.dumps(recent[-60:])}. {feedback}',

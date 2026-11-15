@@ -48,7 +48,7 @@ def selection(episode, manifest_path):
         manifest = build(episode,store) if is_generated(episode) else None
         manifest_path.parent.mkdir(parents=True,exist_ok=True)
         manifest_path.write_text(json.dumps(manifest,indent=2)+'\n')
-    return {'episode':episode,'next':action,'ai':is_generated(episode)}
+    return {'episode':episode,'next':action}
 
 
 def is_generated(episode):
@@ -69,7 +69,7 @@ def run(stage, episode, root):
         store.save(key, state)
 
     if stage == 'youtube':
-        from .render import plan_episode, duration
+        from .render import FULL_SIZE, duration, plan_episode, video_size
         manifest = None
         if is_generated(episode):
             manifest = json.loads((root/'episode-plan.json').read_text())
@@ -77,8 +77,16 @@ def run(stage, episode, root):
                 raise ValueError('Publication plan differs from the original AI checkpoint')
         package, _, timeline = plan_episode(episode, False, manifest)
         metadata = json.loads((root/'metadata.json').read_text())
-        if metadata != package.build(timeline) or not 600 <= duration(root/'video.mp4') <= 900:
-            raise ValueError('Only the validated full wildlife episode may be published')
+        video = root/'video.mp4'
+        if (metadata != package.build(timeline) or not 600 <= duration(video) <= 900
+                or video_size(video) != FULL_SIZE):
+            raise ValueError('Only the validated full 4K wildlife episode may be published')
+        from PIL import Image
+        from .thumbnail import SIZE, THUMBNAIL_MAX_BYTES
+        artwork = root/'thumbnail.jpg'
+        with Image.open(artwork) as thumbnail:
+            if thumbnail.size != SIZE or artwork.stat().st_size >= THUMBNAIL_MAX_BYTES:
+                raise ValueError('Invalid wildlife thumbnail dimensions or file size')
         client = youtube_client()
         if state.get('phase') == 'published':
             return state['video_id']

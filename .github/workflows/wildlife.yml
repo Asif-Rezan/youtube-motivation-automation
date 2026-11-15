@@ -35,7 +35,6 @@ jobs:
       scenes: ${{ steps.plan.outputs.scenes }}
       next: ${{ steps.plan.outputs.next }}
       episode: ${{ steps.plan.outputs.episode }}
-      ai: ${{ steps.plan.outputs.ai }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,7 +54,6 @@ jobs:
         run: |
           episode="$EPISODE"
           next=render
-          ai=false
           mkdir -p output/wildlife-plan
           if [[ "$PREVIEW" == true ]]; then
             episode=goat-island
@@ -64,11 +62,9 @@ jobs:
             selected=$(python -u -m wildlife.publication select --episode "$episode" | tee /dev/stderr | tail -n1)
             episode=$(jq -er '.episode' <<< "$selected")
             next=$(jq -er '.next' <<< "$selected")
-            ai=$(jq -r '.ai' <<< "$selected")
           fi
           echo "episode=$episode" >> "$GITHUB_OUTPUT"
           echo "next=$next" >> "$GITHUB_OUTPUT"
-          echo "ai=$ai" >> "$GITHUB_OUTPUT"
           if [[ "$next" == render ]]; then
             args=(--episode "$episode" --manifest output/wildlife-plan/plan.json)
             if [[ "$PREVIEW" == true ]]; then args+=(--preview); fi
@@ -160,39 +156,11 @@ jobs:
           path: output/wildlife-parts/visual-*.mp4
           if-no-files-found: error
           retention-days: 7
-  thumbnail:
-    name: Generate episode thumbnail artwork
-    needs: prepare
-    if: needs.prepare.outputs.next == 'render' && needs.prepare.outputs.ai == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - run: |
-          pip install 'torch==2.7.1' --index-url https://download.pytorch.org/whl/cpu
-          pip install -r requirements-images-cpu.txt 'Pillow>=11,<13'
-      - uses: actions/download-artifact@v4
-        with:
-          name: wildlife-plan
-          path: output/wildlife-plan
-      - run: python -u -m wildlife.art --manifest output/wildlife-plan/plan.json --output output/wildlife-parts/thumbnail-art.png
-      - uses: actions/upload-artifact@v4
-        with:
-          name: wildlife-thumbnail-art
-          path: output/wildlife-parts/thumbnail-art.png
-          if-no-files-found: error
-          retention-days: 7
   assemble:
-    name: Assemble 1080p video, thumbnail and metadata
-    needs: [prepare, audio, scenes, thumbnail]
-    if: always() && !cancelled() && needs.audio.result == 'success' && needs.scenes.result == 'success' && (needs.prepare.outputs.ai != 'true' || needs.thumbnail.result == 'success')
+    name: Assemble 4K video and draw 1080p thumbnail
+    needs: [prepare, audio, scenes]
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 60
     env:
       EPISODE: ${{ needs.prepare.outputs.episode }}
     steps:
@@ -218,11 +186,6 @@ jobs:
         with:
           name: wildlife-plan
           path: output/wildlife-plan
-      - uses: actions/download-artifact@v4
-        if: needs.prepare.outputs.ai == 'true'
-        with:
-          name: wildlife-thumbnail-art
-          path: output/wildlife-parts
       - shell: bash
         run: |
           args=(--episode "$EPISODE" --manifest output/wildlife-plan/plan.json)

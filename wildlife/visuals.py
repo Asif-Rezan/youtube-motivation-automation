@@ -122,54 +122,67 @@ class Island:
         return result
 
 
-def animal_sprite(colour, frame, grazing, species):
+def animal_sprite(colour, frame, grazing, species, scale=1):
     """Faceted body, muzzle, horns, and individually animated legs."""
     coat, light, shadow = (('#eee2bf','#fff5da','#b4a488') if colour == 0
                             else ('#746456','#a79277','#443c36'))
-    sprite = Image.new('RGBA', (120,100))
+    sprite = Image.new('RGBA', (round(120*scale),round(100*scale)))
     draw = ImageDraw.Draw(sprite)
+    def poly(points, pigment):
+        polygon(draw, [(x*scale,y*scale) for x,y in points], pigment)
+
+    def line(points, color, width):
+        draw.line(tuple(v*scale for v in points),fill=color,width=max(1,round(width*scale)))
+
+    def ellipse(box, color):
+        draw.ellipse(tuple(v*scale for v in box),fill=color)
+
     swing = 9 * math.sin(frame * TAU / 12)
     for x, phase, dark in ((32,1,True),(74,-1,True),(38,-1,False),(80,1,False)):
         foot = x+phase*swing
-        polygon(draw, [(x-4,57),(x+4,57),(x+phase*swing*.5+3,76),(foot+3,92),
+        poly([(x-4,57),(x+4,57),(x+phase*swing*.5+3,76),(foot+3,92),
                        (foot-3,92),(x+phase*swing*.5-4,77)], shadow if dark else coat)
-        polygon(draw, [(foot-3,89),(foot+4,89),(foot+5,94),(foot-4,94)], '#423a31')
-    polygon(draw, [(22,44),(30,35),(44,31),(69,32),(83,39),(87,49),(76,62),(38,64),(24,56)],coat)
-    polygon(draw, [(22,44),(30,35),(44,31),(69,32),(83,39),(68,45),(37,46)],light)
-    polygon(draw, [(24,56),(40,53),(75,53),(87,49),(76,62),(38,64)],shadow)
-    polygon(draw, [(26,43),(13,31),(10,34),(20,48)],coat)
+        poly([(foot-3,89),(foot+4,89),(foot+5,94),(foot-4,94)], '#423a31')
+    poly([(22,44),(30,35),(44,31),(69,32),(83,39),(87,49),(76,62),(38,64),(24,56)],coat)
+    poly([(22,44),(30,35),(44,31),(69,32),(83,39),(68,45),(37,46)],light)
+    poly([(24,56),(40,53),(75,53),(87,49),(76,62),(38,64)],shadow)
+    poly([(26,43),(13,31),(10,34),(20,48)],coat)
     n = 19 if grazing else 0
     if species == "rabbit":
         n += 12
-    polygon(draw, [(72,45),(82,28+n),(96,26+n),(93,48+n),(81,55)],coat)
-    polygon(draw, [(82,28+n),(91,18+n),(104,21+n),(112,31+n),(109,39+n),
+    poly([(72,45),(82,28+n),(96,26+n),(93,48+n),(81,55)],coat)
+    poly([(82,28+n),(91,18+n),(104,21+n),(112,31+n),(109,39+n),
                    (94,40+n),(86,35+n)],light)
-    polygon(draw, [(101,28+n),(112,31+n),(109,39+n),(102,39+n)],shadow)
-    polygon(draw, [(89,24+n),(77,20+n),(78,26+n),(87,30+n)],shadow)
+    poly([(101,28+n),(112,31+n),(109,39+n),(102,39+n)],shadow)
+    poly([(89,24+n),(77,20+n),(78,26+n),(87,30+n)],shadow)
     if species == 'rabbit':
         for x, y in [(91,20+n),(99,21+n)]:
-            polygon(draw, [(x-4,y+4),(x-9,y-20),(x-5,y-25),(x,y-21),(x+4,y+4)], light)
-            polygon(draw, [(x-3,y),(x-6,y-18),(x-4,y-20),(x+1,y)], '#c78a86')
+            poly([(x-4,y+4),(x-9,y-20),(x-5,y-25),(x,y-21),(x+4,y+4)], light)
+            poly([(x-3,y),(x-6,y-18),(x-4,y-20),(x+1,y)], '#c78a86')
     elif species == 'deer':
         for x, y in [(91,18+n),(100,19+n)]:
-            draw.line((x,y,x-3,y-18,x-9,y-24),fill='#62513c',width=3)
-            draw.line((x-3,y-14,x+4,y-22),fill='#62513c',width=2)
+            line((x,y,x-3,y-18,x-9,y-24),color='#62513c',width=3)
+            line((x-3,y-14,x+4,y-22),color='#62513c',width=2)
         for x,y in [(37,42),(47,40),(57,41),(67,44)]:
-            draw.ellipse((x,y,x+3,y+3),fill='#fff2ce')
+            ellipse((x,y,x+3,y+3),color='#fff2ce')
     else:
         for x, y in [(92,20+n),(99,21+n)]:
-            polygon(draw, [(x-3,y+2),(x-5,y-7),(x-12,y-15),(x-5,y-13),(x+1,y-5),(x+3,y+1)],
+            poly([(x-3,y+2),(x-5,y-7),(x-12,y-15),(x-5,y-13),(x+1,y-5),(x+3,y+1)],
                     '#73634f')
-    draw.ellipse((97,25+n,100,28+n),fill='#241c13')
+    ellipse((97,25+n,100,28+n),color='#241c13')
     return sprite
 
 
-def frames(size, beat, duration, fps, *, species='goats', habitat='grassland island'):
+def frames(size, beat, duration, fps, *, species='goats', habitat='grassland island', overlay=True):
     world = Island(size, beat.camera, beat.forage, seed=177, habitat=habitat)
     kind = {'goats':'goat','deer':'deer','rabbits':'rabbit'}[species]
     figures = world.actors(beat.population, seed=903)
-    sprites = {(coat, phase, grazing): animal_sprite(coat, phase, grazing, kind)
-               for coat in range(2) for phase in range(12) for grazing in (False, True)}
+    from functools import lru_cache
+
+    @lru_cache(maxsize=768)
+    def sprite_at(coat, phase, grazing, pixels, flip):
+        sprite = animal_sprite(coat,phase,grazing,kind,pixels/120)
+        return sprite.transpose(Image.Transpose.FLIP_LEFT_RIGHT) if flip else sprite
     w, h = size
     title_font = ImageFont.truetype(str(FONT), round(w*.043))
     small = ImageFont.truetype(str(FONT), round(w*.017))
@@ -189,10 +202,7 @@ def frames(size, beat, duration, fps, *, species='goats', habitat='grassland isl
             graze = not walking and math.sin(t*.91+angle) > -.16
             placed.append((py, px, proportion, coat, phase, graze, math.cos(t*.72+angle) < 0 and walking))
         for py, px, scale, coat, phase, graze, flip in sorted(placed):
-            sprite = sprites[coat, phase, graze]
-            if flip:
-                sprite = sprite.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
-            sprite = sprite.resize((max(1,round(120*scale)),max(1,round(100*scale))),Image.Resampling.BILINEAR)
+            sprite = sprite_at(coat,phase,graze,max(12,round(120*scale)),flip)
             shadow = max(2, round(34*scale))
             draw.ellipse((px-shadow, py-3, px+shadow, py+3),fill='#756a45')
             image.paste(sprite, (round(px-sprite.width/2), round(py-sprite.height*.94)),sprite)
@@ -203,6 +213,9 @@ def frames(size, beat, duration, fps, *, species='goats', habitat='grassland isl
             image = image.resize(size, Image.Resampling.BILINEAR,
                                  box=(margin,vertical,w-margin,h-vertical))
             draw = ImageDraw.Draw(image)
+        if not overlay:
+            yield image
+            continue
         x, y = round(w*.035), round(h*.055)
         label = beat.label.upper()
         draw.text((x,y),label,font=title_font,fill='#fff4d9',stroke_width=max(2,w//390),stroke_fill='#252422')

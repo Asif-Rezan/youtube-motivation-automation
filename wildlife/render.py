@@ -8,14 +8,15 @@ import tempfile
 import wave
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
 
 from .episodes import EPISODES, PREVIEW
-from .visuals import FONT, frames
+from .visuals import frames
+from .thumbnail import render_thumbnail
 
 
-ROOT = Path(__file__).resolve().parents[1]
 FPS = 24
+FULL_SIZE = (3840,2160)
+PREVIEW_SIZE = (1280,720)
 RATE = 24000
 BPM = 102
 VOICE = 'am_michael'
@@ -88,22 +89,11 @@ def encode_visuals(scene, seconds, size, target, **art):
             raise RuntimeError(f'Visual encoding failed for {scene.label}')
 
 
-def thumbnail(episode, target, *, artwork=None, label='AFTER THE BOOM'):
-    from PIL import ImageOps
-    source = artwork or ROOT/'assets'/'wildlife'/f'{episode}.jpg'
-    with Image.open(source) as original:
-        image = ImageOps.fit(original.convert('RGB'),(1280,720),Image.Resampling.LANCZOS)
-    draw = ImageDraw.Draw(image)
-    label = label.upper()
-    for size in range(143,50,-2):
-        font = ImageFont.truetype(str(FONT),size)
-        if draw.textlength(label,font=font) <= 1150:
-            break
-    draw.text((640,18), label, font=font, anchor='mt', fill='#fff5dc', stroke_width=10,
-              stroke_fill='#211b18')
-    image.save(target, quality=92, optimize=True)
-    if target.stat().st_size >= 2 * 1024**2:
-        raise RuntimeError('Thumbnail is larger than 2 MiB')
+def video_size(path):
+    data = subprocess.check_output(['ffprobe','-v','error','-select_streams','v:0',
+                                    '-show_entries','stream=width,height','-of','json',str(path)])
+    video = json.loads(data)['streams'][0]
+    return video['width'], video['height']
 
 
 def plan_episode(episode, preview, manifest=None):
@@ -157,7 +147,7 @@ def render_scene(beats, timeline, index, work, preview, manifest=None):
         raise ValueError('Scene index is outside the episode')
     work.mkdir(parents=True, exist_ok=True)
     beat, seconds = beats[index], timeline[index]['seconds']
-    size = (1280,720) if preview else (1920,1080)
+    size = PREVIEW_SIZE if preview else FULL_SIZE
     artwork = {}
     if manifest is not None:
         idea = manifest['idea']
@@ -171,11 +161,13 @@ def assemble(episode, package, timeline, work, output, preview, manifest=None):
            for kind,suffix in [('visual','mp4'),('voice','wav')] for i in range(len(timeline))):
         raise ValueError('Missing planned wildlife scene or narration artifact')
     output.mkdir(parents=True, exist_ok=True)
+    _, beats, _ = plan_episode(episode,preview,manifest)
     if manifest is None:
-        thumbnail(episode,output/'thumbnail.jpg')
+        render_thumbnail(beats,output/'thumbnail.jpg')
     else:
-        thumbnail(episode,output/'thumbnail.jpg',artwork=work/'thumbnail-art.png',
-                  label=manifest['idea']['thumbnail_text'])
+        idea = manifest['idea']
+        render_thumbnail(beats,output/'thumbnail.jpg',label=idea['thumbnail_text'],
+                         species=idea['species'],habitat=idea['habitat'])
         (output/'episode-plan.json').write_text(json.dumps(manifest,indent=2)+'\n')
     for label, kind, suffix in [('video', 'visual', 'mp4'), ('voice', 'voice', 'wav')]:
         (work/f'{label}.txt').write_text(''.join(
@@ -192,6 +184,9 @@ def assemble(episode, package, timeline, work, output, preview, manifest=None):
            '-map','0:v','-map','[a]','-c:v','copy','-c:a','aac','-b:a','192k',
            '-movflags','+faststart','-shortest',target)
     ffmpeg('-xerror','-i',target,'-f','null','-')
+    expected_size = PREVIEW_SIZE if preview else FULL_SIZE
+    if video_size(target) != expected_size:
+        raise RuntimeError('Rendered video resolution differs from the episode settings')
     if abs(duration(target)-sum(x['seconds'] for x in timeline)) > .12:
         raise RuntimeError('Rendered duration differs from the narration timeline')
     metadata = package.build(timeline, preview=preview)
@@ -199,7 +194,7 @@ def assemble(episode, package, timeline, work, output, preview, manifest=None):
     (output/'episode.json').write_text(json.dumps({
         'title':metadata['title'],'illustrative_simulation':True,'preview':preview,
         'voice':VOICE,'pitch_semitones':SEMITONES,'words_per_minute_target':WORDS_PER_MINUTE,
-        'music_bpm':BPM,'chapters':timeline},indent=2))
+        'music_bpm':BPM,'resolution':list(expected_size),'chapters':timeline},indent=2))
 
 
 def render(episode, output, preview=False, manifest=None):
@@ -210,9 +205,6 @@ def render(episode, output, preview=False, manifest=None):
         render_audio(beats, timeline, work)
         for index in range(len(beats)):
             render_scene(beats, timeline, index, work, preview, manifest)
-        if manifest is not None:
-            from .art import make_art
-            make_art(manifest,work/'thumbnail-art.png')
         assemble(episode, package, timeline, work, output, preview, manifest)
 
 
