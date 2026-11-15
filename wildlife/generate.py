@@ -68,10 +68,22 @@ def validate_idea(idea):
         raise ValueError('Invalid story arc length')
 
 
+def unique_scene_labels(previous, batch):
+    used = {scene['label'].strip().casefold() for scene in previous}
+    normalized = []
+    for scene in batch:
+        label = base = scene['label'].strip()
+        part = 2
+        while label.casefold() in used:
+            suffix = f' ({part})'
+            label = base[:45-len(suffix)].rstrip() + suffix
+            part += 1
+        used.add(label.casefold())
+        normalized.append(dict(scene,label=label))
+    return normalized
+
+
 def validate_scenes(scenes):
-    for field in ('label','visual'):
-        if len({s[field].casefold().strip() for s in scenes}) != len(scenes):
-            raise ValueError(f'Scene {field} must be distinct')
     for scene in scenes:
         if not 73 <= len(scene['narration'].split()) <= 91:
             raise ValueError('Each narrated scene needs 73–91 words')
@@ -138,18 +150,18 @@ def build(episode, store):
                 "Exactly four distinct and chronological scenes. Aim for 82 words of narration per scene "
                 "(allowed range 73–91) with single spaces and ASCII punctuation. Write a continuous story, with a concrete hook early and a resolution "
                 "in scene 20. No citations or numerical claims about real studies. Give the fictional population as a "
-                "whole number from 0 to 9999 and forage_percent as a multiple of five from 0 to 100. Keep each caption label under 38 characters. Each visual "
+                "whole number from 0 to 9999 and forage_percent as a multiple of five from 0 to 100. Keep each caption label specific to its scene and under 38 characters. Each visual "
                 "describes a different visible environment for its narration, text-free with no animals, within "
                 f"180 characters. {feedback}",
                 schema, seed+1000+start*20+attempt*3, 3500)
             try:
-                validate_scenes(scenes+result['scenes'])
+                validate_scenes(result['scenes'])
             except ValueError as error:
                 counts = [len(s['narration'].split()) for s in result['scenes']]
                 feedback = f'Rewrite all four scenes. {error}. Previous word counts were {counts}.'
                 print(f'Scene batch {start+1} retry:',error,counts,flush=True)
                 continue
-            scenes.extend(result['scenes'])
+            scenes.extend(unique_scene_labels(scenes,result['scenes']))
             break
         else:
             raise RuntimeError(f'Could not validate the narration for scene batch {start+1}')

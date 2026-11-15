@@ -42,7 +42,9 @@ class WildlifePlanningTests(unittest.TestCase):
             scene = asdict(beat)
             scene['forage_percent'] = round(scene.pop('forage') * 20) * 5
             scene['narration'] = ' '.join(['Example'] * 75) + '.'
-            scene['visual'] = f'Wide view of the forest edge from position {index}.'
+            scene['visual'] = 'Wide view of the forest edge in the evening.'
+            if index in (0, 8, 9):
+                scene['label'] = 'The herd grows'
             scenes.append(scene)
         store = MemoryStore()
         episode = 'auto-2026-11-15'
@@ -54,6 +56,9 @@ class WildlifePlanningTests(unittest.TestCase):
         self.assertEqual(manifest['idea']['thumbnail_text'], 'THE GREEN VANISHES')
         package, beats, timeline = plan_episode(episode, False, manifest)
         self.assertEqual(len(beats), 20)
+        self.assertEqual(beats[0].label, 'The herd grows')
+        self.assertEqual(len({beat.label.casefold() for beat in beats}), 20)
+        self.assertTrue(beats[8].label.startswith('The herd grows ('))
         self.assertTrue(600 <= sum(chapter['seconds'] for chapter in timeline) <= 900)
         self.assertEqual(package.build(timeline)['title'],
                          'Deer on an Island: What If Their Food Starts to VANISH?')

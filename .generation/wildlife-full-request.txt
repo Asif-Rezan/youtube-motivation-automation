@@ -1,1 +1,1 @@
-Start the first full AI-planned wildlife episode with a new thumbnail and Python-rendered low-poly animation.
+Start the full 4K wildlife generation after fixing repeated Qwen chapter labels, with current visuals and packaging.
