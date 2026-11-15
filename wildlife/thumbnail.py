@@ -23,11 +23,13 @@ def episode_cue(episode):
     return 'arrow'
 
 
-def draw_cue(image, cue):
+def draw_cue(image, cue, *, arrow_offset=(0,0)):
     draw = ImageDraw.Draw(image)
     if cue == 'arrow':
         points = [(1772,244),(1792,300),(1649,371),(1674,410),
                   (1501,453),(1540,291),(1578,328)]
+        dx,dy = arrow_offset
+        points = [(x+dx,y+dy) for x,y in points]
         draw.polygon(points,fill=ARROW_RED)
         draw.line([*points,points[0]],fill='#fff6e8',width=22,joint='curve')
         draw.line([*points,points[0]],fill='#43131d',width=8,joint='curve')
@@ -50,8 +52,7 @@ def draw_cue(image, cue):
 
 
 def render_thumbnail(beats, target: Path, *, label='AFTER THE BOOM', species='goats',
-                     habitat='grassland island', cue='arrow', varied_layout=False):
-    width, frame_height = SIZE
+                     habitat='grassland island', cue='arrow'):
     peak = max(beats,key=lambda beat:beat.population)
     overview = replace(peak,camera='aerial')
     cover = next(frames(SIZE,overview,1,1,species=species,habitat=habitat,overlay=False))
@@ -65,34 +66,26 @@ def render_thumbnail(beats, target: Path, *, label='AFTER THE BOOM', species='go
         ImageDraw.Draw(near).ellipse((x+100,y+sprite.height-54,x+sprite.width-45,y+sprite.height-20),
                                       fill='#53623a')
         near.paste(sprite,(x,y),sprite)
+    opening_count = f'{beats[0].population:,} {species.upper()}'
+    outcome = 'HOW MANY?' if cue in ('question','trail') else f'{peak.population:,} {species.upper()}'
+    cover = compose_thumbnail(near,cover,label,cue,(opening_count,outcome))
+    save_thumbnail(cover,target)
+
+
+def compose_thumbnail(near,cover,label,cue,labels,*,arrow_offset=(0,0)):
+    width, frame_height = SIZE
     mask = Image.new('L',SIZE)
     seam = ((955,0),(748,frame_height))
-    cover_draw = ImageDraw.Draw(cover)
-    if varied_layout and cue == 'question':
-        inset = (35,285,820,950)
-        ImageDraw.Draw(mask).ellipse(inset,fill=255)
-        cover.paste(near,(0,0),mask)
-        ImageDraw.Draw(cover).ellipse(inset,outline='#fff1d4',width=12)
-    elif varied_layout and cue == 'spotlight':
-        inset = (49,289,850,950)
-        ImageDraw.Draw(mask).rounded_rectangle(inset,radius=70,fill=255)
-        cover.paste(near,(0,0),mask)
-        ImageDraw.Draw(cover).rounded_rectangle(inset,radius=70,outline='#fff1d4',width=10)
-    elif varied_layout and cue == 'trail':
-        cover_draw.rectangle((0,0,806,1080),fill='#10426a')
-        cover.paste(near.crop((0,235,810,1080)),(0,235))
-        ImageDraw.Draw(cover).line(((810,235),(810,1080)),fill='#fff1d4',width=10)
-    else:
-        ImageDraw.Draw(mask).polygon([(0,0),*seam,(0,frame_height)],fill=255)
-        cover.paste(near,(0,0),mask)
-        ImageDraw.Draw(cover).line(seam,fill='#fff1d4',width=11)
+    ImageDraw.Draw(mask).polygon([(0,0),*seam,(0,frame_height)],fill=255)
+    cover.paste(near,(0,0),mask)
+    ImageDraw.Draw(cover).line(seam,fill='#fff1d4',width=11)
     cover = ImageEnhance.Color(cover).enhance(1.32)
     cover = ImageEnhance.Contrast(cover).enhance(1.13)
     cover = ImageEnhance.Brightness(cover).enhance(1.10)
     gradient = Image.new('L',(1,236))
     gradient.putdata([round(205 * (1-y/236)**.8) for y in range(236)])
     cover.paste('#132b3f',(0,0,width,236),gradient.resize((width,236)))
-    draw_cue(cover,cue)
+    draw_cue(cover,cue,arrow_offset=arrow_offset)
     draw = ImageDraw.Draw(cover)
     label = label.upper()
     for font_size in range(186,54,-2):
@@ -102,44 +95,29 @@ def render_thumbnail(beats, target: Path, *, label='AFTER THE BOOM', species='go
     draw.text((width//2,46),label,font=font,anchor='mt',fill='#fff5d9',
               stroke_width=11,stroke_fill=INK)
     badge = ImageFont.truetype(str(FONT),57)
-    opening_count = f'{beats[0].population:,} {species.upper()}'
-    outcome = f'{peak.population:,} {species.upper()}'
-    if cue in ('question','trail'):
-        outcome = 'HOW MANY?'
-    for text, x, anchor in [(opening_count,48,'lt'),(outcome,width-48,'rt')]:
+    for text, x, anchor in [(labels[0],48,'lt'),(labels[1],width-48,'rt')]:
         box = draw.textbbox((x,972),text,font=badge,anchor=anchor)
         draw.rounded_rectangle((box[0]-16,box[1]-11,box[2]+16,box[3]+11),radius=16,
                                fill='#163337',outline='#eee6bd',width=3)
         draw.text((x,972),text,font=badge,anchor=anchor,fill='#fff1ce')
-    save_thumbnail(cover,target)
+    return cover
 
 
 def render_science_thumbnail(beats, target, idea, cue):
     from .science_visuals import science_frame
 
     domain,topic = idea['domain'],idea['topic']
-    index = max(range(len(beats)),key=lambda i:abs(beats[i].forage-beats[0].forage))
-    frame = science_frame(SIZE,domain,topic,beats[index].forage,beats[index].camera)
-    cover = ImageEnhance.Color(frame).enhance(1.31)
-    cover = ImageEnhance.Contrast(cover).enhance(1.12)
-    cover = ImageEnhance.Brightness(cover).enhance(1.08)
-    draw = ImageDraw.Draw(cover)
-    label = idea['thumbnail_text'].upper()
-    # Leave the featured object visible and vary where the headline sits.
-    band, anchor, position = {
-        'space': ((0,0,1920,236),'lt',(80,38)),
-        'ocean': ((0,841,1920,1080),'mt',(960,889)),
-        'earth': ((0,0,1920,242),'mt',(960,40)),
-        'technology': ((0,0,1920,230),'rt',(1810,40)),
-    }[domain]
-    draw.rectangle(band, fill={'space':'#152242','ocean':'#0c4361',
-                              'earth':'#244752','technology':'#2d2244'}[domain])
-    for font_size in range(158,54,-2):
-        font = ImageFont.truetype(str(FONT),font_size)
-        if draw.textlength(label,font=font) <= 1710:
-            break
-    draw.text(position,label,font=font,anchor=anchor,fill='#fff6e1',stroke_width=9,stroke_fill=INK)
-    draw_cue(cover,cue)
+    before = beats[0]
+    after = max(beats,key=lambda beat:abs(beat.forage-before.forage))
+    near = science_frame(SIZE,domain,topic,before.forage,'shore')
+    cover = science_frame(SIZE,domain,topic,after.forage,'aerial')
+    if domain == 'earth':
+        # Center the foreground feature in each half of the original split.
+        near.paste(near.crop((405,0,1365,1080)),(0,0))
+        cover.paste(cover.crop((440,0,1540,1080)),(820,0))
+    offset = (0,196) if topic == 'rivers' else (0,0)
+    cover = compose_thumbnail(near,cover,idea['thumbnail_text'],cue,
+                              ('BEFORE','WHAT NEXT?'),arrow_offset=offset)
     save_thumbnail(cover,target)
 
 

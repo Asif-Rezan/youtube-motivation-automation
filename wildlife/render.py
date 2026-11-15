@@ -179,7 +179,7 @@ def assemble(episode, package, timeline, work, output, preview, manifest=None):
         cue = episode_cue(episode)
         if idea.get('domain','wildlife') == 'wildlife':
             render_thumbnail(beats,output/'thumbnail.jpg',label=idea['thumbnail_text'],
-                             species=idea['species'],habitat=idea['habitat'],cue=cue,varied_layout=True)
+                             species=idea['species'],habitat=idea['habitat'],cue=cue)
         else:
             render_science_thumbnail(beats,output/'thumbnail.jpg',idea,cue)
         (output/'episode-plan.json').write_text(json.dumps(manifest,indent=2)+'\n')
