@@ -1,0 +1,137 @@
+"""Procedural scenes for space, ocean, earth and technology thought experiments."""
+
+import math
+
+from PIL import Image, ImageDraw
+
+
+def science_frames(size, beat, duration, fps, *, domain, topic, disclose=False):
+    for number in range(round(duration*fps)):
+        yield science_frame(size,domain,topic,beat.forage,beat.camera,number/fps,
+                            disclose=disclose and number < fps*3)
+
+
+def science_frame(size, domain, topic, intensity, camera, seconds=0, *, disclose=False):
+    palette = {'space':'#0a1632','ocean':'#135b83','earth':'#547e8d','technology':'#17233a'}
+    image = Image.new('RGB',size,palette[domain])
+    draw = ImageDraw.Draw(image)
+    sx,sy=size[0]/1920,size[1]/1080
+    shift = {'aerial':0,'shore':-100,'pasture':80}[camera]
+    travel = math.sin(seconds*.38)
+    level = max(0,min(1,intensity))
+
+    def polygon(points,fill):
+        draw.polygon([(round(x*sx),round(y*sy)) for x,y in points],fill=fill)
+
+    def line(points,fill,width=4):
+        draw.line([(round(x*sx),round(y*sy)) for x,y in points],fill=fill,width=max(1,round(width*sx)))
+
+    def ellipse(x,y,rx,ry,fill,outline=None):
+        draw.ellipse(tuple(round(v*k) for v,k in zip((x-rx,y-ry,x+rx,y+ry),(sx,sy,sx,sy))),
+                     fill=fill,outline=outline,width=max(1,round(4*sx)))
+
+    if domain == 'space':
+        for i in range(100):
+            x,y=(i*157+53)%1920,(i*113+91)%1080
+            ellipse(x,y,2+i%3,2+i%3,('#f4dda6' if i%7==0 else '#aebee2'))
+        x,y=1000+shift+15*travel,580
+        radius=250 if camera=='aerial' else 315
+        if topic in ('moon','shadows'):
+            ellipse(x-375,y-180,105+145*level,105+145*level,'#cfcbcb','#f2e2c2')
+        if topic == 'rings':
+            ellipse(x,y+34,590,112,None,'#d8bd87')
+            ellipse(x,y+34,505,88,None,'#a3a9ba')
+        ellipse(x,y,radius,radius,'#2269a0','#61c7db')
+        polygon([(x-radius*.84,y-radius*.39),(x-radius*.28,y-radius*.78),
+                 (x+radius*.21,y-radius*.69),(x+radius*.02,y-radius*.11),
+                 (x-radius*.26,y+radius*.1),(x-radius*.44,y+radius*.57),
+                 (x-radius*.78,y+radius*.2)],'#6fa878')
+        polygon([(x+radius*.29,y-radius*.13),(x+radius*.76,y-radius*.25),
+                 (x+radius*.92,y+radius*.25),(x+radius*.46,y+radius*.69)],'#4b896e')
+        if topic == 'daylight':
+            line([(x+90-100*level,y-radius),(x+66-100*level,y+radius)],'#f8cf73',7)
+        if topic == 'rings':
+            line([(x-500,y+80),(x-300,y+117),(x+170,y+128),(x+480,y+85)],'#f0cb8d',12)
+    elif domain == 'ocean':
+        surface=370-175*level+20*travel if topic=='tides' else 330+16*travel
+        polygon([(0,surface),(1920,surface),(1920,1080),(0,1080)],'#127cb0')
+        polygon([(0,850),(510,760),(930,660),(1350,470),(1920,420),(1920,1080),(0,1080)],'#d4ab72')
+        polygon([(0,950),(550,850),(1000,770),(1400,600),(1920,570),(1920,1080),(0,1080)],'#8f805f')
+        for i in range(25):
+            y=surface+45+(i*37)%420
+            x=(i*153+48*travel)%1380
+            if y < 700-x*.20:
+                line([(x,y),(x+95,y),(x+140,y-8)],'#67c8e5')
+        if topic == 'sea ice':
+            for i in range(round(16*(1-level))+2):
+                x,y=(i*121)%1420,surface+42+(i*32)%170
+                polygon([(x,y),(x+90,y-15),(x+141,y+10),(x+70,y+27)],'#c7eef0')
+        elif topic == 'reefs':
+            for i in range(13):
+                x,y=450+i*62,790-i*8
+                line([(x,y),(x+8,y-67*(1-level)),(x+30,y-93*(1-level))],'#e57e76',10)
+                line([(x+7,y-35),(x-22,y-65)],'#d98a79',7)
+        else:
+            for i in range(10):
+                x,y=1530+i*38,462-i*2+shift*.15
+                polygon([(x,y),(x+22,y-55),(x+38,y),(x+38,y+28),(x,y+28)],'#e4e0bd')
+            if topic == 'currents':
+                y=surface+125+115*level
+                line([(80,y),(420,y-30),(720,y+45),(976,y+20)],'#9af1ee',11)
+                polygon([(976,y+20),(925,y-4),(927,y+54)],'#9af1ee')
+    elif domain == 'earth':
+        polygon([(0,618),(300,455),(680,626),(1080,255),(1510,628),(1920,493),(1920,1080),(0,1080)],'#536e69')
+        polygon([(720,650),(1080,255),(1410,635),(1120,525),(1010,588)],'#9d9885')
+        snow=290+165*level if topic=='albedo' else 350
+        polygon([(1080,255),(1080+(snow-255)*.86,snow),(1065,snow-45),
+                 (1080-(snow-255)*.90,snow)],'#e4eedf')
+        polygon([(0,787),(450,687),(1000,788),(1460,665),(1920,710),(1920,1080),(0,1080)],'#708841')
+        if topic=='rivers':
+            polygon([(1000,620),(1095,620),(1180-350*level,795),(1470-550*level,1080),
+                     (1210-550*level,1080),(1040-315*level,810)],'#62b9c9')
+        else:
+            for i in range(6):
+                if topic=='clouds' and i/6<level:
+                    continue
+                x=160+i*280+20*travel
+                polygon([(x,320),(x+46,293),(x+113,302),(x+148,327),(x+26,330)],'#c2ddd7')
+            if topic=='wind':
+                for i in range(4):
+                    x,y=235+i*390,605+i%2*75
+                    end=x+(170 if level<.5 else -170)
+                    line([(x,y),(end,y+18)],'#f0c969',8)
+                    polygon([(end,y+18),(end+(28 if level>=.5 else -28),y+2),
+                             (end+(28 if level>=.5 else -28),y+34)],'#f0c969')
+    else:
+        polygon([(0,835),(900,654),(1920,825),(1920,1080),(0,1080)],'#253953')
+        nodes=[]
+        for i in range(12):
+            x=135+i*148+shift*.3
+            height=155+(i*137)%390
+            top=790-height
+            polygon([(x,790),(x,top),(x+102,top-24),(x+102,790)],'#365070')
+            for row in range(4):
+                for col in range(3):
+                    y=top+45+row*30
+                    if y<775 and (i+row+col)%10>=round(level*8):
+                        l=x+15+col*22
+                        polygon([(l,y),(l+12,y),(l+12,y+15),(l,y+15)],'#f5c978')
+            nodes.append((x+50,top-45))
+        if topic in ('internet','network','navigation'):
+            x,y=900+shift,201
+            ellipse(x,y,46,28,'#bbdce7')
+            for a,b in nodes[::2]:
+                if (a%320)/320>level:
+                    line([(x,y),(a,b)],'#66c3db',4)
+        else:
+            for i in range(5):
+                x=615+i*137
+                polygon([(x,942),(x,887),(x+104,887),(x+104,942)],
+                        '#e7b858' if i<round(level*5) else '#415f7a')
+    if disclose:
+        from PIL import ImageFont
+        from .visuals import FONT
+        draw.text((round(64*sx),round(1014*sy)),'ILLUSTRATIVE SIMULATION',
+                  font=ImageFont.truetype(str(FONT),round(24*sx)),fill='#f9f0d8',
+                  stroke_width=max(1,round(sx)),stroke_fill='#182027')
+    return image

@@ -10,6 +10,7 @@ from lyrics_cpu import WILDLIFE_NARRATION_PATTERN
 
 from .episodes import Beat
 from .metadata import POWER_WORDS, Packaging, emphasize_title
+from .whatif import TOPICS, select_topic
 
 
 SPECIES = {'goats': 'goat', 'deer': 'deer', 'rabbits': 'rabbit'}
@@ -34,6 +35,8 @@ IDEA = obj(species=enum(SPECIES), habitat=enum(HABITATS), pressure=enum(PRESSURE
            title=STRING, opening=STRING, description=STRING,
            tags={'type': 'array', 'items': STRING, 'minItems': 4, 'maxItems': 12},
            thumbnail_text=STRING, arc=STRING)
+GENERAL_IDEA = obj(**{key:value for key,value in IDEA['properties'].items()
+                     if key not in ('species','habitat','pressure')}, premise=STRING)
 SCENE = obj(label=STRING, narration={'type':'string','pattern':WILDLIFE_NARRATION_PATTERN}, visual=STRING, population={'type':'integer','minimum':0,'maximum':9999},
             forage_percent={'type':'integer','enum':list(range(0,101,5))}, camera=enum(('shore','aerial','pasture')),
             action=enum(('walk','graze')))
@@ -44,23 +47,43 @@ def ask(prompt, schema, seed, limit):
     result = request_story('chat/completions', {
         'messages': [{'role':'user','content':prompt}],
         'response_format': {'type':'json_schema','json_schema':{'schema':schema}},
-        'seed':seed, 'max_completion_tokens':limit, 'wildlife_narration':schema is not IDEA,
+        'seed':seed, 'max_completion_tokens':limit, 'wildlife_narration':'scenes' in schema['properties'],
     })
     return json.loads(result['choices'][0]['message']['content'])
 
 
 def packaging(idea):
-    title = emphasize_title(idea['title'],idea['species'],idea['pressure'])
-    return Packaging(title,idea['species'],idea['opening'],idea['description'],tuple(idea['tags']))
+    subject = idea.get('subject') or idea['species']
+    title = emphasize_title(idea['title'],subject,idea.get('pressure'))
+    return Packaging(title,subject,idea['opening'],idea['description'],tuple(idea['tags']))
 
 
 def concept(idea):
+    if idea.get('domain') and idea['domain'] != 'wildlife':
+        return [idea['domain'],idea['topic'],idea['premise']]
     return [idea[key] for key in ('species','habitat','pressure')]
+
+
+def history_entry(episode, idea):
+    return {'episode':episode,'concept':concept(idea),'title':idea['title'],
+            'domain':idea.get('domain','wildlife'),'topic':idea.get('topic','')}
+
 
 
 def validate_idea(idea):
     from jsonschema import validate
-    validate({key:value for key,value in idea.items() if key != 'thumbnail_prompt'}, IDEA)
+    domain = idea.get('domain','wildlife')
+    if domain not in TOPICS:
+        raise ValueError('Unknown what-if category')
+    validate({key:value for key,value in idea.items()
+              if key not in ('thumbnail_prompt','domain','topic','subject')},
+             IDEA if domain == 'wildlife' else GENERAL_IDEA)
+    if domain != 'wildlife':
+        registered = {(topic,subject) for topic,subject,_ in TOPICS[domain]}
+        if (idea.get('topic'),idea.get('subject')) not in registered:
+            raise ValueError('The episode needs a topic from its what-if category')
+        if not 30 <= len(idea['premise']) <= 300:
+            raise ValueError('The episode needs a concrete what-if premise')
     packaging(idea).validate()
     if not re.fullmatch(r"[A-Za-z0-9 -]{4,22}", idea['thumbnail_text']):
         raise ValueError('Thumbnail text must be 4–22 plain characters')
@@ -101,31 +124,38 @@ def build(episode, store):
         decode(cached, episode)
         if not any(row['episode'] == episode for row in history):
             idea = cached['idea']
-            store.save(HISTORY_KEY, history + [{'episode':episode,'concept':concept(idea),'title':idea['title']}])
+            store.save(HISTORY_KEY, history + [history_entry(episode,idea)])
         return cached
     seed = int.from_bytes(hashlib.sha256(episode.encode()).digest()[:4],'big') % 2_000_000_000
     recent = [[['goats','grassland island','drought'],'2 Goats, 1 Island: What Happens When the Food Runs Out?']]
     recent += [[row['concept'],row['title']] for row in history]
     occupied = {tuple(row[0]) for row in recent}
     titles = {row[1].casefold() for row in recent}
+    domain, topic, subject, starter, reused = select_topic(history,seed)
+    wildlife = domain == 'wildlife'
+    schema = IDEA if wildlife else GENERAL_IDEA
+    angle = ('Use this as a loose starting point for a materially different hypothetical: ' if reused
+             else 'Build the episode around this concrete what-if: ') + starter
+    historical_premises = [str(row[0][2]) for row in recent if row[0][0] == domain]
     feedback = ''
     for attempt in range(5):
         idea = ask(
-            'Invent one original English wildlife what-if for a hypothetical computer simulation. '
-            'Use only the species, habitats and pressures allowed by the schema. Species is plural. '
-            'Explore a mechanism beyond simple population growth. Pick a species, habitat and pressure '
-            'combination not in the used list. Title 35–70 characters; start with the species, end in a '
-            f'curiosity-driven question, and make an accurate promise for the story. Include one fitting uppercase '
-            f'power word from {", ".join(sorted(POWER_WORDS))}. Opening 40–160 characters '
-            'and naturally include the species. Write one short description paragraph, 6–10 distinct searchable '
-            'tags including the species, and a 2–4 word thumbnail hook within 22 characters. '
-            'The arc must be hypothetical and explain defensible '
-            'ecological mechanisms. Avoid implying that repeated browsing makes saplings grow faster '
-            'or claiming unsupported benefits from a habitat loss. Keep the arc under 600 characters. '
-            f'Used topics: {json.dumps(recent[-60:])}. {feedback}',
-            IDEA, seed+100*attempt, 1500)
+            'Write an original, English what-if scenario for a hypothetical science and technology series. '
+            f'{angle} State the specific initiating change in the premise, explore a surprising consequence, '
+            'and reveal the answer in the final scenes. Avoid a generic disaster or population boom. '
+            'Distinguish the assumed conditions from real facts. Title 35–70 characters, with '
+            f'{subject} near the start, one fitting power word from {", ".join(sorted(POWER_WORDS))}, '
+            f'and a question ending. Include {subject} in the opening of 40–160 characters and in a tag. '
+            'Write one short description paragraph, 6–10 distinct tags and a 2–4 word thumbnail hook '
+            'within 22 plain characters that hints at the unanswered question. '
+            'The arc must fit 600 characters. '
+            f'Prior stories to avoid: {json.dumps(recent[-60:])}. {feedback}',
+            schema,seed+100*attempt,1500)
         if not re.fullmatch(r'[A-Za-z0-9 -]{4,22}',idea['thumbnail_text']):
-            idea['thumbnail_text'] = HEADLINES[idea['pressure']]
+            idea['thumbnail_text'] = HEADLINES[idea['pressure']] if wildlife else 'WHAT CHANGES'
+        idea.update(domain=domain,topic=topic)
+        if not wildlife:
+            idea['subject'] = subject
         idea['title'] = packaging(idea).title
         try:
             validate_idea(idea)
@@ -133,11 +163,17 @@ def build(episode, store):
             feedback = f'Repair this validation issue: {error}.'
             print('Idea retry:',error,flush=True)
             continue
+        if not wildlife:
+            tokens = set(re.findall(r'[a-z]+',idea['premise'].lower()))
+            if any(len(tokens & other) / max(1,len(tokens | other)) >= .65
+                   for other in (set(re.findall(r'[a-z]+',text.lower())) for text in historical_premises)):
+                feedback = 'The premise repeats an older story. Change the initiating event and consequence.'
+                continue
         if tuple(concept(idea)) not in occupied and idea['title'].casefold() not in titles:
             break
-        feedback = 'The combination or title repeated a previous episode. Choose a different species and pressure.'
+        feedback = 'The premise or title repeated an earlier episode. Change the central consequence.'
     else:
-        raise RuntimeError('No distinct, validated wildlife idea was generated')
+        raise RuntimeError('No distinct, validated what-if idea was generated')
     scenes = []
     schema = obj(scenes={'type':'array','items':SCENE,'minItems':4,'maxItems':4})
     for start in range(0,20,4):
@@ -145,12 +181,16 @@ def build(episode, store):
         feedback = ''
         for attempt in range(4):
             result = ask(
-                f"Write exactly scenes {start+1} to {start+4} of this twenty-scene English wildlife "
+                f"Write exactly scenes {start+1} to {start+4} of this twenty-scene English what-if "
                 f"thought experiment. Plan: {json.dumps(idea)}. Prior beats: {json.dumps(prior)}. "
                 "Exactly four distinct and chronological scenes. Aim for 82 words of narration per scene "
                 "(allowed range 73–91) with single spaces and ASCII punctuation. Write a continuous story, with a concrete hook early and a resolution "
-                "in scene 20. No citations or numerical claims about real studies. Give the fictional population as a "
-                "whole number from 0 to 9999 and forage_percent as a multiple of five from 0 to 100. Keep each caption label specific to its scene and under 38 characters. Each visual "
+                "in scene 20. Keep real facts separate from the hypothetical conditions. "
+                + ("Give the fictional population as a whole number from 0 to 9999 and "
+                   "forage_percent as a multiple of five from 0 to 100. " if wildlife else
+                   "Set population to zero. Set forage_percent from 0 to 100 in steps of five "
+                   "to guide the animation intensity for the scenario, with meaningful changes across scenes. ")
+                + "Keep each caption label specific to its scene and under 38 characters. Each visual "
                 "describes a different visible environment for its narration, text-free with no animals, within "
                 f"180 characters. {feedback}",
                 schema, seed+1000+start*20+attempt*3, 3500)
@@ -168,7 +208,7 @@ def build(episode, store):
     payload = {'episode':episode, 'idea':idea, 'scenes':scenes}
     decode(payload, episode)
     store.save(key,payload)
-    store.save(HISTORY_KEY, history + [{'episode':episode,'concept':concept(idea),'title':idea['title']}])
+    store.save(HISTORY_KEY, history + [history_entry(episode,idea)])
     return payload
 
 

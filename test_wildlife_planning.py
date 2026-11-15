@@ -5,6 +5,7 @@ from unittest.mock import patch
 from wildlife.episodes import GOATS, GOAT_PACKAGING
 from wildlife.generate import build
 from wildlife.render import plan_episode
+from wildlife.whatif import TOPICS, select_topic
 from wildlife.metadata import emphasize_title
 
 
@@ -25,6 +26,45 @@ class WildlifePlanningTests(unittest.TestCase):
             replace(GOAT_PACKAGING, title=GOAT_PACKAGING.title.replace('SURVIVE', 'survive')).validate()
         self.assertEqual(emphasize_title('What Happens to Deer?', 'deer', 'habitat recovery'),
                          'Deer on an Island: Can Their Habitat RECOVER?')
+
+    def test_what_if_categories_rotate_without_revisiting_used_topics(self):
+        history = []
+        for _ in range(20):
+            domain, topic, _, _, reused = select_topic(history, 4)
+            self.assertFalse(reused)
+            history.append({'domain':domain,'topic':topic})
+        self.assertEqual({row['domain'] for row in history[:5]},set(TOPICS))
+        self.assertTrue(select_topic(history,4)[-1])
+
+    def test_space_plan_round_trip_contains_no_wildlife_fields(self):
+        idea = {
+            'title':'Earth With Rings: Can Its Seasons SURVIVE?',
+            'opening':'Imagine Earth with a bright ring system and watch how its shadows move through the year.',
+            'description':'A hypothetical view of what a new planetary ring could change.',
+            'tags':['Earth','planet rings','orbital science','what if'],
+            'thumbnail_text':'RINGS OVER EARTH',
+            'premise':'A ring appears around Earth and its shadow changes over time.',
+            'arc':'Show the rings from orbit, then examine their moving shadow and possible seasonal effects.',
+        }
+        batch = []
+        for beat in GOATS[:4]:
+            scene = asdict(beat)
+            scene['forage_percent'] = round(scene.pop('forage') * 20) * 5
+            scene['population'] = 0
+            scene['narration'] = ' '.join(['Example'] * 75) + '.'
+            scene['visual'] = 'Wide view of Earth and the orbital ring system.'
+            batch.append(scene)
+        store = MemoryStore()
+        episode = 'auto-2026-11-16'
+        with patch('wildlife.generate.select_topic',return_value=(
+                'space','rings','Earth','What if Earth had rings?',False)), patch(
+                'wildlife.generate.ask',side_effect=[idea]+[{'scenes':batch}]*5):
+            manifest = build(episode,store)
+        self.assertEqual(manifest['idea']['domain'],'space')
+        self.assertNotIn('species',manifest['idea'])
+        package, beats, timeline = plan_episode(episode,False,manifest)
+        self.assertEqual(len(beats),20)
+        self.assertEqual(package.build(timeline)['title'],idea['title'])
 
     def test_ai_plan_keeps_a_full_runtime_and_reuses_the_same_episode_on_retry(self):
         idea = {
@@ -48,8 +88,10 @@ class WildlifePlanningTests(unittest.TestCase):
             scenes.append(scene)
         store = MemoryStore()
         episode = 'auto-2026-11-15'
-        with patch('wildlife.generate.ask', side_effect=[idea] + [
-                {'scenes': scenes[i:i+4]} for i in range(0,20,4)]) as request:
+        with patch('wildlife.generate.select_topic',return_value=(
+                'wildlife','bridge','Deer','What if a land bridge opened?',False)), patch(
+                'wildlife.generate.ask',side_effect=[idea]+[
+                    {'scenes':scenes[i:i+4]} for i in range(0,20,4)]) as request:
             manifest = build(episode, store)
             self.assertEqual(build(episode, store), manifest)
         self.assertEqual(request.call_count, 6)

@@ -11,7 +11,7 @@ import numpy as np
 
 from .episodes import EPISODES, PREVIEW
 from .visuals import frames
-from .thumbnail import episode_cue, render_thumbnail
+from .thumbnail import episode_cue, render_science_thumbnail, render_thumbnail
 
 
 FPS = 24
@@ -81,8 +81,14 @@ def encode_visuals(scene, seconds, size, target, **art):
                '-video_size',f'{width}x{height}','-framerate',str(FPS),'-i','pipe:0',
                '-an','-c:v','libx264','-preset','fast','-threads','4','-crf','18',
                '-pix_fmt','yuv420p',str(target)]
+    domain = art.pop('domain','wildlife')
+    if domain == 'wildlife':
+        rendered_frames = frames(size,scene,seconds,FPS,**art)
+    else:
+        from .science_visuals import science_frames
+        rendered_frames = science_frames(size,scene,seconds,FPS,domain=domain,**art)
     with subprocess.Popen(command, stdin=subprocess.PIPE) as proc:
-        for frame in frames(size, scene, seconds, FPS, **art):
+        for frame in rendered_frames:
             proc.stdin.write(frame.tobytes())
         proc.stdin.close()
         if proc.wait():
@@ -151,7 +157,11 @@ def render_scene(beats, timeline, index, work, preview, manifest=None):
     artwork = {}
     if manifest is not None:
         idea = manifest['idea']
-        artwork = {'species':idea['species'],'habitat':idea['habitat']}
+        domain = idea.get('domain','wildlife')
+        if domain == 'wildlife':
+            artwork = {'species':idea['species'],'habitat':idea['habitat']}
+        else:
+            artwork = {'domain':domain,'topic':idea['topic']}
     encode_visuals(beat, seconds, size, work/f'visual-{index:02}.mp4',disclose=index == 0,**artwork)
     print(json.dumps({'chapter':beat.label,'rendered':True,'seconds':seconds}),flush=True)
 
@@ -166,8 +176,12 @@ def assemble(episode, package, timeline, work, output, preview, manifest=None):
         render_thumbnail(beats,output/'thumbnail.jpg')
     else:
         idea = manifest['idea']
-        render_thumbnail(beats,output/'thumbnail.jpg',label=idea['thumbnail_text'],
-                         species=idea['species'],habitat=idea['habitat'],cue=episode_cue(episode))
+        cue = episode_cue(episode)
+        if idea.get('domain','wildlife') == 'wildlife':
+            render_thumbnail(beats,output/'thumbnail.jpg',label=idea['thumbnail_text'],
+                             species=idea['species'],habitat=idea['habitat'],cue=cue,varied_layout=True)
+        else:
+            render_science_thumbnail(beats,output/'thumbnail.jpg',idea,cue)
         (output/'episode-plan.json').write_text(json.dumps(manifest,indent=2)+'\n')
     for label, kind, suffix in [('video', 'visual', 'mp4'), ('voice', 'voice', 'wav')]:
         (work/f'{label}.txt').write_text(''.join(

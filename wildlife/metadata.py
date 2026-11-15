@@ -15,13 +15,14 @@ POWER_WORDS = {'SURVIVE','CRISIS','VANISH','RECOVER','COLLAPSE','BOOM'}
 _POWER_WORD = re.compile(r'\b(' + '|'.join(sorted(POWER_WORDS)) + r')\b', re.IGNORECASE)
 
 
-def emphasize_title(title, subject, pressure):
+def emphasize_title(title, subject, pressure=None):
     """Keep the model's hook when possible and use a pressure-specific fallback."""
     match = _POWER_WORD.search(title)
     if match:
         return title[:match.start()] + match.group().upper() + title[match.end():]
-    question = PRESSURE_HOOKS[pressure]
-    return f'{subject.title()} on an Island: {question}'
+    if pressure is None:
+        return title
+    return f'{subject.title()} on an Island: {PRESSURE_HOOKS[pressure]}'
 
 
 @dataclass(frozen=True)
