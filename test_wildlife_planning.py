@@ -1,10 +1,11 @@
 import unittest
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from unittest.mock import patch
 
-from wildlife.episodes import GOATS
+from wildlife.episodes import GOATS, GOAT_PACKAGING
 from wildlife.generate import build
 from wildlife.render import plan_episode
+from wildlife.metadata import emphasize_title
 
 
 class MemoryStore:
@@ -19,10 +20,16 @@ class MemoryStore:
 
 
 class WildlifePlanningTests(unittest.TestCase):
+    def test_power_word_is_required_and_can_be_recovered_from_the_premise(self):
+        with self.assertRaisesRegex(ValueError, 'uppercase power word'):
+            replace(GOAT_PACKAGING, title=GOAT_PACKAGING.title.replace('SURVIVE', 'survive')).validate()
+        self.assertEqual(emphasize_title('What Happens to Deer?', 'deer', 'habitat recovery'),
+                         'Deer on an Island: Can Their Habitat RECOVER?')
+
     def test_ai_plan_keeps_a_full_runtime_and_reuses_the_same_episode_on_retry(self):
         idea = {
             'species': 'deer', 'habitat': 'wooded island', 'pressure': 'vegetation loss',
-            'title': 'Deer on an Island: What Happens When the Forest Thins?',
+            'title': 'Deer on an Island: What If Their Food Starts to Vanish?',
             'opening': 'Follow the deer as browsing changes the mix of plants on one wooded island.',
             'description': 'An illustrative story about woodland recovery and pressure from browsing.',
             'tags': ['woodland deer', 'wildlife simulation', 'island ecology', 'browsing pressure'],
@@ -48,4 +55,5 @@ class WildlifePlanningTests(unittest.TestCase):
         package, beats, timeline = plan_episode(episode, False, manifest)
         self.assertEqual(len(beats), 20)
         self.assertTrue(600 <= sum(chapter['seconds'] for chapter in timeline) <= 900)
-        self.assertEqual(package.build(timeline)['title'], idea['title'])
+        self.assertEqual(package.build(timeline)['title'],
+                         'Deer on an Island: What If Their Food Starts to VANISH?')

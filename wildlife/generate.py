@@ -9,7 +9,7 @@ import re
 from lyrics_cpu import WILDLIFE_NARRATION_PATTERN
 
 from .episodes import Beat
-from .metadata import Packaging
+from .metadata import POWER_WORDS, Packaging, emphasize_title
 
 
 SPECIES = {'goats': 'goat', 'deer': 'deer', 'rabbits': 'rabbit'}
@@ -50,7 +50,8 @@ def ask(prompt, schema, seed, limit):
 
 
 def packaging(idea):
-    return Packaging(idea['title'], idea['species'], idea['opening'], idea['description'], tuple(idea['tags']))
+    title = emphasize_title(idea['title'],idea['species'],idea['pressure'])
+    return Packaging(title,idea['species'],idea['opening'],idea['description'],tuple(idea['tags']))
 
 
 def concept(idea):
@@ -102,7 +103,8 @@ def build(episode, store):
             'Use only the species, habitats and pressures allowed by the schema. Species is plural. '
             'Explore a mechanism beyond simple population growth. Pick a species, habitat and pressure '
             'combination not in the used list. Title 35–70 characters; start with the species, end in a '
-            'curiosity-driven question, and make an accurate promise for the story. Opening 40–160 characters '
+            f'curiosity-driven question, and make an accurate promise for the story. Include one fitting uppercase '
+            f'power word from {", ".join(sorted(POWER_WORDS))}. Opening 40–160 characters '
             'and naturally include the species. Write one short description paragraph, 6–10 distinct searchable '
             'tags including the species, and a 2–4 word thumbnail hook within 22 characters. '
             'The arc must be hypothetical and explain defensible '
@@ -112,6 +114,7 @@ def build(episode, store):
             IDEA, seed+100*attempt, 1500)
         if not re.fullmatch(r'[A-Za-z0-9 -]{4,22}',idea['thumbnail_text']):
             idea['thumbnail_text'] = HEADLINES[idea['pressure']]
+        idea['title'] = packaging(idea).title
         try:
             validate_idea(idea)
         except ValueError as error:

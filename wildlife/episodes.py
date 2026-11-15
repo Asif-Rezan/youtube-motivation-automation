@@ -43,7 +43,7 @@ PREVIEW = (
     Beat('The dry season', 'When the rain slows, the green patches shrink. Now the island has to feed a herd that grew during the good years.', 116, .23, 'pasture'),
 )
 GOAT_PACKAGING = Packaging(
-    title='2 Goats, 1 Island: What Happens When the Food Runs Out?',
+    title='2 Goats, 1 Island: Can They SURVIVE When Food Runs Out?',
     subject='goats',
     opening='What happens when two goats arrive on a small island with no predators? '
             'Follow the growing herd as the island runs low on food.',

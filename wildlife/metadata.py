@@ -3,6 +3,27 @@ from dataclasses import dataclass
 import re
 
 
+PRESSURE_HOOKS = {
+    'drought': 'Can They SURVIVE the Drought?',
+    'winter': 'Can They SURVIVE the Winter?',
+    'food competition': 'What Happens in a Food CRISIS?',
+    'vegetation loss': 'What If Their Food Starts to VANISH?',
+    'water shortage': 'Can They Survive a Water CRISIS?',
+    'habitat recovery': 'Can Their Habitat RECOVER?',
+}
+POWER_WORDS = {'SURVIVE','CRISIS','VANISH','RECOVER','COLLAPSE','BOOM'}
+_POWER_WORD = re.compile(r'\b(' + '|'.join(sorted(POWER_WORDS)) + r')\b', re.IGNORECASE)
+
+
+def emphasize_title(title, subject, pressure):
+    """Keep the model's hook when possible and use a pressure-specific fallback."""
+    match = _POWER_WORD.search(title)
+    if match:
+        return title[:match.start()] + match.group().upper() + title[match.end():]
+    question = PRESSURE_HOOKS[pressure]
+    return f'{subject.title()} on an Island: {question}'
+
+
 @dataclass(frozen=True)
 class Packaging:
     title: str
@@ -15,6 +36,8 @@ class Packaging:
         subject = self.subject.casefold()
         if not 35 <= len(self.title) <= 70 or not self.title.endswith('?'):
             raise ValueError('Wildlife title must be a concise question of 35–70 characters')
+        if not any(match.group() in POWER_WORDS for match in _POWER_WORD.finditer(self.title)):
+            raise ValueError('Wildlife title requires an uppercase power word')
         if not subject or not re.search(r'\b' + re.escape(subject) + r'\b', self.title[:32].casefold()):
             raise ValueError('Put the episode subject near the start of the title')
         if not 40 <= len(self.opening) <= 160 or subject not in self.opening.casefold():
