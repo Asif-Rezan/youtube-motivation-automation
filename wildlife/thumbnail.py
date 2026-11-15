@@ -13,6 +13,7 @@ THUMBNAIL_MAX_BYTES = 2 * 1024**2
 
 CUES = ('arrow', 'question', 'spotlight', 'trail')
 AMBER = '#ffcf34'
+ARROW_RED = '#f52d40'
 INK = '#182027'
 
 
@@ -27,8 +28,9 @@ def draw_cue(image, cue):
     if cue == 'arrow':
         points = [(1772,244),(1792,300),(1649,371),(1674,410),
                   (1501,453),(1540,291),(1578,328)]
-        draw.polygon(points,fill=AMBER)
-        draw.line([*points,points[0]],fill=INK,width=13,joint='curve')
+        draw.polygon(points,fill=ARROW_RED)
+        draw.line([*points,points[0]],fill='#fff6e8',width=22,joint='curve')
+        draw.line([*points,points[0]],fill='#43131d',width=8,joint='curve')
     elif cue == 'question':
         symbol = ImageFont.truetype(str(FONT),190)
         draw.text((1661,280),'?',anchor='mt',font=symbol,fill=AMBER,stroke_width=13,stroke_fill=INK)
