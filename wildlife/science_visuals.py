@@ -72,9 +72,12 @@ def science_frame(size, domain, topic, intensity, camera, seconds=0, *, disclose
                 line([(x,y),(x+8,y-67*(1-level)),(x+30,y-93*(1-level))],'#e57e76',10)
                 line([(x+7,y-35),(x-22,y-65)],'#d98a79',7)
         else:
-            for i in range(10):
-                x,y=1530+i*38,462-i*2+shift*.15
-                polygon([(x,y),(x+22,y-55),(x+38,y),(x+38,y+28),(x,y+28)],'#e4e0bd')
+            # Vegetation at the water's edge ties the scene to the coastal ecosystem.
+            for i in range(15):
+                x,y=1460+i*30,467-i*2+shift*.15
+                blade = 26+(i*11)%34
+                polygon([(x-10,y),(x-17,y-blade),(x,y-9),(x+9,y-blade*.85),
+                         (x+12,y-9),(x+22,y-blade*.58),(x+18,y)],'#5e8a58')
             if topic == 'currents':
                 y=surface+125+115*level
                 line([(80,y),(420,y-30),(720,y+45),(976,y+20)],'#9af1ee',11)

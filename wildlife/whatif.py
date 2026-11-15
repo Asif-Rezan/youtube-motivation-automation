@@ -1,4 +1,4 @@
-"""Story seeds for several kinds of hypothetical science and technology videos."""
+"""Story seeds for what-if videos about nature and ecosystems."""
 
 TOPICS = {
     'space': (
@@ -8,16 +8,16 @@ TOPICS = {
         ('shadows', 'Moon', 'What if a permanent lunar settlement had to follow sunlight?'),
     ),
     'ocean': (
-        ('tides', 'Tides', 'What if a coastal city had to live through an unusually large daily tidal range?'),
-        ('currents', 'Ocean', 'What if an ocean current shifted away from a fishing coast? Follow the changes across seasons.'),
-        ('sea ice', 'Sea Ice', 'What if seasonal sea ice formed weeks later every year?'),
-        ('reefs', 'Coral Reefs', 'What if a reef lost the shelter it gives to nearby coasts?'),
+        ('tides', 'Tides', 'What if a tidal marsh stayed underwater several hours longer every day? Follow the effects on feeding birds and marsh plants.'),
+        ('currents', 'Ocean', 'What if a nutrient-rich ocean current shifted away from a kelp forest? Follow the effects through its food web.'),
+        ('sea ice', 'Sea Ice', 'What if seasonal sea ice formed weeks later every year? Explore how the change travels through the marine food web.'),
+        ('reefs', 'Coral Reefs', 'What if a coral reef stopped sheltering its lagoon from waves? Follow what changes for seagrass and juvenile fish.'),
     ),
     'earth': (
-        ('clouds', 'Clouds', 'What if low clouds disappeared over one region for a month?'),
-        ('rivers', 'Rivers', 'What if a river suddenly changed course beside a town?'),
-        ('albedo', 'Snow', 'What if mountain snow melted early and exposed darker rock?'),
-        ('wind', 'Wind', 'What if the prevailing wind reversed for one growing season?'),
+        ('clouds', 'Clouds', 'What if a cloud forest lost its morning fog for a month? Follow the effects on moisture, moss and small animals.'),
+        ('rivers', 'Rivers', 'What if a river suddenly changed course and cut a wetland off from its water supply?'),
+        ('albedo', 'Snow', 'What if mountain snow melted early each spring? Follow what happens to the downstream meadow as runoff shifts.'),
+        ('wind', 'Wind', 'What if wind reversed for one growing season across a woodland? Explore what happens to seed dispersal and regrowth.'),
     ),
     'technology': (
         ('navigation', 'Navigation', 'What if satellite navigation signals vanished for a full day?'),
@@ -34,9 +34,13 @@ TOPICS = {
 }
 
 
+# Older saved plans still use the full topic registry for validation and rendering.
+ACTIVE_DOMAINS = ('wildlife','ocean','earth')
+
+
 def select_topic(history, seed):
     """Rotate through categories before revisiting one and prefer unused prompts."""
-    domains = tuple(TOPICS)
+    domains = ACTIVE_DOMAINS
     recent = [row.get('domain', 'wildlife') for row in history]
     last_seen = {domain:index for index,domain in enumerate(recent)}
     domain = min(domains, key=lambda name: (last_seen.get(name,-1), (domains.index(name)-seed)%len(domains)))

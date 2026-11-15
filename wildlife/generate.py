@@ -140,9 +140,10 @@ def build(episode, store):
     feedback = ''
     for attempt in range(5):
         idea = ask(
-            'Write an original, English what-if scenario for a hypothetical science and technology series. '
-            f'{angle} State the specific initiating change in the premise, explore a surprising consequence, '
-            'and reveal the answer in the final scenes. Avoid a generic disaster or population boom. '
+            'Write an original English what-if story for a series about nature and ecosystems. '
+            f'{angle} State the specific initiating change in the premise, explore a surprising consequence '
+            'that travels through habitats, resources or the food web. Reveal the answer in the final '
+            'scenes. Keep the central question ecological and avoid a generic disaster or population boom. '
             'Distinguish the assumed conditions from real facts. Title 35–70 characters, with '
             f'{subject} near the start, one fitting power word from {", ".join(sorted(POWER_WORDS))}, '
             f'and a question ending. Include {subject} in the opening of 40–160 characters and in a tag. '

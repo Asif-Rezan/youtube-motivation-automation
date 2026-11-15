@@ -5,7 +5,7 @@ from unittest.mock import patch
 from wildlife.episodes import GOATS, GOAT_PACKAGING
 from wildlife.generate import build
 from wildlife.render import plan_episode
-from wildlife.whatif import TOPICS, select_topic
+from wildlife.whatif import ACTIVE_DOMAINS, TOPICS, select_topic
 from wildlife.metadata import emphasize_title
 
 
@@ -29,11 +29,11 @@ class WildlifePlanningTests(unittest.TestCase):
 
     def test_what_if_categories_rotate_without_revisiting_used_topics(self):
         history = []
-        for _ in range(20):
+        for _ in range(sum(len(TOPICS[domain]) for domain in ACTIVE_DOMAINS)):
             domain, topic, _, _, reused = select_topic(history, 4)
             self.assertFalse(reused)
             history.append({'domain':domain,'topic':topic})
-        self.assertEqual({row['domain'] for row in history[:5]},set(TOPICS))
+        self.assertEqual({row['domain'] for row in history[:len(ACTIVE_DOMAINS)]},set(ACTIVE_DOMAINS))
         self.assertTrue(select_topic(history,4)[-1])
 
     def test_space_plan_round_trip_contains_no_wildlife_fields(self):
