@@ -6,7 +6,10 @@ low-poly terrain, animated goat sprites, shoreline and aerial shots, and a popul
 The timeline contains illustrative scenario values and does not estimate a real herd.
 
 Run the workflow with the preview checkbox for a 30-second video or leave it unchecked for the
-full 1080p episode. The artifact contains the MP4, 1280 × 720 thumbnail, and chapter timeline.
+full 1080p episode. The artifact contains the MP4, 1280 × 720 thumbnail, chapter timeline,
+and upload-ready metadata. Each episode supplies a subject-first title with a question, a
+topic-specific description, and relevant tags. Full videos get chapters based on rendered timings.
+The run summary shows the exact title, description, and tags.
 The previous nursery-rhyme schedule is removed. Its existing manual and recovery paths are available.
 
 To render locally with FFmpeg, CPU PyTorch and `requirements-wildlife.txt` installed:

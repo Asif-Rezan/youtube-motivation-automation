@@ -1,12 +1,8 @@
 name: Wildlife simulation video
 on:
   push:
-    branches: [codex/wildlife-simulation]
-    paths:
-      - 'wildlife/**'
-      - 'assets/wildlife/**'
-      - requirements-wildlife.txt
-      - .github/workflows/wildlife.yml
+    branches: [main]
+    paths: [.generation/wildlife-full-request.txt]
   workflow_dispatch:
     inputs:
       episode:
@@ -26,7 +22,7 @@ jobs:
     timeout-minutes: 75
     env:
       EPISODE: ${{ inputs.episode || 'goat-island' }}
-      PREVIEW: ${{ github.event_name == 'push' || inputs.preview }}
+      PREVIEW: ${{ inputs.preview || false }}
       HF_HUB_DISABLE_XET: '1'
       OMP_NUM_THREADS: '2'
     steps:
@@ -50,7 +46,10 @@ jobs:
           args=(--episode "$EPISODE")
           if [[ "$PREVIEW" == true ]]; then args+=(--preview); fi
           python -u -m wildlife.render "${args[@]}"
-      - name: Save video, thumbnail and timeline
+      - name: Show the episode metadata
+        run: |
+          jq -r '"## " + .title + "\n\n" + .description + "\n\n**Tags** " + (.tags | join(", "))' output/wildlife/metadata.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Save video, thumbnail, metadata and timeline
         uses: actions/upload-artifact@v4
         with:
           name: wildlife-${{ inputs.episode || 'goat-island' }}
@@ -58,5 +57,6 @@ jobs:
             output/wildlife/video.mp4
             output/wildlife/thumbnail.jpg
             output/wildlife/episode.json
+            output/wildlife/metadata.json
           if-no-files-found: error
           retention-days: 14

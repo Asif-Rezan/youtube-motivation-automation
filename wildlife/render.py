@@ -105,7 +105,8 @@ def render(episode, output, preview=False):
     import torch
     from kokoro import KPipeline
 
-    title, beats = EPISODES[episode]
+    packaging, beats = EPISODES[episode]
+    packaging.validate()
     if preview:
         beats = PREVIEW
     output.mkdir(parents=True, exist_ok=True)
@@ -148,8 +149,10 @@ def render(episode, output, preview=False):
         ffmpeg('-xerror','-i',target,'-f','null','-')
     if abs(duration(target)-sum(x['seconds'] for x in timeline)) > .12:
         raise RuntimeError('Rendered duration differs from the narration timeline')
+    metadata = packaging.build(timeline, preview=preview)
+    (output/'metadata.json').write_text(json.dumps(metadata, indent=2) + '\n')
     (output/'episode.json').write_text(json.dumps({
-        'title':title,'illustrative_simulation':True,'preview':preview,
+        'title':metadata['title'],'illustrative_simulation':True,'preview':preview,
         'voice':VOICE,'pitch_semitones':SEMITONES,'words_per_minute_target':WORDS_PER_MINUTE,
         'music_bpm':BPM,'chapters':timeline},indent=2))
 

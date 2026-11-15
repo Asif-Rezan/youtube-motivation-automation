@@ -1,6 +1,8 @@
 """Original scripts for illustrative island simulations."""
 from dataclasses import dataclass
 
+from .metadata import Packaging
+
 
 @dataclass(frozen=True)
 class Beat:
@@ -32,4 +34,16 @@ PREVIEW = (
     Beat('The herd grows', 'Then their offspring start breeding. Soon the herd is grazing the same ground faster than plants can grow back.', 31, .73, 'aerial', 'walk'),
     Beat('The dry season', 'When the rain slows, the green patches shrink. Now the island has to feed a herd that grew during the good years.', 116, .23, 'pasture'),
 )
-EPISODES = {'goat-island': ('What Happens When Two Goats Take Over an Island?', GOATS)}
+GOAT_PACKAGING = Packaging(
+    title='2 Goats, 1 Island: What Happens When the Food Runs Out?',
+    subject='goats',
+    opening='What happens when two goats arrive on a small island with no predators? '
+            'Follow the growing herd as the island runs low on food.',
+    description='Watch the goats spread across the island, see how their grazing changes the landscape, '
+                'and follow the population through a dry season. The changing herd and pasture show '
+                'how limited food can shape an island ecosystem.',
+    tags=('goats on an island', 'two goats one island', 'goat population', 'feral goats',
+          'wildlife simulation', 'island ecosystem', 'population growth', 'carrying capacity',
+          'overgrazing', 'animated ecology'),
+)
+EPISODES = {'goat-island': (GOAT_PACKAGING, GOATS)}
