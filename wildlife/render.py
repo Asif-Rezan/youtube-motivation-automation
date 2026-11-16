@@ -147,7 +147,9 @@ def plan_episode(episode, preview, manifest=None):
     timeline = []
     elapsed = 0
     for index, beat in enumerate(beats):
-        speech = len(beat.narration.split())*60/WORDS_PER_MINUTE
+        # Keep established timings when resuming a saved plan with production cues.
+        source = manifest['scenes'][index]['narration'] if manifest is not None else beat.narration
+        speech = len(source.split())*60/WORDS_PER_MINUTE
         seconds = 10 if preview else math.ceil((speech+1.5)*FPS)/FPS
         timeline.append({'chapter':beat.label,'start':round(elapsed,3),
                          'seconds':seconds,'population':beat.population,'forage':beat.forage,

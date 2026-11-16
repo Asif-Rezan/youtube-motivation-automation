@@ -77,6 +77,21 @@ class WildlifePlanningTests(unittest.TestCase):
         self.assertEqual(metadata['tags'][:2], ['river changes course', 'wetland hydrology'])
         self.assertEqual(metadata['tags'].count('wetland hydrology'), 1)
 
+    def test_production_fields_are_excluded_from_spoken_copy(self):
+        from wildlife.narration import spoken_text
+
+        text = ('Birds look for food. Forage percent drops to 30. Population zero. '
+                'Marsh floor darkens with sediment. Aerial view shows flooded patches. '
+                'Camera: aerial. Action: walk. Visual: Dark mud. '
+                'Visual cues still help birds find food. The population rises as birds return.')
+        self.assertEqual(
+            spoken_text(text),
+            'Birds look for food. Marsh floor darkens with sediment. '
+            'Visual cues still help birds find food. The population rises as birds return.')
+        self.assertEqual(
+            spoken_text('Forage is scarce. The population reached 40 birds.'),
+            'Forage is scarce. The population reached 40 birds.')
+
     def test_tidal_marsh_renders_bird_motion_and_a_visible_change_in_waterline(self):
         from PIL import ImageChops
         from wildlife.science_visuals import science_frames

@@ -9,6 +9,7 @@ import re
 from lyrics_cpu import StoryGenerationError, WILDLIFE_NARRATION_PATTERN
 
 from .episodes import Beat
+from .narration import spoken_text
 from .metadata import POWER_WORDS, Packaging, emphasize_title, normalize_generated_tags
 from .whatif import TOPICS, select_topic
 
@@ -266,11 +267,19 @@ def generate_scene(idea, previous, seed, wildlife):
                 f'Write scene {index} of this twenty-scene English story. Plan: {json.dumps(idea)}. Prior beats: {json.dumps(prior)}. '
                 'Aim for 82 spoken words per scene (73–91 allowed), single spaces and ASCII punctuation. '
                 'Keep facts separate from hypothetical conditions. Name time jumps early in the narration. '
+                'Narration is only words spoken to the viewer. Keep visual directions, field labels, '
+                'camera angles, actions and raw simulation counters in their own fields. '
                 f'{direction} {counters} Use a specific 3–38 character caption. '
                 'Describe a distinct visible background with no text or animals in one sentence of '
                 f'24–160 characters. {feedback}',
                 schema, seed + 1005 + index * 20 + attempt * 3, 1100)
             scene = repair_scene_copy(result['scenes'][0], index)
+            narration = spoken_text(scene['narration'])
+            if narration != scene['narration']:
+                if len(narration.split()) < 73:
+                    raise ValueError('Replace production cues with spoken story sentences and keep 73–91 words')
+                print(f'Wildlife scene {index}: removed production cues from narration', flush=True)
+                scene['narration'] = narration
             validate_scenes([scene])
             if index == 1:
                 validate_opening(scene['narration'])
@@ -301,8 +310,11 @@ def decode(payload, episode):
         validate(scene,SCENE)
     validate_scenes(scenes)
     names = [field.name for field in fields(Beat)]
-    beats = tuple(Beat(**{key:scene[key] for key in names if key != 'forage'},
-                       forage=scene['forage_percent']/100) for scene in scenes)
+    beats = tuple(Beat(**{key:scene[key] for key in names if key not in ('forage','narration')},
+                       narration=spoken_text(scene['narration']), forage=scene['forage_percent']/100)
+                  for scene in scenes)
+    if any(not beat.narration for beat in beats):
+        raise ValueError('A saved scene has no spoken narration after removing production cues')
     return packaging(idea), beats
 
 
