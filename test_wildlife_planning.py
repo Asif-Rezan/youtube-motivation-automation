@@ -6,7 +6,7 @@ from wildlife.episodes import GOATS, GOAT_PACKAGING
 from wildlife.generate import build
 from wildlife.render import plan_episode
 from wildlife.whatif import ACTIVE_DOMAINS, TOPICS, select_topic
-from wildlife.metadata import emphasize_title
+from wildlife.metadata import emphasize_title, validate_title
 
 
 class MemoryStore:
@@ -36,9 +36,18 @@ class WildlifePlanningTests(unittest.TestCase):
         self.assertEqual({row['domain'] for row in history[:len(ACTIVE_DOMAINS)]},set(ACTIVE_DOMAINS))
         self.assertTrue(select_topic(history,4)[-1])
 
+    def test_all_non_wildlife_topics_repair_titles_without_power_words(self):
+        for domain, topics in TOPICS.items():
+            if domain == 'wildlife':
+                continue
+            for topic, subject, _ in topics:
+                with self.subTest(topic=topic):
+                    title = emphasize_title(f'{subject}: What Happens Next?',subject,topic=topic)
+                    validate_title(title,subject)
+
     def test_space_plan_round_trip_contains_no_wildlife_fields(self):
         idea = {
-            'title':'Earth With Rings: Can Its Seasons SURVIVE?',
+            'title':'Earth With Rings: Would the Seasons Change?',
             'opening':'Imagine Earth with a bright ring system and watch how its shadows move through the year.',
             'description':'A hypothetical view of what a new planetary ring could change.',
             'tags':['Earth','planet rings','orbital science','what if'],
@@ -64,7 +73,7 @@ class WildlifePlanningTests(unittest.TestCase):
         self.assertNotIn('species',manifest['idea'])
         package, beats, timeline = plan_episode(episode,False,manifest)
         self.assertEqual(len(beats),20)
-        self.assertEqual(package.build(timeline)['title'],idea['title'])
+        self.assertEqual(package.build(timeline)['title'],'Earth Gets Rings: Can Its Seasons SURVIVE?')
 
     def test_ai_plan_keeps_a_full_runtime_and_reuses_the_same_episode_on_retry(self):
         idea = {

@@ -11,18 +11,52 @@ PRESSURE_HOOKS = {
     'water shortage': 'Can They Survive a Water CRISIS?',
     'habitat recovery': 'Can Their Habitat RECOVER?',
 }
+TOPIC_TITLES = {
+    'tides': 'Tides Rise: Can a Coastal Marsh SURVIVE?',
+    'currents': 'Ocean Currents Shift: Can a Kelp Forest SURVIVE?',
+    'sea ice': 'Sea Ice Arrives Late: Can the Food Web SURVIVE?',
+    'reefs': 'Coral Reefs Lose Their Shelter: Can Fish SURVIVE?',
+    'clouds': 'Clouds VANISH: Can a Forest SURVIVE Without Fog?',
+    'rivers': 'Rivers Change Course: Can a Wetland SURVIVE?',
+    'albedo': 'Snow Melts Early: Can a Mountain Meadow SURVIVE?',
+    'wind': 'Wind Reverses: Can a Woodland RECOVER?',
+    'rings': 'Earth Gets Rings: Can Its Seasons SURVIVE?',
+    'moon': 'Moon Appears Bigger: Could Familiar Tides VANISH?',
+    'daylight': 'Earth Slows Down: Can Life SURVIVE Longer Days?',
+    'shadows': 'Moon Base in Darkness: Can a Settlement SURVIVE?',
+    'navigation': 'Navigation Signals VANISH: How Would a City Adapt?',
+    'storage': 'Power Grid Has a Week of Energy: Can It Avoid a CRISIS?',
+    'network': 'Internet Links VANISH: Can a City Stay Connected?',
+    'power': 'Power Grid Goes Local: Can a Neighborhood SURVIVE?',
+}
 POWER_WORDS = {'SURVIVE','CRISIS','VANISH','RECOVER','COLLAPSE','BOOM'}
 _POWER_WORD = re.compile(r'\b(' + '|'.join(sorted(POWER_WORDS)) + r')\b', re.IGNORECASE)
 
 
-def emphasize_title(title, subject, pressure=None):
+def emphasize_title(title, subject, pressure=None, *, topic=None):
     """Keep the model's hook when possible and use a pressure-specific fallback."""
-    match = _POWER_WORD.search(title)
-    if match:
-        return title[:match.start()] + match.group().upper() + title[match.end():]
-    if pressure is None:
-        return title
-    return f'{subject.title()} on an Island: {PRESSURE_HOOKS[pressure]}'
+    if not any(match.group() in POWER_WORDS for match in _POWER_WORD.finditer(title)):
+        match = _POWER_WORD.search(title)
+        if match:
+            title = title[:match.start()] + match.group().upper() + title[match.end():]
+    try:
+        validate_title(title,subject)
+    except ValueError:
+        if topic in TOPIC_TITLES:
+            return TOPIC_TITLES[topic]
+        if pressure is not None:
+            return f'{subject.title()} on an Island: {PRESSURE_HOOKS[pressure]}'
+    return title
+
+
+def validate_title(title,subject):
+    subject = subject.casefold()
+    if not 35 <= len(title) <= 70 or not title.endswith('?'):
+        raise ValueError('Wildlife title must be a concise question of 35–70 characters')
+    if not any(match.group() in POWER_WORDS for match in _POWER_WORD.finditer(title)):
+        raise ValueError('Wildlife title requires an uppercase power word')
+    if not subject or not re.search(r'\b' + re.escape(subject) + r'\b',title[:32].casefold()):
+        raise ValueError('Put the episode subject near the start of the title')
 
 
 @dataclass(frozen=True)
@@ -35,12 +69,7 @@ class Packaging:
 
     def validate(self):
         subject = self.subject.casefold()
-        if not 35 <= len(self.title) <= 70 or not self.title.endswith('?'):
-            raise ValueError('Wildlife title must be a concise question of 35–70 characters')
-        if not any(match.group() in POWER_WORDS for match in _POWER_WORD.finditer(self.title)):
-            raise ValueError('Wildlife title requires an uppercase power word')
-        if not subject or not re.search(r'\b' + re.escape(subject) + r'\b', self.title[:32].casefold()):
-            raise ValueError('Put the episode subject near the start of the title')
+        validate_title(self.title,self.subject)
         if not 40 <= len(self.opening) <= 160 or subject not in self.opening.casefold():
             raise ValueError('Write a concise, subject-specific opening for the description')
         if not self.description.strip():

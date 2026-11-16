@@ -6,7 +6,7 @@ from dataclasses import fields
 from pathlib import Path
 import re
 
-from lyrics_cpu import WILDLIFE_NARRATION_PATTERN
+from lyrics_cpu import StoryGenerationError, WILDLIFE_NARRATION_PATTERN
 
 from .episodes import Beat
 from .metadata import POWER_WORDS, Packaging, emphasize_title
@@ -54,7 +54,7 @@ def ask(prompt, schema, seed, limit):
 
 def packaging(idea):
     subject = idea.get('subject') or idea['species']
-    title = emphasize_title(idea['title'],subject,idea.get('pressure'))
+    title = emphasize_title(idea['title'],subject,idea.get('pressure'),topic=idea.get('topic'))
     return Packaging(title,subject,idea['opening'],idea['description'],tuple(idea['tags']))
 
 
@@ -157,7 +157,10 @@ def build(episode, store):
         idea.update(domain=domain,topic=topic)
         if not wildlife:
             idea['subject'] = subject
+        original_title = idea['title']
         idea['title'] = packaging(idea).title
+        if idea['title'] != original_title:
+            print(f'Normalized the title for {domain}/{topic}',flush=True)
         try:
             validate_idea(idea)
         except ValueError as error:
@@ -174,7 +177,9 @@ def build(episode, store):
             break
         feedback = 'The premise or title repeated an earlier episode. Change the central consequence.'
     else:
-        raise RuntimeError('No distinct, validated what-if idea was generated')
+        raise StoryGenerationError(
+            'The planner could not produce distinct, valid episode metadata.',
+            code='what_if_metadata', details={'domain':domain,'topic':topic,'attempts':5,'last_check':feedback})
     scenes = []
     schema = obj(scenes={'type':'array','items':SCENE,'minItems':4,'maxItems':4})
     for start in range(0,20,4):
