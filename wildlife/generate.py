@@ -9,7 +9,7 @@ import re
 from lyrics_cpu import StoryGenerationError, WILDLIFE_NARRATION_PATTERN
 
 from .episodes import Beat
-from .metadata import POWER_WORDS, Packaging, emphasize_title
+from .metadata import POWER_WORDS, Packaging, emphasize_title, normalize_generated_tags
 from .whatif import TOPICS, select_topic
 
 
@@ -170,6 +170,10 @@ def build(episode, store):
         idea.update(domain=domain,topic=topic)
         if not wildlife:
             idea['subject'] = subject
+        original_tags = idea['tags']
+        idea['tags'] = normalize_generated_tags(original_tags, idea.get('subject') or idea['species'])
+        if idea['tags'] != original_tags:
+            print(f'Normalized the search tags for {domain}/{topic}', flush=True)
         original_title = idea['title']
         idea['title'] = packaging(idea).title
         if idea['title'] != original_title:

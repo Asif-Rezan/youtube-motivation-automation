@@ -98,6 +98,35 @@ def validate_title(title,subject):
         raise ValueError('Put the episode subject near the start of the title')
 
 
+def tag_cost(tag):
+    return len(tag) + (2 if ' ' in tag else 0)
+
+
+def fit_tags(candidates, *, limit):
+    """Deduplicate search phrases and keep them within YouTube's tag budget."""
+    tags = []
+    used = set()
+    budget = 0
+    for candidate in candidates:
+        tag = ' '.join(candidate.split())
+        cost = tag_cost(tag) + bool(tags)
+        if not tag or tag.casefold() in used or budget + cost > 500:
+            continue
+        tags.append(tag)
+        used.add(tag.casefold())
+        budget += cost
+        if len(tags) == limit:
+            break
+    return tags
+
+
+def normalize_generated_tags(tags, subject):
+    tags = fit_tags(tags, limit=12)
+    if not any(subject.casefold() in tag.casefold() for tag in tags):
+        tags = fit_tags([f'{subject} what if', *tags], limit=12)
+    return tags
+
+
 @dataclass(frozen=True)
 class Packaging:
     title: str
@@ -118,7 +147,7 @@ class Packaging:
         tags = [tag.casefold().strip() for tag in self.tags]
         if not 4 <= len(tags) <= 12 or len(set(tags)) != len(tags) or not all(tags):
             raise ValueError('Use four to twelve distinct, relevant tags')
-        if len(','.join(f'"{tag}"' if ' ' in tag else tag for tag in tags)) > 500:
+        if sum(map(tag_cost, tags)) + len(tags) - 1 > 500:
             raise ValueError('Tags exceed the YouTube tag budget')
         if not any(subject in tag for tag in tags):
             raise ValueError('Include at least one subject-specific tag')
@@ -150,17 +179,5 @@ class Packaging:
         candidates = [*(from_topic[1] if from_topic else ()), *self.tags,
                       f'{self.subject} what if', 'ecosystem what if', 'ecology simulation',
                       'low poly animation', 'nature simulation']
-        tags = []
-        used = set()
-        budget = 0
-        for candidate in candidates:
-            tag = ' '.join(candidate.split())
-            cost = len(tag) + (2 if ' ' in tag else 0) + bool(tags)
-            if not tag or tag.casefold() in used or budget+cost > 500:
-                continue
-            tags.append(tag)
-            used.add(tag.casefold())
-            budget += cost
-            if len(tags) == 18:
-                break
+        tags = fit_tags(candidates, limit=18)
         return {'title': title, 'description': description, 'tags': tags}

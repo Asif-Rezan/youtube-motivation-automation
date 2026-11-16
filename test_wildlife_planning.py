@@ -77,6 +77,19 @@ class WildlifePlanningTests(unittest.TestCase):
         self.assertEqual(metadata['tags'][:2], ['river changes course', 'wetland hydrology'])
         self.assertEqual(metadata['tags'].count('wetland hydrology'), 1)
 
+    def test_tag_repair_for_tides_reserves_room_for_the_subject(self):
+        from wildlife.metadata import normalize_generated_tags, tag_cost
+
+        candidates = [' tidal marsh ecology ', 'TIDAL MARSH ECOLOGY', 'high tide and marsh birds',
+                      'estuary habitat', 'marsh food web', 'oversize ' * 70]
+        candidates.extend(f'coastal marsh search phrase {index}' for index in range(20))
+        tags = normalize_generated_tags(candidates, 'Tides')
+        self.assertEqual(tags[:3], ['Tides what if', 'tidal marsh ecology', 'high tide and marsh birds'])
+        self.assertEqual(len({tag.casefold() for tag in tags}), len(tags))
+        self.assertLessEqual(len(tags), 12)
+        self.assertLessEqual(sum(map(tag_cost, tags)) + len(tags) - 1, 500)
+        self.assertEqual(normalize_generated_tags(tags, 'Tides'), tags)
+
     def test_ecosystem_upload_has_english_education_and_audience_metadata(self):
         from upload_settings import load_settings, upload_body
 
@@ -119,7 +132,7 @@ class WildlifePlanningTests(unittest.TestCase):
             'title':'Earth With Rings: Would the Seasons Change?',
             'opening':'Imagine Earth with a bright ring system and watch how its shadows move through the year.',
             'description':'A hypothetical view of what a new planetary ring could change.',
-            'tags':['Earth','planet rings','orbital science','what if'],
+            'tags':['planet rings','orbital science','planetary shadows','what if'],
             'thumbnail_text':'RINGS OVER EARTH',
             'premise':'A ring appears around Earth and its shadow changes over time.',
             'arc':'Show the rings from orbit, then examine their moving shadow and possible seasonal effects.',
@@ -140,6 +153,7 @@ class WildlifePlanningTests(unittest.TestCase):
             manifest = build(episode,store)
         self.assertEqual(manifest['idea']['domain'],'space')
         self.assertNotIn('species',manifest['idea'])
+        self.assertEqual(manifest['idea']['tags'][0], 'Earth what if')
         package, beats, timeline = plan_episode(episode,False,manifest)
         self.assertEqual(len(beats),20)
         self.assertEqual(package.build(timeline)['title'],'Earth Gets Rings: Can Its Seasons SURVIVE?')
