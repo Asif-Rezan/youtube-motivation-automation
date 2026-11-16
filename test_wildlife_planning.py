@@ -92,6 +92,35 @@ class WildlifePlanningTests(unittest.TestCase):
             spoken_text('Forage is scarce. The population reached 40 birds.'),
             'Forage is scarce. The population reached 40 birds.')
 
+    def test_episode_visuals_use_scene_descriptions_and_episode_specific_seeds(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+
+        from PIL import Image
+        from wildlife.render import generate_scene_illustration
+
+        manifest = {
+            'episode': 'auto-2026-11-16-123',
+            'idea': {'species': 'deer', 'habitat': 'wooded island'},
+            'scenes': [
+                {'visual': 'Rain collects in a small pool under ferns.', 'camera': 'pasture'},
+                {'visual': 'A footpath winds along a clifftop.', 'camera': 'aerial'},
+            ],
+        }
+
+        def draw_image(prompt, target, **options):
+            Image.new('RGB', (options['width'], options['height'])).save(target)
+
+        with TemporaryDirectory() as directory, patch('image_cpu.generate', side_effect=draw_image) as generate:
+            target = Path(directory) / 'scene.png'
+            generate_scene_illustration(manifest, 0, target)
+            generate_scene_illustration(manifest, 1, target)
+            generate_scene_illustration({**manifest, 'episode': 'auto-2026-11-16-456'}, 0, target)
+        first, second, other_episode = generate.call_args_list
+        self.assertIn('pool under ferns', first.args[0])
+        self.assertIn('clifftop', second.args[0])
+        self.assertEqual(len({call.kwargs['seed'] for call in (first, second, other_episode)}), 3)
+
     def test_tidal_marsh_renders_bird_motion_and_a_visible_change_in_waterline(self):
         from PIL import ImageChops
         from wildlife.science_visuals import science_frames

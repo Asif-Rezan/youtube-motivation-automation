@@ -150,12 +150,18 @@ jobs:
         with:
           name: wildlife-plan
           path: output/wildlife-plan
+      - name: Install scene illustration dependencies
+        if: startsWith(needs.prepare.outputs.episode, 'auto-')
+        run: |
+          pip install 'torch==2.7.1' --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-images-cpu.txt
       - shell: bash
         env:
           SCENE_INDEX: ${{ matrix.scene }}
         run: |
           args=(--episode "$EPISODE" --manifest output/wildlife-plan/plan.json)
           if [[ "$PREVIEW" == true ]]; then args+=(--preview); fi
+          if [[ "$EPISODE" == auto-* ]]; then args+=(--generate-art); fi
           python -u -m wildlife.render "${args[@]}" --stage scene --index "$SCENE_INDEX"
       - uses: actions/upload-artifact@v4
         with:

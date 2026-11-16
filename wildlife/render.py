@@ -1,5 +1,6 @@
 """Generate an original wildlife simulation video, soundtrack and thumbnail."""
 import argparse
+import hashlib
 from dataclasses import replace
 import json
 import math
@@ -9,6 +10,7 @@ import tempfile
 import wave
 
 import numpy as np
+from PIL import Image, ImageOps
 
 from .editing import paint_cue, scene_edit, zoom_frame
 from .episodes import EPISODES, PREVIEW
@@ -92,7 +94,7 @@ def music_bed(target, seconds, timeline=()):
         output.writeframes((signal*32767).astype('<i2').tobytes())
 
 
-def encode_visuals(scene, seconds, size, target, *, edit=None, opening=None, **art):
+def encode_visuals(scene, seconds, size, target, *, edit=None, opening=None, illustration=None, **art):
     width, height = size
     command = ['ffmpeg','-v','error','-y','-f','rawvideo','-pixel_format','rgb24',
                '-video_size',f'{width}x{height}','-framerate',str(FPS),'-i','pipe:0',
@@ -111,12 +113,22 @@ def encode_visuals(scene, seconds, size, target, *, edit=None, opening=None, **a
         opening_art = {**art,'disclose':False}
         opening_art.pop('previous_level', None)
         before = next(render_frames(opening,1,1,opening_art))
+    insert = None
+    if illustration is not None:
+        with Image.open(illustration) as source:
+            insert = ImageOps.fit(source.convert('RGB'), size, method=Image.Resampling.BICUBIC)
     use_shot_changes = seconds >= 20
     with subprocess.Popen(command, stdin=subprocess.PIPE) as proc:
         for index, frame in enumerate(render_frames(scene,seconds,FPS,art)):
             elapsed = index/FPS
             showing_comparison = before is not None and edit['at'] <= elapsed < edit['at'] + edit['duration']
-            if use_shot_changes and not showing_comparison:
+            if insert is not None and not showing_comparison and .16 <= elapsed / seconds < .43:
+                progress = (elapsed / seconds - .16) / .27
+                dx = round(width * (.015 + .055 * progress))
+                dy = round(height * (.015 + .055 * progress))
+                frame = insert.resize(size, Image.Resampling.BILINEAR,
+                                      box=(dx, dy, width-dx, height-dy))
+            elif use_shot_changes and not showing_comparison:
                 frame = zoom_frame(frame,elapsed/seconds)
             paint_cue(frame,edit,elapsed,before)
             proc.stdin.write(frame.tobytes())
@@ -182,7 +194,33 @@ def render_audio(beats, timeline, work):
         raw.unlink(missing_ok=True)
 
 
-def render_scene(beats, timeline, index, work, preview, manifest=None):
+def generate_scene_illustration(manifest, index, target):
+    """Create scene-specific art using the same pinned image model as the other pipelines."""
+    from image_cpu import generate
+
+    idea = manifest['idea']
+    scene = manifest['scenes'][index]
+    subject = idea.get('subject') or idea['species']
+    setting = idea.get('habitat') or idea.get('topic', '')
+    perspective = {'shore': 'eye-level wide shot', 'pasture': 'ground-level medium shot',
+                   'aerial': 'overhead wide shot'}[scene['camera']]
+    prompt = (
+        f'Nature documentary illustration of {subject}, {setting}. '
+        f'{scene["visual"]} {perspective}. '
+        'Cinematic environmental composition, layered depth, detailed natural lighting, no lettering.'
+    )
+    seed = int.from_bytes(hashlib.sha256(f'{manifest["episode"]}/{index}'.encode()).digest()[:4], 'big')
+    print(f'Generating the original illustration for wildlife scene {index+1}', flush=True)
+    try:
+        generate(prompt, target, seed=seed, width=768, height=432, steps=14)
+        with Image.open(target) as image:
+            image.verify()
+    except Exception as error:
+        raise RuntimeError(f'Image generation failed for wildlife scene {index+1} '
+                           f'({type(error).__name__})') from error
+
+
+def render_scene(beats, timeline, index, work, preview, manifest=None, *, generate_art=False):
     if not 0 <= index < len(beats):
         raise ValueError('Scene index is outside the episode')
     work.mkdir(parents=True, exist_ok=True)
@@ -199,8 +237,14 @@ def render_scene(beats, timeline, index, work, preview, manifest=None):
             if idea['topic'] == 'tides' and index:
                 artwork['previous_level'] = beats[index-1].forage
     edit = timeline[index]['edit']
-    encode_visuals(beat, seconds, size, work/f'visual-{index:02}.mp4', edit=edit,
-                   opening=beats[edit['compare_to']] if 'compare_to' in edit else None, disclose=index == 0, **artwork)
+    with tempfile.TemporaryDirectory(prefix='wildlife-illustration-', dir=work) as directory:
+        illustration = None
+        if manifest is not None and generate_art:
+            illustration = Path(directory)/'scene.png'
+            generate_scene_illustration(manifest, index, illustration)
+        encode_visuals(beat, seconds, size, work/f'visual-{index:02}.mp4', edit=edit, illustration=illustration,
+                       opening=beats[edit['compare_to']] if 'compare_to' in edit else None,
+                       disclose=index == 0, **artwork)
     print(json.dumps({'chapter':beat.label,'rendered':True,'seconds':seconds}),flush=True)
 
 
@@ -249,14 +293,14 @@ def assemble(episode, package, timeline, work, output, preview, manifest=None):
         'music_bpm':BPM,'resolution':list(expected_size),'chapters':timeline},indent=2))
 
 
-def render(episode, output, preview=False, manifest=None):
+def render(episode, output, preview=False, manifest=None, *, generate_art=False):
     package, beats, timeline = plan_episode(episode, preview, manifest)
     output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='wildlife-',dir=output) as scratch:
         work = Path(scratch)
         render_audio(beats, timeline, work)
         for index in range(len(beats)):
-            render_scene(beats, timeline, index, work, preview, manifest)
+            render_scene(beats, timeline, index, work, preview, manifest, generate_art=generate_art)
         assemble(episode, package, timeline, work, output, preview, manifest)
 
 
@@ -269,6 +313,7 @@ if __name__ == '__main__':
     parser.add_argument('--work',type=Path,default=Path('output/wildlife-parts'))
     parser.add_argument('--index',type=int)
     parser.add_argument('--manifest',type=Path)
+    parser.add_argument('--generate-art',action='store_true')
     args=parser.parse_args()
     manifest = json.loads(args.manifest.read_text()) if args.manifest else None
     package, beats, timeline = plan_episode(args.episode,args.preview,manifest)
@@ -279,8 +324,8 @@ if __name__ == '__main__':
     elif args.stage == 'scene':
         if args.index is None:
             parser.error('--stage scene requires --index')
-        render_scene(beats,timeline,args.index,args.work,args.preview,manifest)
+        render_scene(beats,timeline,args.index,args.work,args.preview,manifest,generate_art=args.generate_art)
     elif args.stage == 'assemble':
         assemble(args.episode,package,timeline,args.work,args.output,args.preview,manifest)
     else:
-        render(args.episode,args.output,args.preview,manifest)
+        render(args.episode,args.output,args.preview,manifest,generate_art=args.generate_art)
