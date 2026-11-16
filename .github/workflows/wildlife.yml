@@ -35,6 +35,7 @@ jobs:
       scenes: ${{ steps.plan.outputs.scenes }}
       next: ${{ steps.plan.outputs.next }}
       episode: ${{ steps.plan.outputs.episode }}
+      topic: ${{ steps.plan.outputs.topic }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,22 +56,28 @@ jobs:
         run: |
           episode="$EPISODE"
           next=render
+          topic_args=()
           if [[ "$GITHUB_EVENT_NAME" == push && "$episode" == auto ]] &&
              grep -qx 'mode=fresh' .generation/wildlife-full-request.txt; then
             episode="auto-$(TZ=Asia/Dhaka date +%F)-$GITHUB_RUN_ID"
+            if grep -qx 'topic=tides' .generation/wildlife-full-request.txt; then
+              topic_args+=(--topic tides)
+            fi
           fi
           mkdir -p output/wildlife-plan
           if [[ "$PREVIEW" == true ]]; then
             episode=goat-island
             echo null > output/wildlife-plan/plan.json
           else
-            selected=$(python -u -m wildlife.publication select --episode "$episode" | tee /dev/stderr | tail -n1)
+            selected=$(python -u -m wildlife.publication select --episode "$episode" "${topic_args[@]}" | tee /dev/stderr | tail -n1)
             episode=$(jq -er '.episode' <<< "$selected")
             next=$(jq -er '.next' <<< "$selected")
           fi
           echo "episode=$episode" >> "$GITHUB_OUTPUT"
           echo "next=$next" >> "$GITHUB_OUTPUT"
           if [[ "$next" == render ]]; then
+            topic=$(jq -r '.idea.topic // ""' output/wildlife-plan/plan.json)
+            echo "topic=$topic" >> "$GITHUB_OUTPUT"
             args=(--episode "$episode" --manifest output/wildlife-plan/plan.json)
             if [[ "$PREVIEW" == true ]]; then args+=(--preview); fi
             scenes=$(python -u -m wildlife.render "${args[@]}" --stage plan)
@@ -155,6 +162,9 @@ jobs:
         run: |
           pip install 'torch==2.7.1' --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements-images-cpu.txt
+      - name: Install headless Blender for the tidal storybook
+        if: needs.prepare.outputs.topic == 'tides'
+        run: bash scripts/install-wildlife-blender.sh
       - shell: bash
         env:
           SCENE_INDEX: ${{ matrix.scene }}
@@ -199,6 +209,9 @@ jobs:
         with:
           name: wildlife-plan
           path: output/wildlife-plan
+      - name: Install headless Blender for the tidal storybook
+        if: needs.prepare.outputs.topic == 'tides'
+        run: bash scripts/install-wildlife-blender.sh
       - shell: bash
         run: |
           args=(--episode "$EPISODE" --manifest output/wildlife-plan/plan.json)

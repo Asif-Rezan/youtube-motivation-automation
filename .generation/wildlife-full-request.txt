@@ -1,2 +1,3 @@
 mode=fresh
-2026-11-16 — Generate a full episode with repaired scene captions and backgrounds.
+topic=tides
+2026-11-16 — Generate a new tidal marsh story with Blender storybook animation and a split thumbnail.

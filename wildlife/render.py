@@ -4,6 +4,7 @@ import hashlib
 from dataclasses import replace
 import json
 import math
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -94,14 +95,30 @@ def music_bed(target, seconds, timeline=()):
         output.writeframes((signal*32767).astype('<i2').tobytes())
 
 
-def encode_visuals(scene, seconds, size, target, *, edit=None, opening=None, illustration=None, **art):
+def encode_visuals(scene, seconds, size, target, *, edit=None, opening=None, illustration=None, storyboard=None, opening_plate=None, **art):
     width, height = size
     command = ['ffmpeg','-v','error','-y','-f','rawvideo','-pixel_format','rgb24',
                '-video_size',f'{width}x{height}','-framerate',str(FPS),'-i','pipe:0',
                '-an','-c:v','libx264','-preset','fast','-threads','4','-crf','18',
                '-pix_fmt','yuv420p',str(target)]
     domain = art.pop('domain','wildlife')
-    def render_frames(beat, length, fps, options):
+    def render_frames(beat, length, fps, options, *, storybook=False):
+        if storybook:
+            from .editing import paint_tide_indicator
+
+            previous_plate = None
+            first = options.get('previous_level', beat.forage)
+            for frame in range(round(length * fps)):
+                path = storyboard/f'{frame//2+1:04d}.png'
+                if path != previous_plate:
+                    with Image.open(path) as source:
+                        plate = source.convert('RGB').resize(size, Image.Resampling.BILINEAR)
+                    previous_plate = path
+                result = plate.copy()
+                elapsed = min(1, frame/max(1, round(length*fps)-1))
+                paint_tide_indicator(result, first + elapsed * (beat.forage - first))
+                yield result
+            return
         if domain == 'wildlife':
             return frames(size,beat,length,fps,**options)
         from .science_visuals import science_frames
@@ -112,14 +129,18 @@ def encode_visuals(scene, seconds, size, target, *, edit=None, opening=None, ill
         scene = replace(scene,camera=opening.camera)
         opening_art = {**art,'disclose':False}
         opening_art.pop('previous_level', None)
-        before = next(render_frames(opening,1,1,opening_art))
+        if opening_plate is None:
+            before = next(render_frames(opening,1,1,opening_art))
+        else:
+            with Image.open(opening_plate) as source:
+                before = source.convert('RGB').resize(size, Image.Resampling.BILINEAR)
     insert = None
     if illustration is not None:
         with Image.open(illustration) as source:
             insert = ImageOps.fit(source.convert('RGB'), size, method=Image.Resampling.BICUBIC)
     use_shot_changes = seconds >= 20
     with subprocess.Popen(command, stdin=subprocess.PIPE) as proc:
-        for index, frame in enumerate(render_frames(scene,seconds,FPS,art)):
+        for index, frame in enumerate(render_frames(scene,seconds,FPS,art,storybook=storyboard is not None)):
             elapsed = index/FPS
             showing_comparison = before is not None and edit['at'] <= elapsed < edit['at'] + edit['duration']
             if insert is not None and not showing_comparison and .16 <= elapsed / seconds < .43:
@@ -239,12 +260,27 @@ def render_scene(beats, timeline, index, work, preview, manifest=None, *, genera
     edit = timeline[index]['edit']
     with tempfile.TemporaryDirectory(prefix='wildlife-illustration-', dir=work) as directory:
         illustration = None
+        storyboard = None
+        opening_plate = None
+        if artwork.get('topic') == 'tides' and os.environ.get('WILDLIFE_BLENDER'):
+            from .storybook import render_marsh
+
+            storyboard = Path(directory)/'storybook'
+            render_marsh(storyboard, start=artwork.get('previous_level', beat.forage),
+                         end=beat.forage, camera=beat.camera, shot=index,
+                         frames=math.ceil(round(seconds*FPS)/2))
+            if 'compare_to' in edit:
+                earlier = beats[edit['compare_to']]
+                opening_dir = Path(directory)/'earlier'
+                render_marsh(opening_dir, start=earlier.forage, end=earlier.forage, camera=earlier.camera,
+                             shot=edit['compare_to'], frames=1)
+                opening_plate = opening_dir/'0001.png'
         if manifest is not None and generate_art:
             illustration = Path(directory)/'scene.png'
             generate_scene_illustration(manifest, index, illustration)
-        encode_visuals(beat, seconds, size, work/f'visual-{index:02}.mp4', edit=edit, illustration=illustration,
+        encode_visuals(beat, seconds, size, work/f'visual-{index:02}.mp4', edit=edit, illustration=illustration, storyboard=storyboard,
                        opening=beats[edit['compare_to']] if 'compare_to' in edit else None,
-                       disclose=index == 0, **artwork)
+                       opening_plate=opening_plate, disclose=index == 0, **artwork)
     print(json.dumps({'chapter':beat.label,'rendered':True,'seconds':seconds}),flush=True)
 
 
@@ -262,6 +298,10 @@ def assemble(episode, package, timeline, work, output, preview, manifest=None):
         if idea.get('domain','wildlife') == 'wildlife':
             render_thumbnail(beats,output/'thumbnail.jpg',label=thumbnail_hook(idea),
                              species=idea['species'],habitat=idea['habitat'],cue=cue)
+        elif idea['topic'] == 'tides' and os.environ.get('WILDLIFE_BLENDER'):
+            from .storybook import render_marsh_thumbnail
+
+            render_marsh_thumbnail(beats,output/'thumbnail.jpg',thumbnail_hook(idea))
         else:
             render_science_thumbnail(beats,output/'thumbnail.jpg',idea,cue)
         (output/'episode-plan.json').write_text(json.dumps(manifest,indent=2)+'\n')

@@ -155,7 +155,7 @@ def validate_opening(narration):
         raise ValueError('Ask a specific unanswered question within the first 34 spoken words')
 
 
-def build(episode, store):
+def build(episode, store, *, requested_topic=None):
     key = f'wildlife/{episode}/plan.json'
     history = store.load(HISTORY_KEY, [])
     cached = store.load(key, None)
@@ -171,6 +171,11 @@ def build(episode, store):
     occupied = {tuple(row[0]) for row in recent}
     titles = {row[1].casefold() for row in recent}
     domain, topic, subject, starter, reused = select_topic(history,seed)
+    if requested_topic:
+        domain, topic, subject, starter = next(
+            (name, *entry) for name, entries in TOPICS.items()
+            for entry in entries if entry[0] == requested_topic)
+        reused = any(row.get('topic') == topic for row in history)
     wildlife = domain == 'wildlife'
     schema = IDEA if wildlife else GENERAL_IDEA
     angle = ('Use this as a loose starting point for a materially different hypothetical: ' if reused

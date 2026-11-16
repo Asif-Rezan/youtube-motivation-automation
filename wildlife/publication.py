@@ -24,7 +24,7 @@ def next_action(store, episode):
     return 'render'
 
 
-def selection(episode, manifest_path):
+def selection(episode, manifest_path, *, topic=None):
     from datetime import datetime
     from zoneinfo import ZoneInfo
     from .episodes import EPISODES
@@ -45,7 +45,7 @@ def selection(episode, manifest_path):
         raise ValueError('Unknown wildlife episode')
     action = next_action(store, episode)
     if action == 'render':
-        manifest = build(episode,store) if is_generated(episode) else None
+        manifest = build(episode,store,requested_topic=topic) if is_generated(episode) else None
         manifest_path.parent.mkdir(parents=True,exist_ok=True)
         manifest_path.write_text(json.dumps(manifest,indent=2)+'\n')
     return {'episode':episode,'next':action}
@@ -131,12 +131,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('stage', choices=('select', 'youtube', 'facebook', 'cleanup'))
     parser.add_argument('--episode', default='auto')
+    parser.add_argument('--topic', choices=('tides',))
     parser.add_argument('--manifest',type=Path,default=Path('output/wildlife-plan/plan.json'))
     parser.add_argument('--root', type=Path, default=Path('output/wildlife'))
     args = parser.parse_args()
     try:
         if args.stage == 'select':
-            print(json.dumps(selection(args.episode,args.manifest)))
+            print(json.dumps(selection(args.episode,args.manifest,topic=args.topic)))
         else:
             print(run(args.stage, args.episode, args.root))
     except Exception as error:
