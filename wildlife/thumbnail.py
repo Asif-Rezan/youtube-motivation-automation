@@ -163,6 +163,12 @@ def compose_thumbnail(near,cover,label,cue,*,arrow_offset=(0,0)):
     cover = ImageEnhance.Contrast(cover).enhance(1.13)
     cover = ImageEnhance.Brightness(cover).enhance(1.10)
     draw_cue(cover,cue,arrow_offset=arrow_offset)
+    draw_headline(cover, label)
+    return cover
+
+
+def draw_headline(cover, label):
+    width = cover.width
     draw = ImageDraw.Draw(cover)
     label = label.upper()
     font = cover_font(200)
@@ -174,13 +180,19 @@ def compose_thumbnail(near,cover,label,cue,*,arrow_offset=(0,0)):
     display_width = min(1780, round(ink_width*216/ink_height*1.12))
     lettering = lettering.resize((display_width,216),Image.Resampling.LANCZOS)
     cover.paste(lettering,((width-display_width)//2,20),lettering)
-    return cover
 
 
 def render_science_thumbnail(beats, target, idea, cue):
     from .science_visuals import science_frame
 
     domain,topic = idea['domain'],idea['topic']
+    if domain == 'ocean' and topic == 'tides':
+        from .tidal_marsh import tidal_frame
+
+        cover = tidal_frame(SIZE, .88, 'shore', portrait=True)
+        draw_headline(cover, thumbnail_hook(idea))
+        save_thumbnail(cover, target)
+        return
     before = beats[0]
     after = max(beats,key=lambda beat:abs(beat.forage-before.forage))
     near = science_frame(SIZE,domain,topic,before.forage,'shore')

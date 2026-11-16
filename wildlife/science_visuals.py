@@ -5,18 +5,28 @@ import math
 from PIL import Image, ImageDraw
 
 
-def science_frames(size, beat, duration, fps, *, domain, topic, disclose=False):
+def science_frames(size, beat, duration, fps, *, domain, topic, disclose=False, shot=0, previous_level=None):
     for number in range(round(duration*fps)):
-        yield science_frame(size,domain,topic,beat.forage,beat.camera,number/fps,
-                            disclose=disclose and number < fps*3)
+        seconds = number / fps
+        camera = beat.camera
+        if duration >= 18:
+            # Alternate wide, overhead and close coverage within a long narrated beat.
+            views = ('shore', 'aerial', 'pasture')
+            camera = views[(views.index(camera) + int(3 * seconds / duration)) % len(views)]
+        level = beat.forage
+        if topic == 'tides' and previous_level is not None:
+            blend = min(1, seconds / min(6, duration))
+            level = previous_level + (level - previous_level) * blend
+        yield science_frame(size,domain,topic,level,camera,seconds,
+                            disclose=disclose and number < fps*3, shot=shot)
 
 
-def science_frame(size, domain, topic, intensity, camera, seconds=0, *, disclose=False):
+def science_frame(size, domain, topic, intensity, camera, seconds=0, *, disclose=False, shot=0):
     palette = {'space':'#0a1632','ocean':'#135b83','earth':'#547e8d','technology':'#17233a'}
     image = Image.new('RGB',size,palette[domain])
     draw = ImageDraw.Draw(image)
     sx,sy=size[0]/1920,size[1]/1080
-    shift = {'aerial':0,'shore':-100,'pasture':80}[camera]
+    shift = {'aerial':0,'shore':-100,'pasture':80}[camera] + (shot % 5 - 2) * 24
     travel = math.sin(seconds*.38)
     level = max(0,min(1,intensity))
 
@@ -30,7 +40,11 @@ def science_frame(size, domain, topic, intensity, camera, seconds=0, *, disclose
         draw.ellipse(tuple(round(v*k) for v,k in zip((x-rx,y-ry,x+rx,y+ry),(sx,sy,sx,sy))),
                      fill=fill,outline=outline,width=max(1,round(4*sx)))
 
-    if domain == 'space':
+    if domain == 'ocean' and topic == 'tides':
+        from .tidal_marsh import tidal_frame
+        image = tidal_frame(size, intensity, camera, seconds, shot=shot)
+        draw = ImageDraw.Draw(image)
+    elif domain == 'space':
         for i in range(100):
             x,y=(i*157+53)%1920,(i*113+91)%1080
             ellipse(x,y,2+i%3,2+i%3,('#f4dda6' if i%7==0 else '#aebee2'))
@@ -53,7 +67,7 @@ def science_frame(size, domain, topic, intensity, camera, seconds=0, *, disclose
         if topic == 'rings':
             line([(x-500,y+80),(x-300,y+117),(x+170,y+128),(x+480,y+85)],'#f0cb8d',12)
     elif domain == 'ocean':
-        surface=370-175*level+20*travel if topic=='tides' else 330+16*travel
+        surface=330+16*travel
         polygon([(0,surface),(1920,surface),(1920,1080),(0,1080)],'#127cb0')
         polygon([(0,850),(510,760),(930,660),(1350,470),(1920,420),(1920,1080),(0,1080)],'#d4ab72')
         polygon([(0,950),(550,850),(1000,770),(1400,600),(1920,570),(1920,1080),(0,1080)],'#8f805f')
@@ -155,6 +169,16 @@ def science_frame(size, domain, topic, intensity, camera, seconds=0, *, disclose
                 x=615+i*137
                 polygon([(x,942),(x,887),(x+104,887),(x+104,942)],
                         '#e7b858' if i<round(level*5) else '#415f7a')
+    if topic == 'tides':
+        from .editing import paint_tide_indicator
+        paint_tide_indicator(image, level)
+    elif camera != 'aerial':
+        width, height = image.size
+        dx, dy = round(width * .07), round(height * .07)
+        horizontal = (shot % 3) * dx // 2 if camera == 'shore' else dx + (shot % 3) * dx // 2
+        image = image.resize(size, Image.Resampling.BILINEAR,
+                             box=(horizontal, dy, width - 2*dx + horizontal, height - dy))
+        draw = ImageDraw.Draw(image)
     if disclose:
         from PIL import ImageFont
         from .visuals import FONT

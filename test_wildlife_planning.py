@@ -77,6 +77,19 @@ class WildlifePlanningTests(unittest.TestCase):
         self.assertEqual(metadata['tags'][:2], ['river changes course', 'wetland hydrology'])
         self.assertEqual(metadata['tags'].count('wetland hydrology'), 1)
 
+    def test_tidal_marsh_renders_bird_motion_and_a_visible_change_in_waterline(self):
+        from PIL import ImageChops
+        from wildlife.science_visuals import science_frames
+        from wildlife.tidal_marsh import landscape
+
+        beat = replace(GOATS[0], camera='shore', forage=.2)
+        frames = list(science_frames((320,180), beat, 1, 4, domain='ocean', topic='tides'))
+        self.assertEqual(len(frames), 4)
+        self.assertIsNotNone(ImageChops.difference(frames[0], frames[-1]).getbbox())
+        _, low_waterline, _ = landscape('shore', .2)
+        _, high_waterline, _ = landscape('shore', .8)
+        self.assertGreater(high_waterline[20][1] - low_waterline[20][1], 200)
+
     def test_tag_repair_for_tides_reserves_room_for_the_subject(self):
         from wildlife.metadata import normalize_generated_tags, tag_cost
 
@@ -156,6 +169,8 @@ class WildlifePlanningTests(unittest.TestCase):
         self.assertEqual(manifest['idea']['tags'][0], 'Earth what if')
         package, beats, timeline = plan_episode(episode,False,manifest)
         self.assertEqual(len(beats),20)
+        self.assertIn('text', timeline[0]['edit'])
+        self.assertGreaterEqual(sum('text' in chapter['edit'] for chapter in timeline), 17)
         self.assertEqual(package.build(timeline)['title'],'Earth Gets Rings: Can Its Seasons SURVIVE?')
 
     def test_ai_plan_keeps_a_full_runtime_and_reuses_the_same_episode_on_retry(self):

@@ -108,7 +108,9 @@ def encode_visuals(scene, seconds, size, target, *, edit=None, opening=None, **a
     before = None
     if opening is not None:
         scene = replace(scene,camera=opening.camera)
-        before = next(render_frames(opening,1,1,{**art,'disclose':False}))
+        opening_art = {**art,'disclose':False}
+        opening_art.pop('previous_level', None)
+        before = next(render_frames(opening,1,1,opening_art))
     use_shot_changes = seconds >= 20
     with subprocess.Popen(command, stdin=subprocess.PIPE) as proc:
         for index, frame in enumerate(render_frames(scene,seconds,FPS,art)):
@@ -141,6 +143,7 @@ def plan_episode(episode, preview, manifest=None):
         if preview:
             raise ValueError('AI daily episodes are rendered at full length')
     package.validate()
+    science = manifest is not None and manifest['idea'].get('domain', 'wildlife') != 'wildlife'
     timeline = []
     elapsed = 0
     for index, beat in enumerate(beats):
@@ -148,7 +151,7 @@ def plan_episode(episode, preview, manifest=None):
         seconds = 10 if preview else math.ceil((speech+1.5)*FPS)/FPS
         timeline.append({'chapter':beat.label,'start':round(elapsed,3),
                          'seconds':seconds,'population':beat.population,'forage':beat.forage,
-                         'edit':scene_edit(beats,index,seconds)})
+                         'edit':scene_edit(beats,index,seconds,science=science)})
         elapsed += seconds
     if not preview and (len(beats) != 20 or not 600 <= elapsed <= 900):
         raise ValueError('A full wildlife episode needs 20 scenes and a 10–15 minute runtime')
@@ -190,7 +193,9 @@ def render_scene(beats, timeline, index, work, preview, manifest=None):
         if domain == 'wildlife':
             artwork = {'species':idea['species'],'habitat':idea['habitat']}
         else:
-            artwork = {'domain':domain,'topic':idea['topic']}
+            artwork = {'domain':domain,'topic':idea['topic'],'shot':index}
+            if idea['topic'] == 'tides' and index:
+                artwork['previous_level'] = beats[index-1].forage
     edit = timeline[index]['edit']
     encode_visuals(beat, seconds, size, work/f'visual-{index:02}.mp4', edit=edit,
                    opening=beats[edit['compare_to']] if 'compare_to' in edit else None, disclose=index == 0, **artwork)
