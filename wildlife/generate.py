@@ -10,7 +10,7 @@ from lyrics_cpu import StoryGenerationError, WILDLIFE_NARRATION_PATTERN
 
 from .episodes import Beat
 from .narration import spoken_text
-from .metadata import POWER_WORDS, Packaging, emphasize_title, normalize_generated_tags
+from .metadata import Packaging, emphasize_title, episode_title, normalize_generated_tags
 from .whatif import TOPICS, select_topic
 
 
@@ -62,7 +62,7 @@ def ask(prompt, schema, seed, limit):
 def packaging(idea):
     subject = idea.get('subject') or idea['species']
     title = emphasize_title(idea['title'],subject,idea.get('pressure'),topic=idea.get('topic'))
-    return Packaging(title,subject,idea['opening'],idea['description'],tuple(idea['tags']),topic=idea.get('topic',''),premise=idea.get('premise',''))
+    return Packaging(title,subject,idea['opening'],idea['description'],tuple(idea['tags']),topic=idea.get('topic',''),premise=idea.get('premise',''),pressure=idea.get('pressure'))
 
 
 def concept(idea):
@@ -72,7 +72,9 @@ def concept(idea):
 
 
 def history_entry(episode, idea):
-    return {'episode':episode,'concept':concept(idea),'title':idea['title'],
+    package = packaging(idea)
+    published_title = episode_title(package.title, package.subject, package.topic, package.pressure)
+    return {'episode':episode,'concept':concept(idea),'title':published_title,
             'domain':idea.get('domain','wildlife'),'topic':idea.get('topic','')}
 
 
@@ -188,9 +190,9 @@ def build(episode, store, *, requested_topic=None):
             f'{angle} State the specific initiating change in the premise, explore a surprising consequence '
             'that travels through habitats, resources or the food web. Reveal the answer in the final '
             'scenes. Keep the central question ecological and avoid a generic disaster or population boom. '
-            'Distinguish the assumed conditions from real facts. Title 35–70 characters, with '
-            f'{subject} near the start, one fitting power word from {", ".join(sorted(POWER_WORDS))}, '
-            f'and a question ending. Include {subject} in the opening of 40–160 characters and in a tag. '
+            'Distinguish the assumed conditions from real facts. Title 35–84 characters. Start it exactly '
+            f'with What Happens When, name {subject} immediately afterward and end with a question mark. '
+            f'Include {subject} in the opening of 40–160 characters and in a tag. '
             'Write one short description paragraph that tees up the main consequence without giving away the answer. '
             'Use 6–10 distinct topic-specific search phrases, including the habitat and ecological mechanism. '
             'Write a 2–4 word thumbnail hook that adds a time, stakes or an unexpected detail from the story '
@@ -224,7 +226,10 @@ def build(episode, store, *, requested_topic=None):
                    for other in (set(re.findall(r'[a-z]+',text.lower())) for text in historical_premises)):
                 feedback = 'The premise repeats an older story. Change the initiating event and consequence.'
                 continue
-        if tuple(concept(idea)) not in occupied and idea['title'].casefold() not in titles:
+        package = packaging(idea)
+        published_title = episode_title(package.title, package.subject, package.topic, package.pressure)
+        if (tuple(concept(idea)) not in occupied and idea['title'].casefold() not in titles
+                and published_title.casefold() not in titles):
             break
         feedback = 'The premise or title repeated an earlier episode. Change the central consequence.'
     else:
@@ -252,7 +257,7 @@ def generate_scene(idea, previous, seed, wildlife):
             'Leave its answer open. Skip greetings, channel intros, invented statistics and calls to subscribe.'
         )
     else:
-        opening = ' '.join(previous[0]['narration'].split()[:34])
+        opening = ' '.join(spoken_text(previous[0]['narration']).split()[:34])
         direction = f'The opening promise was {json.dumps(opening)}. Continue with a fresh discovery.'
     if index == 11:
         direction += ' In scene 11, reveal an early surprise and ask a question that follows from it.'
@@ -281,13 +286,13 @@ def generate_scene(idea, previous, seed, wildlife):
             scene = repair_scene_copy(result['scenes'][0], index)
             narration = spoken_text(scene['narration'])
             if narration != scene['narration']:
-                if len(narration.split()) < 73:
-                    raise ValueError('Replace production cues with spoken story sentences and keep 73–91 words')
-                print(f'Wildlife scene {index}: removed production cues from narration', flush=True)
-                scene['narration'] = narration
+                if len(narration.split()) < 55:
+                    raise ValueError('Write at least 55 spoken words after production cues are removed')
+                # Stored narration keeps the validated timing. Decode filters it for speech.
+                print(f'Wildlife scene {index}: production cues excluded from speech', flush=True)
             validate_scenes([scene])
             if index == 1:
-                validate_opening(scene['narration'])
+                validate_opening(narration)
         except StoryGenerationError as error:
             if not error.retryable:
                 raise

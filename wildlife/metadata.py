@@ -88,8 +88,57 @@ def emphasize_title(title, subject, pressure=None, *, topic=None):
     return title
 
 
+TITLE_PREFIX = 'What Happens When '
+TOPIC_EVENTS = {
+    'tides': 'Tides Flood a Marsh for Longer',
+    'currents': 'Ocean Currents Shift Away From Kelp',
+    'sea ice': 'Sea Ice Forms Later',
+    'reefs': 'Coral Reefs Stop Sheltering a Lagoon',
+    'clouds': 'Clouds Stop Reaching a Forest',
+    'rivers': 'Rivers Change Course',
+    'albedo': 'Snow Melts Early',
+    'wind': 'Wind Reverses Over a Woodland',
+    'rings': 'Earth Gets Rings',
+    'moon': 'the Moon Appears Bigger',
+    'daylight': 'Earth Slows Down',
+    'shadows': 'a Moon Base Loses Sunlight',
+    'navigation': 'Navigation Signals Vanish',
+    'storage': 'the Power Grid Can Store a Week of Energy',
+    'network': 'Internet Links Vanish',
+    'power': 'a Neighborhood Runs on a Local Power Grid',
+}
+ANIMAL_EVENTS = {
+    'drought': 'Face a Drought',
+    'winter': 'Face a Harsh Winter',
+    'food competition': 'Compete for Food',
+    'vegetation loss': 'Run Out of Plants to Eat',
+    'water shortage': 'Run Out of Water',
+    'habitat recovery': 'Get a Chance to Recover',
+}
+
+
+def episode_title(title, subject, topic='', pressure=None):
+    if title.startswith(TITLE_PREFIX):
+        return title
+    if topic in TOPIC_EVENTS:
+        return TITLE_PREFIX + TOPIC_EVENTS[topic] + '?'
+    if pressure:
+        event = ANIMAL_EVENTS[pressure]
+    elif 'food runs out' in title.casefold():
+        event = 'Run Out of Food'
+    else:
+        event = 'Face a Changing Island'
+    return f'{TITLE_PREFIX}{subject.title()} {event} on an Island?'
+
+
 def validate_title(title,subject):
     subject = subject.casefold()
+    if title.startswith(TITLE_PREFIX):
+        if not 35 <= len(title) <= 84 or not title.endswith('?'):
+            raise ValueError('Story title must be a question of 35–84 characters')
+        if not re.search(r'\b' + re.escape(subject) + r'\b',title[len(TITLE_PREFIX):].casefold()):
+            raise ValueError('Put the episode subject in the story title')
+        return
     if not 35 <= len(title) <= 70 or not title.endswith('?'):
         raise ValueError('Wildlife title must be a concise question of 35–70 characters')
     if not any(match.group() in POWER_WORDS for match in _POWER_WORD.finditer(title)):
@@ -136,6 +185,7 @@ class Packaging:
     tags: tuple[str, ...]
     topic: str = ''
     premise: str = ''
+    pressure: str | None = None
 
     def validate(self):
         subject = self.subject.casefold()
@@ -154,7 +204,9 @@ class Packaging:
 
     def build(self, timeline, *, preview=False):
         self.validate()
-        title = self.title + ' (30-Second Preview)' if preview else self.title
+        title = episode_title(self.title, self.subject, self.topic, self.pressure)
+        if preview:
+            title += ' (30-Second Preview)'
         paragraphs = [self.premise or self.opening]
         if self.description.strip().casefold() != paragraphs[0].strip().casefold():
             paragraphs.append(self.description)

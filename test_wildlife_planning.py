@@ -215,7 +215,7 @@ class WildlifePlanningTests(unittest.TestCase):
         self.assertEqual(len(beats),20)
         self.assertIn('text', timeline[0]['edit'])
         self.assertGreaterEqual(sum('text' in chapter['edit'] for chapter in timeline), 17)
-        self.assertEqual(package.build(timeline)['title'],'Earth Gets Rings: Can Its Seasons SURVIVE?')
+        self.assertEqual(package.build(timeline)['title'],'What Happens When Earth Gets Rings?')
 
     def test_ai_plan_keeps_a_full_runtime_and_reuses_the_same_episode_on_retry(self):
         idea = {
@@ -237,6 +237,8 @@ class WildlifePlanningTests(unittest.TestCase):
             if index in (0, 8, 9):
                 scene['label'] = 'The herd grows'
             scenes.append(scene)
+        scenes[2]['narration'] = ('Camera: aerial. Action: walk. Forage drops to 30 percent. '
+                                   + ' '.join(['Example'] * 65) + '.')
         # A valid script should survive unusable caption/background lengths in scene 7.
         scenes[6]['label'] = '<>'
         scenes[6]['visual'] = ' '
@@ -263,6 +265,11 @@ class WildlifePlanningTests(unittest.TestCase):
         self.assertEqual(len(beats), 20)
         self.assertEqual(beats[0].label, 'The herd grows')
         self.assertEqual(beats[6].label, 'Scene 7')
+        self.assertEqual(len(beats[2].narration.split()), 65)
+        self.assertNotIn('Camera:', beats[2].narration)
+        self.assertEqual(timeline[0]['edit']['chapter'][0], 1)
+        self.assertEqual(len(timeline[1]['edit']['quiz'][1]), 3)
+        self.assertEqual(timeline[-1]['edit']['comparison_values'][0], f'{beats[0].population:,} deer')
         self.assertEqual(beats[6].narration, scenes[6]['narration'])
         self.assertEqual(beats[6].camera, scenes[6]['camera'])
         self.assertLessEqual(len(beats[7].label), 45)
@@ -272,4 +279,4 @@ class WildlifePlanningTests(unittest.TestCase):
         self.assertTrue(beats[8].label.startswith('The herd grows ('))
         self.assertTrue(600 <= sum(chapter['seconds'] for chapter in timeline) <= 900)
         self.assertEqual(package.build(timeline)['title'],
-                         'Deer on an Island: What If Their Food Starts to VANISH?')
+                         'What Happens When Deer Run Out of Plants to Eat on an Island?')

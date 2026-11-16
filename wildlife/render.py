@@ -13,7 +13,7 @@ import wave
 import numpy as np
 from PIL import Image, ImageOps
 
-from .editing import paint_cue, scene_edit, zoom_frame
+from .editing import documentary_overlay, paint_cue, zoom_frame
 from .episodes import EPISODES, PREVIEW
 from .visuals import frames
 from .thumbnail import episode_cue, render_science_thumbnail, render_thumbnail
@@ -75,9 +75,10 @@ def music_bed(target, seconds, timeline=()):
     rng = np.random.default_rng(221)
     for entry in timeline:
         edit = entry.get('edit', {})
-        if not edit:
+        at = edit.get('quiz_at', edit.get('at'))
+        if at is None:
             continue
-        start = max(0, round((entry['start'] + edit['at'] - .42)*RATE))
+        start = max(0, round((entry['start'] + at - .42)*RATE))
         count = min(length-start, round(1.25*RATE))
         if count <= 0:
             continue
@@ -120,7 +121,7 @@ def encode_visuals(scene, seconds, size, target, *, edit=None, opening=None, ill
                 yield result
             return
         if domain == 'wildlife':
-            return frames(size,beat,length,fps,**options)
+            return frames(size,beat,length,fps,show_count=not (edit and 'counter' in edit),**options)
         from .science_visuals import science_frames
         return science_frames(size,beat,length,fps,domain=domain,**options)
 
@@ -184,9 +185,10 @@ def plan_episode(episode, preview, manifest=None):
         source = manifest['scenes'][index]['narration'] if manifest is not None else beat.narration
         speech = len(source.split())*60/WORDS_PER_MINUTE
         seconds = 10 if preview else math.ceil((speech+1.5)*FPS)/FPS
+        edit = {} if preview else documentary_overlay(
+            beats,index,seconds,science=science,subject=package.subject,topic=package.topic)
         timeline.append({'chapter':beat.label,'start':round(elapsed,3),
-                         'seconds':seconds,'population':beat.population,'forage':beat.forage,
-                         'edit':scene_edit(beats,index,seconds,science=science)})
+                         'seconds':seconds,'population':beat.population,'forage':beat.forage,'edit':edit})
         elapsed += seconds
     if not preview and (len(beats) != 20 or not 600 <= elapsed <= 900):
         raise ValueError('A full wildlife episode needs 20 scenes and a 10–15 minute runtime')

@@ -241,7 +241,7 @@ def animal_sprite(colour, frame, grazing, species, scale=1):
     return sprite
 
 
-def draw_scene_overlay(image, beat, population_icon, count_font, disclosure_font, show_disclosure):
+def draw_scene_overlay(image, beat, population_icon, count_font, disclosure_font, show_disclosure, *, show_count=True):
     """Use visual cues to signal what's happening without covering the scene."""
     w,h = image.size
     scale = w/1280
@@ -275,23 +275,24 @@ def draw_scene_overlay(image, beat, population_icon, count_font, disclosure_font
         polygon(draw,points(((43,41),(27,40),(22,28),(36,29))), '#b9e177')
         polygon(draw,points(((46,37),(51,23),(66,23),(62,34))), '#91c772')
 
-    count = f'{beat.population:,}'
-    right = round(w*.965)
-    padding = round(12*scale)
-    text_width = math.ceil(draw.textlength(count,font=count_font))
-    left = right-text_width-population_icon.width-3*padding
-    draw.rounded_rectangle((left,round(y),right,round(y+74*scale)),
-                           radius=round(15*scale),fill=dark,outline='#a4d7d1',
-                           width=max(1,round(2*scale)))
-    image.paste(population_icon,(left+padding,round(y+(74*scale-population_icon.height)/2)),population_icon)
-    draw.text((right-padding,round(y+37*scale)),count,anchor='rm',font=count_font,fill=pale)
+    if show_count:
+        count = f'{beat.population:,}'
+        right = round(w*.965)
+        padding = round(12*scale)
+        text_width = math.ceil(draw.textlength(count,font=count_font))
+        left = right-text_width-population_icon.width-3*padding
+        draw.rounded_rectangle((left,round(y),right,round(y+74*scale)),
+                               radius=round(15*scale),fill=dark,outline='#a4d7d1',
+                               width=max(1,round(2*scale)))
+        image.paste(population_icon,(left+padding,round(y+(74*scale-population_icon.height)/2)),population_icon)
+        draw.text((right-padding,round(y+37*scale)),count,anchor='rm',font=count_font,fill=pale)
     if show_disclosure:
         draw.text((round(w*.032),round(h*.945)),'ILLUSTRATIVE SIMULATION',
                   font=disclosure_font,fill='#ffffff',stroke_width=max(1,round(scale)),
                   stroke_fill='#28352d')
 
 
-def frames(size, beat, duration, fps, *, species='goats', habitat='grassland island', overlay=True, disclose=False):
+def frames(size, beat, duration, fps, *, species='goats', habitat='grassland island', overlay=True, disclose=False, show_count=True):
     world = Island(size, beat.camera, beat.forage, seed=177, habitat=habitat)
     kind = {'goats':'goat','deer':'deer','rabbits':'rabbit'}[species]
     figures = world.actors(beat.population, seed=903)
@@ -353,5 +354,5 @@ def frames(size, beat, duration, fps, *, species='goats', habitat='grassland isl
                                  box=(margin+pan,vertical,w-margin+pan,h-vertical))
             draw = ImageDraw.Draw(image)
         if overlay:
-            draw_scene_overlay(image,beat,population_icon,count_font,disclosure_font,disclose and t<3)
+            draw_scene_overlay(image,beat,population_icon,count_font,disclosure_font,disclose and t<3,show_count=show_count)
         yield image
