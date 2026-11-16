@@ -21,6 +21,11 @@ HEADLINES = {'drought':'WHEN RAIN STOPS','winter':'WINTER ARRIVES',
              'water shortage':'WATER RUNS OUT','habitat recovery':'CAN IT RECOVER'}
 HISTORY_KEY = 'wildlife/ideas.json'
 STRING = {'type': 'string'}
+CAMERA_VIEWS = {
+    'shore': 'Wide view from the edge of the setting.',
+    'aerial': 'Overhead view of the surrounding environment.',
+    'pasture': 'Ground-level view across the immediate surroundings.',
+}
 
 
 def obj(**props):
@@ -107,12 +112,35 @@ def unique_scene_labels(previous, batch):
     return normalized
 
 
+def repair_scene_copy(scene, index):
+    """Keep the story and render controls when display text needs repair."""
+    label = re.sub(r'[<>]', '', ' '.join(scene['label'].split()))
+    if len(label) > 45:
+        label = label[:46].rsplit(' ', 1)[0] if ' ' in label[:46] else label[:45]
+        label = label.rstrip(' ,:;-')
+    if len(label) < 3:
+        label = f'Scene {index}'
+
+    visual = ' '.join(scene['visual'].split())
+    if len(visual) > 220:
+        visual = visual[:221].rsplit(' ', 1)[0] if ' ' in visual[:221] else ''
+    if len(visual) < 24:
+        visual = CAMERA_VIEWS[scene['camera']]
+    repaired = dict(scene, label=label, visual=visual)
+    changed = [field for field in ('label', 'visual') if repaired[field] != scene[field]]
+    if changed:
+        print(f'Wildlife scene {index}: repaired {", ".join(changed)}', flush=True)
+    return repaired
+
+
 def validate_scenes(scenes):
     for scene in scenes:
         if not 73 <= len(scene['narration'].split()) <= 91:
             raise ValueError('Each narrated scene needs 73–91 words')
-        if not 3 <= len(scene['label'].strip()) <= 45 or not 24 <= len(scene['visual'].strip()) <= 220:
-            raise ValueError('Missing concise scene label or background description')
+        if not 3 <= len(scene['label'].strip()) <= 45:
+            raise ValueError('Scene label must be 3–45 characters')
+        if not 24 <= len(scene['visual'].strip()) <= 220:
+            raise ValueError('Scene background description must be 24–220 characters')
         if scene['forage_percent'] not in range(0,101,5) or not 0 <= scene['population'] <= 9999:
             raise ValueError('Scene counters must be within the supported ranges')
 
@@ -198,15 +226,8 @@ def build(episode, store):
             'The planner could not produce distinct, valid episode metadata.',
             code='what_if_metadata', details={'domain':domain,'topic':topic,'attempts':5,'last_check':feedback})
     scenes = []
-    for start in range(0, 20, 2):
-        try:
-            scenes.extend(generate_scenes(idea, scenes, 2, seed, wildlife, attempts=1))
-        except StoryGenerationError as error:
-            if not error.retryable:
-                raise
-            print(f'Scenes {start+1}–{start+2}: retrying individually', flush=True)
-            for _ in range(2):
-                scenes.extend(generate_scenes(idea, scenes, 1, seed, wildlife, attempts=3))
+    for _ in range(20):
+        scenes.append(generate_scene(idea, scenes, seed, wildlife))
     payload = {'episode':episode, 'idea':idea, 'scenes':scenes}
     decode(payload, episode)
     store.save(key,payload)
@@ -214,11 +235,11 @@ def build(episode, store):
     return payload
 
 
-def generate_scenes(idea, previous, count, seed, wildlife, *, attempts):
-    first = len(previous) + 1
-    last = first + count - 1
+def generate_scene(idea, previous, seed, wildlife):
+    index = len(previous) + 1
+    attempts = 3
     prior = [(scene['label'], scene['population'], scene['forage_percent']) for scene in previous]
-    if first == 1:
+    if index == 1:
         direction = (
             'Open scene 1 with the event promised by the title and show its subject. '
             'Within the first 34 spoken words, tease a surprising clue and ask one specific question. '
@@ -227,9 +248,9 @@ def generate_scenes(idea, previous, count, seed, wildlife, *, attempts):
     else:
         opening = ' '.join(previous[0]['narration'].split()[:34])
         direction = f'The opening promise was {json.dumps(opening)}. Continue with a fresh discovery.'
-    if first <= 11 <= last:
+    if index == 11:
         direction += ' In scene 11, reveal an early surprise and ask a question that follows from it.'
-    if last == 20:
+    if index == 20:
         direction += ' In scene 20, answer the opening question, explain the cause and return to the opening subject.'
     else:
         direction += ' Build toward the outcome without resolving the opening question.'
@@ -237,37 +258,37 @@ def generate_scenes(idea, previous, count, seed, wildlife, *, attempts):
         'Use whole-number population from 0 to 9999 and forage_percent in steps of five from 0 to 100.'
         if wildlife else 'Set population to zero and vary forage_percent in steps of five from 0 to 100.'
     )
-    schema = obj(scenes={'type': 'array', 'items': SCENE, 'minItems': count, 'maxItems': count})
+    schema = obj(scenes={'type': 'array', 'items': SCENE, 'minItems': 1, 'maxItems': 1})
     feedback = ''
     for attempt in range(attempts):
         try:
             result = ask(
-                f'Write exactly {count} chronological English scenes, numbered {first} through {last} '
-                f'in the story. Plan: {json.dumps(idea)}. Prior beats: {json.dumps(prior)}. '
+                f'Write scene {index} of this twenty-scene English story. Plan: {json.dumps(idea)}. Prior beats: {json.dumps(prior)}. '
                 'Aim for 82 spoken words per scene (73–91 allowed), single spaces and ASCII punctuation. '
                 'Keep facts separate from hypothetical conditions. Name time jumps early in the narration. '
                 f'{direction} {counters} Use a specific 3–38 character caption. '
                 'Describe a distinct visible background with no text or animals in one sentence of '
                 f'24–160 characters. {feedback}',
-                schema, seed + 1000 + first * 20 + (0 if count == 2 else 5) + attempt * 3,
-                1100 * count)
-            batch = result['scenes']
-            validate_scenes(batch)
-            if first == 1:
-                validate_opening(batch[0]['narration'])
+                schema, seed + 1005 + index * 20 + attempt * 3, 1100)
+            scene = repair_scene_copy(result['scenes'][0], index)
+            validate_scenes([scene])
+            if index == 1:
+                validate_opening(scene['narration'])
         except StoryGenerationError as error:
             if not error.retryable:
                 raise
-            feedback = f'Repair the JSON constraint {error.details.get("constraint", error.code)}.'
+            constraint = error.details.get('constraint', error.code)
+            field = error.details.get('field', '$')
+            feedback = f'Repair the JSON constraint {constraint} at {field}.'
         except ValueError as error:
             feedback = str(error)
         else:
-            return unique_scene_labels(previous, batch)
-        print(f'Wildlife scenes {first}–{last}, attempt {attempt+1}/{attempts}: {feedback}', flush=True)
+            return unique_scene_labels(previous, [scene])[0]
+        print(f'Wildlife scene {index}, attempt {attempt+1}/{attempts}: {feedback}', flush=True)
     raise StoryGenerationError(
-        f'Could not generate valid wildlife scenes {first}–{last}',
+        f'Could not generate valid wildlife scene {index}',
         code='what_if_narration', retryable=True,
-        details={'first_scene': first, 'last_scene': last, 'attempts': attempts, 'last_check': feedback})
+        details={'scene': index, 'attempts': attempts, 'last_check': feedback})
 
 
 def decode(payload, episode):

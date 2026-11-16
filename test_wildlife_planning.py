@@ -138,7 +138,7 @@ class WildlifePlanningTests(unittest.TestCase):
             'arc':'Show the rings from orbit, then examine their moving shadow and possible seasonal effects.',
         }
         batch = []
-        for beat in GOATS[:2]:
+        for beat in GOATS[:1]:
             scene = asdict(beat)
             scene['forage_percent'] = round(scene.pop('forage') * 20) * 5
             scene['population'] = 0
@@ -149,7 +149,7 @@ class WildlifePlanningTests(unittest.TestCase):
         episode = 'auto-2026-11-16'
         with patch('wildlife.generate.select_topic',return_value=(
                 'space','rings','Earth','What if Earth had rings?',False)), patch(
-                'wildlife.generate.ask',side_effect=[idea]+[{'scenes':batch}]*10):
+                'wildlife.generate.ask',side_effect=[idea]+[{'scenes':batch}]*20):
             manifest = build(episode,store)
         self.assertEqual(manifest['idea']['domain'],'space')
         self.assertNotIn('species',manifest['idea'])
@@ -178,27 +178,37 @@ class WildlifePlanningTests(unittest.TestCase):
             if index in (0, 8, 9):
                 scene['label'] = 'The herd grows'
             scenes.append(scene)
+        # A valid script should survive unusable caption/background lengths in scene 7.
+        scenes[6]['label'] = '<>'
+        scenes[6]['visual'] = ' '
+        scenes[7]['label'] = 'A long descriptive caption ' * 5
+        scenes[7]['visual'] = 'Overhead view of the surrounding forest and clearings. ' * 8
         store = MemoryStore()
         episode = 'auto-2026-11-15'
         truncated = StoryGenerationError(
             'Incomplete model output', details={'constraint': 'incomplete_output'}, retryable=True)
-        completions = [idea, truncated, {'scenes': scenes[:1]}, {'scenes': scenes[1:2]}]
-        completions.extend({'scenes': scenes[i:i+2]} for i in range(2, 20, 2))
+        completions = [idea, truncated, *({'scenes': [scene]} for scene in scenes)]
         with patch('wildlife.generate.select_topic',return_value=(
                 'wildlife','bridge','Deer','What if a land bridge opened?',False)), patch(
                 'wildlife.generate.ask',side_effect=completions) as request:
             manifest = build(episode, store)
             self.assertEqual(build(episode, store), manifest)
-        self.assertEqual(request.call_count, 13)
-        pair, first, second = request.call_args_list[1:4]
-        self.assertEqual(pair.args[1]['properties']['scenes']['maxItems'], 2)
-        self.assertEqual(first.args[1]['properties']['scenes']['maxItems'], 1)
+        self.assertEqual(request.call_count, 22)
+        initial, retry, second = request.call_args_list[1:4]
+        self.assertEqual(initial.args[1]['properties']['scenes']['maxItems'], 1)
+        self.assertIn('incomplete_output', retry.args[0])
+        self.assertNotEqual(initial.args[2], retry.args[2])
         self.assertIn(scenes[0]['label'], second.args[0])
-        self.assertLess(first.args[3], pair.args[3])
         self.assertEqual(manifest['idea']['thumbnail_text'], 'THE GREEN VANISHES')
         package, beats, timeline = plan_episode(episode, False, manifest)
         self.assertEqual(len(beats), 20)
         self.assertEqual(beats[0].label, 'The herd grows')
+        self.assertEqual(beats[6].label, 'Scene 7')
+        self.assertEqual(beats[6].narration, scenes[6]['narration'])
+        self.assertEqual(beats[6].camera, scenes[6]['camera'])
+        self.assertLessEqual(len(beats[7].label), 45)
+        for index in (6, 7):
+            self.assertTrue(24 <= len(manifest['scenes'][index]['visual']) <= 220)
         self.assertEqual(len({beat.label.casefold() for beat in beats}), 20)
         self.assertTrue(beats[8].label.startswith('The herd grows ('))
         self.assertTrue(600 <= sum(chapter['seconds'] for chapter in timeline) <= 900)

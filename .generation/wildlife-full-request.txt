@@ -1,2 +1,2 @@
 mode=fresh
-2026-11-16 — Generate a new full episode with validated subject tags.
+2026-11-16 — Generate a full episode with repaired scene captions and backgrounds.
