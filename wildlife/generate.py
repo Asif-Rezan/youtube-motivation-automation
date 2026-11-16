@@ -116,6 +116,15 @@ def validate_scenes(scenes):
             raise ValueError('Scene counters must be within the supported ranges')
 
 
+def validate_opening(narration):
+    first_words = narration.split()[:34]
+    if narration.casefold().startswith(('welcome', 'hello', 'hey everyone', 'in this video',
+                                       'today we', 'today, we')):
+        raise ValueError('Start with the episode event instead of a greeting or introduction')
+    if not any(word.endswith('?') for word in first_words):
+        raise ValueError('Ask a specific unanswered question within the first 34 spoken words')
+
+
 def build(episode, store):
     key = f'wildlife/{episode}/plan.json'
     history = store.load(HISTORY_KEY, [])
@@ -187,14 +196,30 @@ def build(episode, store):
     schema = obj(scenes={'type':'array','items':SCENE,'minItems':4,'maxItems':4})
     for start in range(0,20,4):
         prior = [(s['label'],s['population'],s['forage_percent']) for s in scenes]
+        if start == 0:
+            direction = (
+                'Open scene 1 with a short, concrete line (about 12 words) that immediately delivers '
+                'the event promised by the title and shows the subject in the opening shot. Within '
+                'the first 34 spoken words, tease a surprising clue and ask one specific question '
+                'about its consequence. Leave its answer open. No greeting, channel intro, generic '
+                'teaser, invented statistics or call to subscribe. Let scene 2 build on that clue. '
+            )
+        else:
+            opening = ' '.join(scenes[0]['narration'].split()[:34])
+            direction = (
+                f'The opening promise was: {json.dumps(opening)}. '
+                'Build toward its answer with a fresh discovery or consequence in each scene. '
+                'If this batch includes scene 20, answer the opening question with the outcome '
+                'and explain which change caused it. In earlier scenes give clues without resolving it. '
+            )
         feedback = ''
         for attempt in range(4):
             result = ask(
                 f"Write exactly scenes {start+1} to {start+4} of this twenty-scene English what-if "
                 f"thought experiment. Plan: {json.dumps(idea)}. Prior beats: {json.dumps(prior)}. "
                 "Exactly four distinct and chronological scenes. Aim for 82 words of narration per scene "
-                "(allowed range 73–91) with single spaces and ASCII punctuation. Write a continuous story, with a concrete hook early and a resolution "
-                "in scene 20. Keep real facts separate from the hypothetical conditions. "
+                "(allowed range 73–91) with single spaces and ASCII punctuation. Write a continuous story. "
+                "Keep real facts separate from the hypothetical conditions. " + direction
                 + ("Give the fictional population as a whole number from 0 to 9999 and "
                    "forage_percent as a multiple of five from 0 to 100. " if wildlife else
                    "Set population to zero. Set forage_percent from 0 to 100 in steps of five "
@@ -205,6 +230,8 @@ def build(episode, store):
                 schema, seed+1000+start*20+attempt*3, 3500)
             try:
                 validate_scenes(result['scenes'])
+                if start == 0:
+                    validate_opening(result['scenes'][0]['narration'])
             except ValueError as error:
                 counts = [len(s['narration'].split()) for s in result['scenes']]
                 feedback = f'Rewrite all four scenes. {error}. Previous word counts were {counts}.'
@@ -213,7 +240,9 @@ def build(episode, store):
             scenes.extend(unique_scene_labels(scenes,result['scenes']))
             break
         else:
-            raise RuntimeError(f'Could not validate the narration for scene batch {start+1}')
+            raise StoryGenerationError(
+                f'Could not validate the narration for scene batch {start+1}',
+                code='what_if_narration', details={'first_scene':start+1,'attempts':4,'last_check':feedback})
     payload = {'episode':episode, 'idea':idea, 'scenes':scenes}
     decode(payload, episode)
     store.save(key,payload)

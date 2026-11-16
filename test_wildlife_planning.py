@@ -3,7 +3,7 @@ from dataclasses import asdict, replace
 from unittest.mock import patch
 
 from wildlife.episodes import GOATS, GOAT_PACKAGING
-from wildlife.generate import build
+from wildlife.generate import build, validate_opening
 from wildlife.render import plan_episode
 from wildlife.whatif import ACTIVE_DOMAINS, TOPICS, select_topic
 from wildlife.metadata import emphasize_title, thumbnail_hook, validate_title
@@ -21,6 +21,13 @@ class MemoryStore:
 
 
 class WildlifePlanningTests(unittest.TestCase):
+    def test_opening_requires_an_early_question_and_skips_greetings(self):
+        validate_opening('The river changed course overnight. What happens to the wetland it left behind?')
+        with self.assertRaisesRegex(ValueError, 'greeting'):
+            validate_opening('Welcome back. What happens when a river changes course?')
+        with self.assertRaisesRegex(ValueError, '34 spoken words'):
+            validate_opening('One ' * 34 + 'What happens next?')
+
     def test_cover_uses_a_distinct_supported_hook(self):
         idea = {
             'topic': 'rivers',
@@ -107,7 +114,7 @@ class WildlifePlanningTests(unittest.TestCase):
             scene = asdict(beat)
             scene['forage_percent'] = round(scene.pop('forage') * 20) * 5
             scene['population'] = 0
-            scene['narration'] = ' '.join(['Example'] * 75) + '.'
+            scene['narration'] = 'What happens to the seasons? ' + ' '.join(['Example'] * 75) + '.'
             scene['visual'] = 'Wide view of Earth and the orbital ring system.'
             batch.append(scene)
         store = MemoryStore()
@@ -137,7 +144,7 @@ class WildlifePlanningTests(unittest.TestCase):
         for index, beat in enumerate(GOATS):
             scene = asdict(beat)
             scene['forage_percent'] = round(scene.pop('forage') * 20) * 5
-            scene['narration'] = ' '.join(['Example'] * 75) + '.'
+            scene['narration'] = 'Where will the deer find shelter? ' + ' '.join(['Example'] * 75) + '.'
             scene['visual'] = 'Wide view of the forest edge in the evening.'
             if index in (0, 8, 9):
                 scene['label'] = 'The herd grows'
