@@ -5,6 +5,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 
+from .metadata import thumbnail_hook
 from .visuals import FONT, Island, animal_sprite, frames
 
 SIZE = (1920,1080)
@@ -34,8 +35,8 @@ def draw_cue(image, cue, *, arrow_offset=(0,0)):
         draw.line([*points,points[0]],fill='#fff6e8',width=22,joint='curve')
         draw.line([*points,points[0]],fill='#43131d',width=8,joint='curve')
     elif cue == 'question':
-        symbol = ImageFont.truetype(str(FONT),190)
-        draw.text((1661,280),'?',anchor='mt',font=symbol,fill=AMBER,stroke_width=13,stroke_fill=INK)
+        symbol = ImageFont.truetype(str(FONT),300)
+        draw.text((1525,285),'?',anchor='mt',font=symbol,fill='#fff5d9',stroke_width=18,stroke_fill=INK)
     elif cue == 'spotlight':
         box = (1465,369,1815,639)
         draw.ellipse(box,outline=INK,width=23)
@@ -67,8 +68,7 @@ def render_thumbnail(beats, target: Path, *, label='AFTER THE BOOM', species='go
                                       fill='#53623a')
         near.paste(sprite,(x,y),sprite)
     opening_count = f'{beats[0].population:,} {species.upper()}'
-    outcome = 'HOW MANY?' if cue in ('question','trail') else f'{peak.population:,} {species.upper()}'
-    cover = compose_thumbnail(near,cover,label,cue,(opening_count,outcome))
+    cover = compose_thumbnail(near,cover,label,cue,(opening_count,''))
     save_thumbnail(cover,target)
 
 
@@ -88,7 +88,7 @@ def compose_thumbnail(near,cover,label,cue,labels,*,arrow_offset=(0,0)):
     draw_cue(cover,cue,arrow_offset=arrow_offset)
     draw = ImageDraw.Draw(cover)
     label = label.upper()
-    for font_size in range(186,54,-2):
+    for font_size in range(207,54,-2):
         font = ImageFont.truetype(str(FONT),font_size)
         if draw.textlength(label,font=font) <= 1730:
             break
@@ -96,6 +96,8 @@ def compose_thumbnail(near,cover,label,cue,labels,*,arrow_offset=(0,0)):
               stroke_width=11,stroke_fill=INK)
     badge = ImageFont.truetype(str(FONT),57)
     for text, x, anchor in [(labels[0],48,'lt'),(labels[1],width-48,'rt')]:
+        if not text:
+            continue
         box = draw.textbbox((x,972),text,font=badge,anchor=anchor)
         draw.rounded_rectangle((box[0]-16,box[1]-11,box[2]+16,box[3]+11),radius=16,
                                fill='#163337',outline='#eee6bd',width=3)
@@ -116,8 +118,8 @@ def render_science_thumbnail(beats, target, idea, cue):
         near.paste(near.crop((405,0,1365,1080)),(0,0))
         cover.paste(cover.crop((440,0,1540,1080)),(820,0))
     offset = (0,196) if topic == 'rivers' else (0,0)
-    cover = compose_thumbnail(near,cover,idea['thumbnail_text'],cue,
-                              ('BEFORE','WHAT NEXT?'),arrow_offset=offset)
+    cover = compose_thumbnail(near,cover,thumbnail_hook(idea),cue,
+                              ('',''),arrow_offset=offset)
     save_thumbnail(cover,target)
 
 

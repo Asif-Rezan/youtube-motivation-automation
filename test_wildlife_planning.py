@@ -6,7 +6,7 @@ from wildlife.episodes import GOATS, GOAT_PACKAGING
 from wildlife.generate import build
 from wildlife.render import plan_episode
 from wildlife.whatif import ACTIVE_DOMAINS, TOPICS, select_topic
-from wildlife.metadata import emphasize_title, validate_title
+from wildlife.metadata import emphasize_title, thumbnail_hook, validate_title
 
 
 class MemoryStore:
@@ -21,6 +21,50 @@ class MemoryStore:
 
 
 class WildlifePlanningTests(unittest.TestCase):
+    def test_cover_uses_a_distinct_supported_hook(self):
+        idea = {
+            'topic': 'rivers',
+            'title': 'Rivers Change Course: Can a Wetland SURVIVE?',
+            'arc': 'Follow the old riverbed across 10 years of change.',
+            'thumbnail_text': '10 YEARS LATER',
+        }
+        self.assertEqual(thumbnail_hook(idea), '10 YEARS LATER')
+        for rejected in ('20 YEARS LATER', 'RIVERS CHANGE COURSE', 'WHAT HAPPENS NEXT'):
+            with self.subTest(rejected=rejected):
+                self.assertEqual(thumbnail_hook({**idea, 'thumbnail_text': rejected}),
+                                 'THE OLD BED DRIES')
+
+    def test_metadata_includes_the_rendered_chapters_and_topic_search_phrases(self):
+        package = replace(
+            GOAT_PACKAGING, subject='Rivers',
+            title='Rivers Change Course: Can a Wetland SURVIVE?',
+            opening='Rivers can leave wetlands behind when a channel shifts.',
+            premise='A river leaves its old course after a flood.',
+            tags=('rivers and wetlands', 'stream flow', 'wetland hydrology', 'river habitat'),
+            topic='rivers',
+        )
+        metadata = package.build([
+            {'start': 0, 'chapter': 'The flood'},
+            {'start': 17.8, 'chapter': 'A new route'},
+            {'start': 82.6, 'chapter': 'The wetland'},
+        ])
+        self.assertTrue(metadata['description'].startswith(package.premise))
+        self.assertIn('0:00 The flood\n0:17 A new route\n1:22 The wetland', metadata['description'])
+        self.assertIn('Background reading\nUSGS', metadata['description'])
+        self.assertEqual(metadata['tags'][:2], ['river changes course', 'wetland hydrology'])
+        self.assertEqual(metadata['tags'].count('wetland hydrology'), 1)
+
+    def test_ecosystem_upload_has_english_education_and_audience_metadata(self):
+        from upload_settings import load_settings, upload_body
+
+        body = upload_body({'title': GOAT_PACKAGING.title}, 'Episode synopsis',
+                           ['island ecology'], load_settings(wildlife=True))
+        self.assertEqual(body['snippet']['categoryId'], '27')
+        self.assertEqual(body['snippet']['defaultLanguage'], 'en')
+        self.assertEqual(body['snippet']['defaultAudioLanguage'], 'en')
+        self.assertIs(body['status']['selfDeclaredMadeForKids'], False)
+        self.assertIs(body['paidProductPlacementDetails']['hasPaidProductPlacement'], False)
+
     def test_power_word_is_required_and_can_be_recovered_from_the_premise(self):
         with self.assertRaisesRegex(ValueError, 'uppercase power word'):
             replace(GOAT_PACKAGING, title=GOAT_PACKAGING.title.replace('SURVIVE', 'survive')).validate()

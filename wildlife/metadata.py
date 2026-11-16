@@ -29,6 +29,45 @@ TOPIC_TITLES = {
     'network': 'Internet Links VANISH: Can a City Stay Connected?',
     'power': 'Power Grid Goes Local: Can a Neighborhood SURVIVE?',
 }
+# Topic-specific cover angles and search phrases. These are story cues, not predicted outcomes.
+TOPIC_PACKAGING = {
+    'tides': ('LESS TIME TO FEED', ('tidal marsh ecology','high tide and marsh birds')),
+    'currents': ('FOOD DRIFTS AWAY', ('kelp forest food web','ocean current shift')),
+    'sea ice': ('THE HUNT SHRINKS', ('seasonal sea ice','marine food web')),
+    'reefs': ('NO SHIELD LEFT', ('coral reef wave protection','lagoon ecosystem')),
+    'clouds': ('NOT A DROP', ('cloud forest ecology','fog and forest moisture')),
+    'rivers': ('THE OLD BED DRIES', ('river changes course','wetland hydrology')),
+    'albedo': ('THE MEADOW THIRSTS', ('early snowmelt','mountain meadow ecology')),
+    'wind': ('SEEDS GO ELSEWHERE', ('wind seed dispersal','woodland regeneration')),
+    'bridge': ('ONE WAY OUT', ('deer island simulation','wildlife migration')),
+    'seed': ('THE FEAST ENDS', ('rabbit population simulation','seasonal food supply')),
+    'flood': ('CUT OFF', ('goat island simulation','flooded grazing habitat')),
+    'shelter': ('THE LONG WAY HOME', ('deer winter habitat','wildlife movement')),
+}
+BACKGROUND_READING = {
+    'tides': ('NOAA Fisheries — Estuary habitat','https://www.fisheries.noaa.gov/national/habitat-conservation/estuary-habitat'),
+    'currents': ('NOAA Fisheries — Kelp forest habitat','https://www.fisheries.noaa.gov/west-coast/habitat-conservation/kelp-forest-habitat-west-coast'),
+    'reefs': ('USGS — Coastal ecosystems','https://www.usgs.gov/science/science-explorer/coasts/coastal-ecosystems'),
+    'rivers': ('USGS — Hydrology of flooded and wetland forests','https://www.usgs.gov/publications/hydrology-flooded-and-wetland-forests'),
+    'albedo': ('USDA Forest Service — Water needs of riparian and wetland vegetation','https://www.fs.usda.gov/rm/pubs/rmrs_gtr282.pdf'),
+}
+
+
+def thumbnail_hook(idea):
+    topic = TOPIC_PACKAGING.get(idea.get('topic'))
+    headline = ' '.join(idea['thumbnail_text'].upper().split())
+    title_words = set(re.findall(r'[A-Z0-9]+', idea.get('title', '').upper()))
+    hook_words = set(re.findall(r'[A-Z0-9]+', headline))
+    generic_words = {'AFTER', 'BEFORE', 'CHANGES', 'HAPPENS', 'NEXT', 'WHAT', 'NOW', 'THEN'}
+    story = idea.get('premise', '') + ' ' + idea.get('arc', '')
+    counts_match = all(re.search(r'\b' + count + r'\b', story, re.IGNORECASE)
+                       for count in re.findall(r'\d+', headline))
+    if (re.fullmatch(r'[A-Z0-9 -]{4,22}', headline) and 2 <= len(headline.split()) <= 4
+            and hook_words - title_words - generic_words and counts_match):
+        return headline
+    return topic[0] if topic else 'THE BALANCE SHIFTS'
+
+
 POWER_WORDS = {'SURVIVE','CRISIS','VANISH','RECOVER','COLLAPSE','BOOM'}
 _POWER_WORD = re.compile(r'\b(' + '|'.join(sorted(POWER_WORDS)) + r')\b', re.IGNORECASE)
 
@@ -66,6 +105,8 @@ class Packaging:
     opening: str
     description: str
     tags: tuple[str, ...]
+    topic: str = ''
+    premise: str = ''
 
     def validate(self):
         subject = self.subject.casefold()
@@ -85,8 +126,10 @@ class Packaging:
     def build(self, timeline, *, preview=False):
         self.validate()
         title = self.title + ' (30-Second Preview)' if preview else self.title
-        paragraphs = [self.opening, self.description,
-                      'This is an illustrative wildlife simulation. Population counts represent the hypothetical scenario.']
+        paragraphs = [self.premise or self.opening]
+        if self.description.strip().casefold() != paragraphs[0].strip().casefold():
+            paragraphs.append(self.description)
+        paragraphs.append('This is a hypothetical ecosystem scenario. Events and any on-screen counts illustrate the story.')
         if not preview:
             starts = [int(chapter['start']) for chapter in timeline]
             if len(starts) < 3 or starts[0] != 0 or any(b-a < 10 for a, b in zip(starts, starts[1:])):
@@ -94,7 +137,26 @@ class Packaging:
             chapters = [f"{start//60}:{start%60:02d} {chapter['chapter']}"
                         for start, chapter in zip(starts, timeline)]
             paragraphs.append('Chapters\n' + '\n'.join(chapters))
+        if self.topic in BACKGROUND_READING:
+            name,url = BACKGROUND_READING[self.topic]
+            paragraphs.append(f'Background reading\n{name} — {url}')
         description = '\n\n'.join(paragraphs)
         if len(description.encode('utf-8')) > 5000 or any(c in title + description for c in '<>'):
             raise ValueError('Wildlife metadata contains invalid characters or exceeds the description limit')
-        return {'title': title, 'description': description, 'tags': list(self.tags)}
+        from_topic = TOPIC_PACKAGING.get(self.topic)
+        candidates = [*(from_topic[1] if from_topic else ()), *self.tags,
+                      'ecosystem what if', 'ecology simulation']
+        tags = []
+        used = set()
+        budget = 0
+        for candidate in candidates:
+            tag = ' '.join(candidate.split())
+            cost = len(tag) + (2 if ' ' in tag else 0) + bool(tags)
+            if not tag or tag.casefold() in used or budget+cost > 500:
+                continue
+            tags.append(tag)
+            used.add(tag.casefold())
+            budget += cost
+            if len(tags) == 12:
+                break
+        return {'title': title, 'description': description, 'tags': tags}

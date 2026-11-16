@@ -90,8 +90,32 @@ def science_frame(size, domain, topic, intensity, camera, seconds=0, *, disclose
                  (1080-(snow-255)*.90,snow)],'#e4eedf')
         polygon([(0,787),(450,687),(1000,788),(1460,665),(1920,710),(1920,1080),(0,1080)],'#708841')
         if topic=='rivers':
-            polygon([(1000,620),(1095,620),(1180-350*level,795),(1470-550*level,1080),
-                     (1210-550*level,1080),(1040-315*level,810)],'#62b9c9')
+            polygon([(0,920),(450,687),(775,756),(380,1080),(0,1080)],'#667f3d')
+            polygon([(1220,1080),(1460,665),(1920,710),(1920,1080)],'#82974a')
+            if level > .45:
+                polygon([(1070,660),(1180,795),(1470,1080),(1210,1080),
+                         (1040,810)],'#ad8152')
+                polygon([(1100,831),(1202,909),(1360,1080),(1300,1080)],'#d9aa66')
+            left, right = 1210-550*level, 1470-550*level
+            polygon([(1000,620),(1095,620),(1180-350*level,795),(right,1080),
+                     (left,1080),(1040-315*level,810)],'#49b8d7')
+            polygon([(1020,638),(1074,642),(1125-350*level,793),
+                     (right-80,1080),(left+40,1080),(1070-315*level,810)],'#248fab')
+            for i in range(15):
+                t = (i+1)/16
+                y = 813+265*t
+                start = (1040-315*level)*(1-t)+left*t+22+9*travel
+                line([(start,y),(start+24+35*t,y-3)],'#98e1de',3)
+            for i in range(35):
+                x, y = 240+(i*149)%1480, 748+(i*67)%314
+                t = max(0,(y-810)/270)
+                lo = (1040-315*level)*(1-t)+left*t
+                hi = (1180-350*level)*(1-t)+right*t
+                if lo-25 < x < hi+28 or (level > .45 and 1015 < x < 1500):
+                    continue
+                height = 18+(i*13)%49
+                polygon([(x-14,y),(x-22,y-height*.7),(x-5,y-9),(x,y-height),
+                         (x+7,y-8),(x+20,y-height*.64),(x+14,y)],'#3b673d')
         else:
             for i in range(6):
                 if topic=='clouds' and i/6<level:

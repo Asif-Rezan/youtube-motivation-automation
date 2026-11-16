@@ -55,7 +55,7 @@ def ask(prompt, schema, seed, limit):
 def packaging(idea):
     subject = idea.get('subject') or idea['species']
     title = emphasize_title(idea['title'],subject,idea.get('pressure'),topic=idea.get('topic'))
-    return Packaging(title,subject,idea['opening'],idea['description'],tuple(idea['tags']))
+    return Packaging(title,subject,idea['opening'],idea['description'],tuple(idea['tags']),topic=idea.get('topic',''),premise=idea.get('premise',''))
 
 
 def concept(idea):
@@ -147,8 +147,11 @@ def build(episode, store):
             'Distinguish the assumed conditions from real facts. Title 35–70 characters, with '
             f'{subject} near the start, one fitting power word from {", ".join(sorted(POWER_WORDS))}, '
             f'and a question ending. Include {subject} in the opening of 40–160 characters and in a tag. '
-            'Write one short description paragraph, 6–10 distinct tags and a 2–4 word thumbnail hook '
-            'within 22 plain characters that hints at the unanswered question. '
+            'Write one short description paragraph that tees up the main consequence without giving away the answer. '
+            'Use 6–10 distinct topic-specific search phrases, including the habitat and ecological mechanism. '
+            'Write a 2–4 word thumbnail hook that adds a time, stakes or an unexpected detail from the story '
+            'and avoids echoing the title. The hook must fit '
+            '22 plain characters. '
             'The arc must fit 600 characters. '
             f'Prior stories to avoid: {json.dumps(recent[-60:])}. {feedback}',
             schema,seed+100*attempt,1500)

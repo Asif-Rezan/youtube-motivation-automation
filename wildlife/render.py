@@ -12,6 +12,7 @@ import numpy as np
 from .episodes import EPISODES, PREVIEW
 from .visuals import frames
 from .thumbnail import episode_cue, render_science_thumbnail, render_thumbnail
+from .metadata import thumbnail_hook
 
 
 FPS = 24
@@ -178,7 +179,7 @@ def assemble(episode, package, timeline, work, output, preview, manifest=None):
         idea = manifest['idea']
         cue = episode_cue(episode)
         if idea.get('domain','wildlife') == 'wildlife':
-            render_thumbnail(beats,output/'thumbnail.jpg',label=idea['thumbnail_text'],
+            render_thumbnail(beats,output/'thumbnail.jpg',label=thumbnail_hook(idea),
                              species=idea['species'],habitat=idea['habitat'],cue=cue)
         else:
             render_science_thumbnail(beats,output/'thumbnail.jpg',idea,cue)
