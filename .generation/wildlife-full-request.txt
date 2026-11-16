@@ -1,1 +1,1 @@
-Resume the full 4K episode with the shared wildlife render dependencies installed.
+2026-11-16 — Start a full video generation with the updated thumbnails and YouTube metadata.
