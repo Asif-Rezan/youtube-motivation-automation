@@ -210,8 +210,14 @@ def build(episode, store):
                 f'The opening promise was: {json.dumps(opening)}. '
                 'Build toward its answer with a fresh discovery or consequence in each scene. '
                 'If this batch includes scene 20, answer the opening question with the outcome '
-                'and explain which change caused it. In earlier scenes give clues without resolving it. '
+                'and explain which change caused it, then return to the place or subject seen in scene 1. '
+                'In earlier scenes give clues without resolving it. '
             )
+            if start == 8:
+                direction += (
+                    'In scene 11, reveal a concrete first answer or surprise from the earlier clues. '
+                    'Ask a new question in the narration that follows directly from that discovery. '
+                )
         feedback = ''
         for attempt in range(4):
             result = ask(
@@ -219,7 +225,8 @@ def build(episode, store):
                 f"thought experiment. Plan: {json.dumps(idea)}. Prior beats: {json.dumps(prior)}. "
                 "Exactly four distinct and chronological scenes. Aim for 82 words of narration per scene "
                 "(allowed range 73–91) with single spaces and ASCII punctuation. Write a continuous story. "
-                "Keep real facts separate from the hypothetical conditions. " + direction
+                "Keep real facts separate from the hypothetical conditions. "
+                "When the story jumps in time, state the new day, week, year or season early in that scene. " + direction
                 + ("Give the fictional population as a whole number from 0 to 9999 and "
                    "forage_percent as a multiple of five from 0 to 100. " if wildlife else
                    "Set population to zero. Set forage_percent from 0 to 100 in steps of five "

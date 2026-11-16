@@ -21,6 +21,20 @@ class MemoryStore:
 
 
 class WildlifePlanningTests(unittest.TestCase):
+    def test_edits_use_story_time_and_compare_the_final_scene_to_the_start(self):
+        from wildlife.editing import scene_edit
+        from wildlife.publication import is_generated
+        from wildlife.thumbnail import episode_cue
+
+        beats = list(GOATS)
+        beats[1] = replace(beats[1], narration='Week three begins with a surge in new grass.')
+        self.assertEqual(scene_edit(beats, 1, 30)['text'], 'WEEK THREE')
+        self.assertLessEqual(len(scene_edit(beats, len(beats)//2, 30)['text'].split()), 4)
+        self.assertEqual(scene_edit(beats, len(beats)-1, 30)['compare_to'], 0)
+        for episode in ('auto-2026-11-16', 'auto-2026-11-16-43806880042'):
+            self.assertTrue(is_generated(episode))
+            self.assertEqual(episode_cue(episode), episode_cue('auto-2026-11-16'))
+
     def test_opening_requires_an_early_question_and_skips_greetings(self):
         validate_opening('The river changed course overnight. What happens to the wetland it left behind?')
         with self.assertRaisesRegex(ValueError, 'greeting'):

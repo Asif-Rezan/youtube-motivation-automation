@@ -28,7 +28,7 @@ def cover_font(size):
 
 def episode_cue(episode):
     if episode.startswith('auto-'):
-        return CUES[date.fromisoformat(episode.removeprefix('auto-')).toordinal() % len(CUES)]
+        return CUES[date.fromisoformat(episode[5:15]).toordinal() % len(CUES)]
     return 'arrow'
 
 

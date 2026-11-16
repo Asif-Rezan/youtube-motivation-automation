@@ -54,6 +54,10 @@ jobs:
         run: |
           episode="$EPISODE"
           next=render
+          if [[ "$GITHUB_EVENT_NAME" == push && "$episode" == auto ]] &&
+             grep -qx 'mode=fresh' .generation/wildlife-full-request.txt; then
+            episode="auto-$(TZ=Asia/Dhaka date +%F)-$GITHUB_RUN_ID"
+          fi
           mkdir -p output/wildlife-plan
           if [[ "$PREVIEW" == true ]]; then
             episode=goat-island

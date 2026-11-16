@@ -1,5 +1,6 @@
 """Generate an original wildlife simulation video, soundtrack and thumbnail."""
 import argparse
+from dataclasses import replace
 import json
 import math
 from pathlib import Path
@@ -9,6 +10,7 @@ import wave
 
 import numpy as np
 
+from .editing import paint_cue, scene_edit, zoom_frame
 from .episodes import EPISODES, PREVIEW
 from .visuals import frames
 from .thumbnail import episode_cue, render_science_thumbnail, render_thumbnail
@@ -44,7 +46,7 @@ def read_voice(pipeline, text, target):
         output.writeframes(pcm.tobytes())
 
 
-def music_bed(target, seconds):
+def music_bed(target, seconds, timeline=()):
     """Original plucked ostinato and soft pads. The final mix ducks against voice."""
     length = math.ceil(seconds * RATE)
     signal = np.zeros(length, dtype=np.float32)
@@ -67,6 +69,20 @@ def music_bed(target, seconds):
             for note in chord[:3]:
                 freq = 440*2**((note-69)/12)
                 signal[start:start+count] += .04*np.sin(t*math.tau*freq)*swell
+    rng = np.random.default_rng(221)
+    for entry in timeline:
+        edit = entry.get('edit', {})
+        if not edit:
+            continue
+        start = max(0, round((entry['start'] + edit['at'] - .42)*RATE))
+        count = min(length-start, round(1.25*RATE))
+        if count <= 0:
+            continue
+        t = np.arange(count,dtype=np.float32)/RATE
+        signal[start:start+count] *= 1 - .55*np.sin(np.pi*t/1.25)**2
+        sweep = np.sin(math.tau*(195*t - 48*t*t))
+        texture = rng.uniform(-.25,.25,count)
+        signal[start:start+count] += .055*(sweep+texture)*np.sin(np.pi*t/1.25)**4
     fade = min(length//2, RATE)
     if fade:
         signal[:fade] *= np.linspace(0,1,fade)
@@ -76,20 +92,31 @@ def music_bed(target, seconds):
         output.writeframes((signal*32767).astype('<i2').tobytes())
 
 
-def encode_visuals(scene, seconds, size, target, **art):
+def encode_visuals(scene, seconds, size, target, *, edit=None, opening=None, **art):
     width, height = size
     command = ['ffmpeg','-v','error','-y','-f','rawvideo','-pixel_format','rgb24',
                '-video_size',f'{width}x{height}','-framerate',str(FPS),'-i','pipe:0',
                '-an','-c:v','libx264','-preset','fast','-threads','4','-crf','18',
                '-pix_fmt','yuv420p',str(target)]
     domain = art.pop('domain','wildlife')
-    if domain == 'wildlife':
-        rendered_frames = frames(size,scene,seconds,FPS,**art)
-    else:
+    def render_frames(beat, length, fps, options):
+        if domain == 'wildlife':
+            return frames(size,beat,length,fps,**options)
         from .science_visuals import science_frames
-        rendered_frames = science_frames(size,scene,seconds,FPS,domain=domain,**art)
+        return science_frames(size,beat,length,fps,domain=domain,**options)
+
+    before = None
+    if opening is not None:
+        scene = replace(scene,camera=opening.camera)
+        before = next(render_frames(opening,1,1,{**art,'disclose':False}))
+    use_shot_changes = seconds >= 20
     with subprocess.Popen(command, stdin=subprocess.PIPE) as proc:
-        for frame in rendered_frames:
+        for index, frame in enumerate(render_frames(scene,seconds,FPS,art)):
+            elapsed = index/FPS
+            showing_comparison = before is not None and edit['at'] <= elapsed < edit['at'] + edit['duration']
+            if use_shot_changes and not showing_comparison:
+                frame = zoom_frame(frame,elapsed/seconds)
+            paint_cue(frame,edit,elapsed,before)
             proc.stdin.write(frame.tobytes())
         proc.stdin.close()
         if proc.wait():
@@ -116,11 +143,12 @@ def plan_episode(episode, preview, manifest=None):
     package.validate()
     timeline = []
     elapsed = 0
-    for beat in beats:
+    for index, beat in enumerate(beats):
         speech = len(beat.narration.split())*60/WORDS_PER_MINUTE
         seconds = 10 if preview else math.ceil((speech+1.5)*FPS)/FPS
         timeline.append({'chapter':beat.label,'start':round(elapsed,3),
-                         'seconds':seconds,'population':beat.population,'forage':beat.forage})
+                         'seconds':seconds,'population':beat.population,'forage':beat.forage,
+                         'edit':scene_edit(beats,index,seconds)})
         elapsed += seconds
     if not preview and (len(beats) != 20 or not 600 <= elapsed <= 900):
         raise ValueError('A full wildlife episode needs 20 scenes and a 10–15 minute runtime')
@@ -163,7 +191,9 @@ def render_scene(beats, timeline, index, work, preview, manifest=None):
             artwork = {'species':idea['species'],'habitat':idea['habitat']}
         else:
             artwork = {'domain':domain,'topic':idea['topic']}
-    encode_visuals(beat, seconds, size, work/f'visual-{index:02}.mp4',disclose=index == 0,**artwork)
+    edit = timeline[index]['edit']
+    encode_visuals(beat, seconds, size, work/f'visual-{index:02}.mp4', edit=edit,
+                   opening=beats[edit['compare_to']] if 'compare_to' in edit else None, disclose=index == 0, **artwork)
     print(json.dumps({'chapter':beat.label,'rendered':True,'seconds':seconds}),flush=True)
 
 
@@ -188,7 +218,7 @@ def assemble(episode, package, timeline, work, output, preview, manifest=None):
         (work/f'{label}.txt').write_text(''.join(
             f"file '{kind}-{i:02}.{suffix}'\n" for i in range(len(timeline))))
     music = work/'music.wav'
-    music_bed(music,sum(item['seconds'] for item in timeline))
+    music_bed(music,sum(item['seconds'] for item in timeline),timeline)
     target = output/'video.mp4'
     ffmpeg('-f','concat','-safe','0','-i',work/'video.txt','-f','concat','-safe','0','-i',work/'voice.txt',
            '-i',music,'-filter_complex',

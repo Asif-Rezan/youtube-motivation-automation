@@ -53,7 +53,7 @@ def selection(episode, manifest_path):
 
 def is_generated(episode):
     import re
-    return bool(re.fullmatch(r'auto-\d{4}-\d{2}-\d{2}',episode))
+    return bool(re.fullmatch(r'auto-\d{4}-\d{2}-\d{2}(?:-\d+)?',episode))
 
 
 def run(stage, episode, root):
