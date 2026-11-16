@@ -48,6 +48,7 @@ def ask(prompt, schema, seed, limit):
         'messages': [{'role':'user','content':prompt}],
         'response_format': {'type':'json_schema','json_schema':{'schema':schema}},
         'seed':seed, 'max_completion_tokens':limit, 'wildlife_narration':'scenes' in schema['properties'],
+        'validation_attempts': 1 if 'scenes' in schema['properties'] else 3,
     })
     return json.loads(result['choices'][0]['message']['content'])
 
@@ -193,68 +194,76 @@ def build(episode, store):
             'The planner could not produce distinct, valid episode metadata.',
             code='what_if_metadata', details={'domain':domain,'topic':topic,'attempts':5,'last_check':feedback})
     scenes = []
-    schema = obj(scenes={'type':'array','items':SCENE,'minItems':4,'maxItems':4})
-    for start in range(0,20,4):
-        prior = [(s['label'],s['population'],s['forage_percent']) for s in scenes]
-        if start == 0:
-            direction = (
-                'Open scene 1 with a short, concrete line (about 12 words) that immediately delivers '
-                'the event promised by the title and shows the subject in the opening shot. Within '
-                'the first 34 spoken words, tease a surprising clue and ask one specific question '
-                'about its consequence. Leave its answer open. No greeting, channel intro, generic '
-                'teaser, invented statistics or call to subscribe. Let scene 2 build on that clue. '
-            )
-        else:
-            opening = ' '.join(scenes[0]['narration'].split()[:34])
-            direction = (
-                f'The opening promise was: {json.dumps(opening)}. '
-                'Build toward its answer with a fresh discovery or consequence in each scene. '
-                'If this batch includes scene 20, answer the opening question with the outcome '
-                'and explain which change caused it, then return to the place or subject seen in scene 1. '
-                'In earlier scenes give clues without resolving it. '
-            )
-            if start == 8:
-                direction += (
-                    'In scene 11, reveal a concrete first answer or surprise from the earlier clues. '
-                    'Ask a new question in the narration that follows directly from that discovery. '
-                )
-        feedback = ''
-        for attempt in range(4):
-            result = ask(
-                f"Write exactly scenes {start+1} to {start+4} of this twenty-scene English what-if "
-                f"thought experiment. Plan: {json.dumps(idea)}. Prior beats: {json.dumps(prior)}. "
-                "Exactly four distinct and chronological scenes. Aim for 82 words of narration per scene "
-                "(allowed range 73–91) with single spaces and ASCII punctuation. Write a continuous story. "
-                "Keep real facts separate from the hypothetical conditions. "
-                "When the story jumps in time, state the new day, week, year or season early in that scene. " + direction
-                + ("Give the fictional population as a whole number from 0 to 9999 and "
-                   "forage_percent as a multiple of five from 0 to 100. " if wildlife else
-                   "Set population to zero. Set forage_percent from 0 to 100 in steps of five "
-                   "to guide the animation intensity for the scenario, with meaningful changes across scenes. ")
-                + "Keep each caption label specific to its scene and under 38 characters. Each visual "
-                "describes a different visible environment for its narration, text-free with no animals, within "
-                f"180 characters. {feedback}",
-                schema, seed+1000+start*20+attempt*3, 3500)
-            try:
-                validate_scenes(result['scenes'])
-                if start == 0:
-                    validate_opening(result['scenes'][0]['narration'])
-            except ValueError as error:
-                counts = [len(s['narration'].split()) for s in result['scenes']]
-                feedback = f'Rewrite all four scenes. {error}. Previous word counts were {counts}.'
-                print(f'Scene batch {start+1} retry:',error,counts,flush=True)
-                continue
-            scenes.extend(unique_scene_labels(scenes,result['scenes']))
-            break
-        else:
-            raise StoryGenerationError(
-                f'Could not validate the narration for scene batch {start+1}',
-                code='what_if_narration', details={'first_scene':start+1,'attempts':4,'last_check':feedback})
+    for start in range(0, 20, 2):
+        try:
+            scenes.extend(generate_scenes(idea, scenes, 2, seed, wildlife, attempts=1))
+        except StoryGenerationError as error:
+            if not error.retryable:
+                raise
+            print(f'Scenes {start+1}–{start+2}: retrying individually', flush=True)
+            for _ in range(2):
+                scenes.extend(generate_scenes(idea, scenes, 1, seed, wildlife, attempts=3))
     payload = {'episode':episode, 'idea':idea, 'scenes':scenes}
     decode(payload, episode)
     store.save(key,payload)
     store.save(HISTORY_KEY, history + [history_entry(episode,idea)])
     return payload
+
+
+def generate_scenes(idea, previous, count, seed, wildlife, *, attempts):
+    first = len(previous) + 1
+    last = first + count - 1
+    prior = [(scene['label'], scene['population'], scene['forage_percent']) for scene in previous]
+    if first == 1:
+        direction = (
+            'Open scene 1 with the event promised by the title and show its subject. '
+            'Within the first 34 spoken words, tease a surprising clue and ask one specific question. '
+            'Leave its answer open. Skip greetings, channel intros, invented statistics and calls to subscribe.'
+        )
+    else:
+        opening = ' '.join(previous[0]['narration'].split()[:34])
+        direction = f'The opening promise was {json.dumps(opening)}. Continue with a fresh discovery.'
+    if first <= 11 <= last:
+        direction += ' In scene 11, reveal an early surprise and ask a question that follows from it.'
+    if last == 20:
+        direction += ' In scene 20, answer the opening question, explain the cause and return to the opening subject.'
+    else:
+        direction += ' Build toward the outcome without resolving the opening question.'
+    counters = (
+        'Use whole-number population from 0 to 9999 and forage_percent in steps of five from 0 to 100.'
+        if wildlife else 'Set population to zero and vary forage_percent in steps of five from 0 to 100.'
+    )
+    schema = obj(scenes={'type': 'array', 'items': SCENE, 'minItems': count, 'maxItems': count})
+    feedback = ''
+    for attempt in range(attempts):
+        try:
+            result = ask(
+                f'Write exactly {count} chronological English scenes, numbered {first} through {last} '
+                f'in the story. Plan: {json.dumps(idea)}. Prior beats: {json.dumps(prior)}. '
+                'Aim for 82 spoken words per scene (73–91 allowed), single spaces and ASCII punctuation. '
+                'Keep facts separate from hypothetical conditions. Name time jumps early in the narration. '
+                f'{direction} {counters} Use a specific 3–38 character caption. '
+                'Describe a distinct visible background with no text or animals in one sentence of '
+                f'24–160 characters. {feedback}',
+                schema, seed + 1000 + first * 20 + (0 if count == 2 else 5) + attempt * 3,
+                1100 * count)
+            batch = result['scenes']
+            validate_scenes(batch)
+            if first == 1:
+                validate_opening(batch[0]['narration'])
+        except StoryGenerationError as error:
+            if not error.retryable:
+                raise
+            feedback = f'Repair the JSON constraint {error.details.get("constraint", error.code)}.'
+        except ValueError as error:
+            feedback = str(error)
+        else:
+            return unique_scene_labels(previous, batch)
+        print(f'Wildlife scenes {first}–{last}, attempt {attempt+1}/{attempts}: {feedback}', flush=True)
+    raise StoryGenerationError(
+        f'Could not generate valid wildlife scenes {first}–{last}',
+        code='what_if_narration', retryable=True,
+        details={'first_scene': first, 'last_scene': last, 'attempts': attempts, 'last_check': feedback})
 
 
 def decode(payload, episode):

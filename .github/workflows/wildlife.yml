@@ -46,7 +46,8 @@ jobs:
       - name: Install the Qwen CPU runtime
         if: inputs.preview != true && env.EPISODE == 'auto'
         run: pip install -r requirements-lyrics.txt
-      - id: plan
+      - name: Select episode and generate the validated plan
+        id: plan
         shell: bash
         env:
           DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
@@ -72,7 +73,7 @@ jobs:
           if [[ "$next" == render ]]; then
             args=(--episode "$episode" --manifest output/wildlife-plan/plan.json)
             if [[ "$PREVIEW" == true ]]; then args+=(--preview); fi
-            scenes=$(python -m wildlife.render "${args[@]}" --stage plan)
+            scenes=$(python -u -m wildlife.render "${args[@]}" --stage plan)
             echo "scenes=$scenes" >> "$GITHUB_OUTPUT"
           fi
       - uses: actions/upload-artifact@v4

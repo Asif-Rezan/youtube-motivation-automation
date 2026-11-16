@@ -140,8 +140,11 @@ def request_story(endpoint, payload):
     seed = payload.get('seed', 1700)
     if type(seed) is not int or not 0 <= seed <= 2**31 - 3:
         raise StoryGenerationError('Lyrics seed must be a nonnegative 31-bit integer')
+    attempts = payload.get('validation_attempts', 3)
+    if type(attempts) is not int or not 1 <= attempts <= 3:
+        raise StoryGenerationError('Qwen validation attempts must be between 1 and 3')
     model = load_model()
-    for attempt in range(3):
+    for attempt in range(attempts):
         # Retry instructions also consume context; check before every inference.
         prompt_tokens=sum(len(model.tokenize(message['content'].encode(),add_bos=False))+16 for message in messages)+32
         if prompt_tokens+limit>CONTEXT_TOKENS:
@@ -181,12 +184,16 @@ def request_story(endpoint, payload):
             issue = issue or 'invalid_json_or_response'
         if issue:
             # Report schema constraints and counters, never generated content or raw errors.
-            print(json.dumps({'check': 'Qwen JSON validation retry', 'attempt': attempt + 1,
+            exhausted = attempt + 1 == attempts
+            check = 'Qwen JSON validation failed' if exhausted else 'Qwen JSON validation retry'
+            print(json.dumps({'check': check, 'attempt': attempt + 1,
                 'constraint': issue, 'field': field, 'bound': bound, 'actual_length': actual,
                 'completion_tokens': result.get('usage', {}).get('completion_tokens')}), flush=True)
-            if attempt == 2:
-                raise StoryGenerationError('Qwen returned incomplete or invalid lyrics JSON after three attempts',
-                    code='lyrics_schema_validation',details={'constraint':issue,'field':field,'bound':bound,'actual_length':actual,'attempts':3},retryable=True) from None
+            if exhausted:
+                message = ('Qwen returned incomplete or invalid lyrics JSON after three attempts'
+                           if attempts == 3 else 'Qwen returned incomplete or invalid JSON')
+                raise StoryGenerationError(message,
+                    code='lyrics_schema_validation',details={'constraint':issue,'field':field,'bound':bound,'actual_length':actual,'attempts':attempts},retryable=True) from None
             correction = f'The previous response failed {issue} for field {field}.'
             if bound is not None:
                 correction += f' The required {issue} is {bound}; the prior length was {actual}.'

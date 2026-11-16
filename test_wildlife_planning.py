@@ -2,6 +2,7 @@ import unittest
 from dataclasses import asdict, replace
 from unittest.mock import patch
 
+from lyrics_cpu import StoryGenerationError
 from wildlife.episodes import GOATS, GOAT_PACKAGING
 from wildlife.generate import build, validate_opening
 from wildlife.render import plan_episode
@@ -124,7 +125,7 @@ class WildlifePlanningTests(unittest.TestCase):
             'arc':'Show the rings from orbit, then examine their moving shadow and possible seasonal effects.',
         }
         batch = []
-        for beat in GOATS[:4]:
+        for beat in GOATS[:2]:
             scene = asdict(beat)
             scene['forage_percent'] = round(scene.pop('forage') * 20) * 5
             scene['population'] = 0
@@ -135,7 +136,7 @@ class WildlifePlanningTests(unittest.TestCase):
         episode = 'auto-2026-11-16'
         with patch('wildlife.generate.select_topic',return_value=(
                 'space','rings','Earth','What if Earth had rings?',False)), patch(
-                'wildlife.generate.ask',side_effect=[idea]+[{'scenes':batch}]*5):
+                'wildlife.generate.ask',side_effect=[idea]+[{'scenes':batch}]*10):
             manifest = build(episode,store)
         self.assertEqual(manifest['idea']['domain'],'space')
         self.assertNotIn('species',manifest['idea'])
@@ -165,13 +166,21 @@ class WildlifePlanningTests(unittest.TestCase):
             scenes.append(scene)
         store = MemoryStore()
         episode = 'auto-2026-11-15'
+        truncated = StoryGenerationError(
+            'Incomplete model output', details={'constraint': 'incomplete_output'}, retryable=True)
+        completions = [idea, truncated, {'scenes': scenes[:1]}, {'scenes': scenes[1:2]}]
+        completions.extend({'scenes': scenes[i:i+2]} for i in range(2, 20, 2))
         with patch('wildlife.generate.select_topic',return_value=(
                 'wildlife','bridge','Deer','What if a land bridge opened?',False)), patch(
-                'wildlife.generate.ask',side_effect=[idea]+[
-                    {'scenes':scenes[i:i+4]} for i in range(0,20,4)]) as request:
+                'wildlife.generate.ask',side_effect=completions) as request:
             manifest = build(episode, store)
             self.assertEqual(build(episode, store), manifest)
-        self.assertEqual(request.call_count, 6)
+        self.assertEqual(request.call_count, 13)
+        pair, first, second = request.call_args_list[1:4]
+        self.assertEqual(pair.args[1]['properties']['scenes']['maxItems'], 2)
+        self.assertEqual(first.args[1]['properties']['scenes']['maxItems'], 1)
+        self.assertIn(scenes[0]['label'], second.args[0])
+        self.assertLess(first.args[3], pair.args[3])
         self.assertEqual(manifest['idea']['thumbnail_text'], 'THE GREEN VANISHES')
         package, beats, timeline = plan_episode(episode, False, manifest)
         self.assertEqual(len(beats), 20)
