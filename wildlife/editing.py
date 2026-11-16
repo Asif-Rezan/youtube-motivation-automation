@@ -53,6 +53,7 @@ def documentary_overlay(beats, index, seconds, *, science, subject, topic):
     result['time'] = time or ('At the start' if index == 0 else None)
     if not science:
         result['counter'] = (beat.population, subject)
+        result['previous_population'] = beats[max(0,index-1)].population
     if 'compare_to' in result:
         before = beats[result['compare_to']]
         if not science:
@@ -115,70 +116,126 @@ def paint_tide_indicator(frame, level):
     draw.rectangle((x0,y0,round(x0 + (x1-x0)*level),y1),fill='#96ded9')
 
 
+def smoothstep(value):
+    value = max(0, min(1, value))
+    return value * value * (3 - 2 * value)
+
+
+def visibility(elapsed, duration):
+    return min(smoothstep(elapsed/.32), smoothstep((duration-elapsed)/.25))
+
+
 def paint_cue(frame, edit, seconds, before=None):
     if not edit:
         return
     width, height = frame.size
     scale = width / 1920
-    active = 'at' in edit and edit['at'] <= seconds < edit['at'] + edit['duration']
+    elapsed = seconds - edit.get('at', 0)
+    active = 'at' in edit and 0 <= elapsed < edit['duration']
     quiz_elapsed = seconds - edit.get('quiz_at', 0)
     in_quiz = 'quiz' in edit and 0 <= quiz_elapsed < 4.5
 
-    def card(draw, text, x, y, *, small=False):
-        font = overlay_font(max(12, round(scale * (34 if small else 62))), bold=True)
-        pad = max(6, round(16 * scale))
-        x0, y0, x1, y1 = draw.textbbox((x, y), text, font=font, anchor='mm')
-        draw.rounded_rectangle((x0-pad,y0-pad,x1+pad,y1+pad),radius=pad,
-                               fill='#173137',outline='#ffd46b',width=max(1,round(3*scale)))
-        draw.text((x,y),text,fill='#fff6df',font=font,anchor='mm')
+    def px(value):
+        return round(value*scale)
+
+    def card(text, x, y, *, opacity=1, box_width=0, compact=False, accent=None):
+        if opacity <= 0:
+            return
+        font_size = 42 if compact else 62
+        font = overlay_font(max(10,px(font_size)),bold=True)
+        measure = ImageDraw.Draw(frame)
+        limit = box_width or px(1550)
+        while measure.textlength(text,font=font) > limit - px(54) and font_size > 22:
+            font_size -= 2
+            font = overlay_font(max(10,px(font_size)),bold=True)
+        w = max(box_width,round(measure.textlength(text,font=font))+px(56))
+        h = px(82 if compact else 108)
+        gutter = px(16)
+        layer = Image.new('RGBA',(w+gutter*2,h+gutter*2))
+        ink = ImageDraw.Draw(layer)
+        left, top, right, bottom = gutter,gutter,gutter+w,gutter+h
+        ink.rounded_rectangle((left,top+px(7),right,bottom+px(7)),radius=px(22),fill=(0,15,20,95))
+        ink.rounded_rectangle((left,top,right,bottom),radius=px(22),fill=(12,36,43,237),
+                              outline='#6a9697',width=max(1,px(2)))
+        if accent:
+            ink.rounded_rectangle((left+px(12),top+px(20),left+px(17),bottom-px(20)),
+                                  radius=max(1,px(3)),fill=accent)
+        ink.text((layer.width//2,gutter+h//2),text,fill='#fff4d9',font=font,anchor='mm')
+        if opacity < 1:
+            layer.putalpha(layer.getchannel('A').point(lambda alpha: round(alpha*opacity)))
+        lift = px(16*(1-opacity))
+        frame.paste(layer,(round(x-layer.width/2),round(y-layer.height/2)+lift),layer)
 
     if in_quiz:
-        background = frame.resize((480,270), Image.Resampling.BILINEAR).filter(ImageFilter.GaussianBlur(3))
-        background = ImageEnhance.Brightness(background.resize(frame.size, Image.Resampling.BILINEAR)).enhance(.66)
-        frame.paste(background)
-        quiz_draw = ImageDraw.Draw(frame)
+        strength = visibility(quiz_elapsed, 4.5)
+        background = frame.resize((480,270), Image.Resampling.BILINEAR).filter(ImageFilter.GaussianBlur(4))
+        background = ImageEnhance.Brightness(background.resize(frame.size, Image.Resampling.BILINEAR)).enhance(.57)
+        frame.paste(Image.blend(frame,background,strength) if strength < 1 else background)
         question, choices = edit['quiz']
-        card(quiz_draw, question, width//2, round(height*.38))
+        card(question,width//2,height*.37,opacity=strength,accent='#ffd46b')
         for index, choice in enumerate(choices):
-            if quiz_elapsed >= index*.35:
-                card(quiz_draw, choice, round(width*(.23+index*.27)), round(height*.55),small=True)
-    elif active and before is not None:
-        crop = (width//4, 0, width*3//4, height)
+            reveal = smoothstep((quiz_elapsed-index*.26-.22)/.35)
+            card(f'{chr(65+index)}   {choice}',width*(.224+index*.276),height*.56,
+                 box_width=px(460),compact=True,opacity=strength*reveal)
+        return
+
+    if active and before is not None:
+        opacity = visibility(elapsed,edit['duration'])
+        original = frame.copy() if opacity < 1 else None
+        crop = (width//4,0,width*3//4,height)
         after = frame.crop(crop)
-        frame.paste(before.crop(crop), (0, 0))
-        frame.paste(after, (width//2, 0))
-        draw = ImageDraw.Draw(frame)
-        draw.line((width//2,0,width//2,height),fill='#fff6df',width=max(2,round(5*scale)))
-        card(draw,'AT THE START' if edit['compare_to'] == 0 else 'EARLIER',width//4,round(height*.81),small=True)
-        card(draw,'NOW',width*3//4,round(height*.81),small=True)
-        if 'comparison_values' in edit:
-            for index, value in enumerate(edit['comparison_values']):
-                card(draw, value, width*(2*index+1)//4, round(height*.88),small=True)
-    elif active and edit.get('text'):
-        card(ImageDraw.Draw(frame),edit['text'],width//2,round(height*.79))
+        frame.paste(before.crop(crop),(0,0))
+        frame.paste(after,(width//2,0))
+        ImageDraw.Draw(frame).line((width//2,0,width//2,height),fill='#fff4d9',width=max(2,px(5)))
+        card('AT THE START' if edit['compare_to'] == 0 else 'EARLIER',width//4,height*.77,
+             compact=True,accent='#7cd6ca')
+        card('NOW',width*3//4,height*.77,compact=True,accent='#ffd46b')
+        for index, value in enumerate(edit.get('comparison_values',())):
+            card(value,width*(2*index+1)//4,height*.88,compact=True)
+        if original is not None:
+            frame.paste(Image.blend(original,frame,opacity))
+        return
+
+    if active and edit.get('text'):
+        card(edit['text'],width//2,height*.79,opacity=visibility(elapsed,edit['duration']),accent='#ffd46b')
 
     draw = ImageDraw.Draw(frame)
-    margin = round(56 * scale)
+    margin = px(56)
+
     def hud(text, x, y, size, anchor='lt', fill='#fff5d9'):
-        font = overlay_font(max(10,round(size*scale)),bold=True)
-        draw.text((x,round(y*scale)),text,anchor=anchor,font=font,fill=fill,
-                  stroke_width=max(1,round(2.2*scale)),stroke_fill='#203238')
+        font = overlay_font(max(10,px(size)),bold=True)
+        draw.text((x,px(y)),text,anchor=anchor,font=font,fill=fill,
+                  stroke_width=max(1,px(2.2)),stroke_fill='#203238')
 
     if edit.get('time'):
-        center = (margin+round(26*scale), round(63*scale))
-        r = round(24*scale)
-        cx,cy = center
-        draw.ellipse((cx-r,cy-r,cx+r,cy+r),fill='#233c43',outline='#ffcf62',
-                     width=max(1,round(4*scale)))
-        draw.line((cx,cy,cx+r*.48,cy-r*.45),fill='#fff5d9',width=max(1,round(3*scale)))
-        hud(edit['time'],margin+round(65*scale),42,48)
+        cx, cy, radius = margin+px(26), px(63), px(24)
+        draw.ellipse((cx-radius,cy-radius,cx+radius,cy+radius),fill='#233c43',outline='#ffcf62',
+                     width=max(1,px(4)))
+        draw.line((cx,cy,cx+radius*.48,cy-radius*.45),fill='#fff5d9',width=max(1,px(3)))
+        hud(edit['time'],margin+px(65),42,48)
 
     if edit.get('chapter') and seconds < 4.5:
         number, title = edit['chapter']
-        hud(f'CHAPTER {number}',margin,137,27,fill='#ffe199')
-        hud(title,margin,176,53)
+        opacity = visibility(seconds,4.5)
+        slide = px(22*(1-opacity))
+        title_size = 52
+        font = overlay_font(max(10,px(title_size)),bold=True)
+        while draw.textlength(title,font=font) > px(1205) and title_size > 28:
+            title_size -= 2
+            font = overlay_font(max(10,px(title_size)),bold=True)
+        box_width = min(px(1280),max(px(360),round(draw.textlength(title,font=font))+px(75)))
+        layer = Image.new('RGBA',(box_width,px(130)))
+        layer_draw = ImageDraw.Draw(layer)
+        layer_draw.rounded_rectangle((0,0,box_width-1,layer.height-1),radius=px(23),fill=(12,36,43,220))
+        layer_draw.text((px(26),px(15)),f'CHAPTER {number}',fill='#ffda7b',
+                        font=overlay_font(max(10,px(24)),bold=True))
+        layer_draw.text((px(26),px(47)),title,fill='#fff5d9',font=font)
+        layer.putalpha(layer.getchannel('A').point(lambda alpha: round(alpha*opacity)))
+        frame.paste(layer,(margin-slide,px(128)),layer)
 
     if edit.get('counter'):
         number, subject = edit['counter']
-        hud(f'{number:,}',width-margin,42,62,anchor='rt')
+        previous = edit.get('previous_population',number)
+        shown = round(previous+(number-previous)*smoothstep(seconds/.65))
+        hud(f'{shown:,}',width-margin,42,62,anchor='rt')
         hud(f'Simulated {subject.lower()}',width-margin,112,24,anchor='rt')

@@ -13,7 +13,7 @@ import wave
 import numpy as np
 from PIL import Image, ImageOps
 
-from .editing import documentary_overlay, paint_cue, zoom_frame
+from .editing import documentary_overlay, paint_cue, smoothstep, zoom_frame
 from .episodes import EPISODES, PREVIEW
 from .visuals import frames
 from .thumbnail import episode_cue, render_science_thumbnail, render_thumbnail
@@ -148,8 +148,11 @@ def encode_visuals(scene, seconds, size, target, *, edit=None, opening=None, ill
                 progress = (elapsed / seconds - .16) / .27
                 dx = round(width * (.015 + .055 * progress))
                 dy = round(height * (.015 + .055 * progress))
-                frame = insert.resize(size, Image.Resampling.BILINEAR,
-                                      box=(dx, dy, width-dx, height-dy))
+                illustration_frame = insert.resize(size, Image.Resampling.BILINEAR,
+                                                   box=(dx, dy, width-dx, height-dy))
+                fade = min(smoothstep((elapsed-.16*seconds)/.26),
+                           smoothstep((.43*seconds-elapsed)/.26))
+                frame = illustration_frame if fade == 1 else Image.blend(frame,illustration_frame,fade)
             elif use_shot_changes and not showing_comparison:
                 frame = zoom_frame(frame,elapsed/seconds)
             paint_cue(frame,edit,elapsed,before)
