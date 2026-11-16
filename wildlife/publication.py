@@ -93,7 +93,8 @@ def run(stage, episode, root):
         if state.get('upload_started') and not state.get('video_id'):
             raise RuntimeError('Ambiguous YouTube upload requires reconciliation')
         if not state.get('video_id'):
-            state.update(wildlife=True, song=metadata)
+            domain = manifest['idea'].get('domain', 'wildlife') if manifest else 'wildlife'
+            state.update(wildlife=True, episode_domain=domain, song=metadata)
             save()
             for name in ('video.mp4', 'thumbnail.jpg'):
                 store.upload(root/name, f'runs/{run_id}/{name}')

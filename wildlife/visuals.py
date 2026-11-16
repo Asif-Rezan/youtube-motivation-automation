@@ -46,22 +46,26 @@ def cloud(draw, x, y, width, height):
 
 
 class Island:
-    def __init__(self, size, camera, forage, seed, habitat):
+    def __init__(self, size, camera, forage, seed, habitat, *, cover=False):
         self.width, self.screen_height = size
         self.camera = camera
         self.foraging = forage
         self.habitat = habitat
         angles = {'aerial': (.88, .05, 0.75), 'shore': (.29, -.23, 1.32),
                   'pasture': (.48, .22, 1.14)}
+        self.cover = cover
         self.tilt, self.turn, scale = angles[camera]
+        if cover and camera == 'aerial':
+            self.tilt, self.turn, scale = .53, .08, 1.26
         self.scale = self.width / 11 * scale
-        self.baseline = self.screen_height * (.59 if camera == 'aerial' else .67)
+        self.baseline = self.screen_height * (.72 if cover else .59 if camera == 'aerial' else .67)
+        self.center = self.width * ((.67 if camera == 'aerial' else .24) if cover else .5)
         self.base = self.landscape(seed)
 
     def project(self, x, y, z):
         horizontal = x*math.cos(self.turn) - y*math.sin(self.turn)
         depth = x*math.sin(self.turn) + y*math.cos(self.turn)
-        return (self.width*.5 + horizontal*self.scale,
+        return (self.center + horizontal*self.scale,
                 self.baseline - (depth*self.tilt + z*.91)*self.scale)
 
     def landscape(self, seed):
@@ -69,7 +73,7 @@ class Island:
         width, screen_height = self.width, self.screen_height
         image = Image.new('RGB', (width, screen_height))
         draw = ImageDraw.Draw(image)
-        horizon = int(screen_height * (.24 if self.camera != 'aerial' else 0))
+        horizon = int(screen_height * (.40 if self.cover else .24 if self.camera != 'aerial' else 0))
         for y in range(screen_height):
             if y < horizon:
                 blend = y / max(1, horizon)
@@ -171,10 +175,10 @@ class Island:
             if r < 60 and b > g and b-r > 95:
                 yield x,y,rng.uniform(.55,1.15),rng.random()*TAU
 
-    def actors(self, count, seed):
+    def actors(self, count, seed, *, limit=112):
         rng = random.Random(seed)
         result = []
-        for i in range(min(count, 112)):
+        for i in range(min(count, limit)):
             while True:
                 x = rng.uniform(-4.3, 4.3)
                 y = rng.uniform(-2.2, 2.2 if self.camera == 'aerial' else -.35)

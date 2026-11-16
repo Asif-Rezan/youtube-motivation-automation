@@ -140,12 +140,16 @@ class Packaging:
         if self.topic in BACKGROUND_READING:
             name,url = BACKGROUND_READING[self.topic]
             paragraphs.append(f'Background reading\n{name} — {url}')
+        subject_hashtag = re.sub(r'[^A-Za-z0-9]', '', self.subject).lower()
+        hashtags = dict.fromkeys(('#simulation', '#'+subject_hashtag, '#ecology', '#whatif', '#animation'))
+        paragraphs.append(' '.join(hashtags))
         description = '\n\n'.join(paragraphs)
         if len(description.encode('utf-8')) > 5000 or any(c in title + description for c in '<>'):
             raise ValueError('Wildlife metadata contains invalid characters or exceeds the description limit')
         from_topic = TOPIC_PACKAGING.get(self.topic)
         candidates = [*(from_topic[1] if from_topic else ()), *self.tags,
-                      'ecosystem what if', 'ecology simulation']
+                      f'{self.subject} what if', 'ecosystem what if', 'ecology simulation',
+                      'low poly animation', 'nature simulation']
         tags = []
         used = set()
         budget = 0
@@ -157,6 +161,6 @@ class Packaging:
             tags.append(tag)
             used.add(tag.casefold())
             budget += cost
-            if len(tags) == 12:
+            if len(tags) == 18:
                 break
         return {'title': title, 'description': description, 'tags': tags}

@@ -9,14 +9,15 @@ from zoneinfo import ZoneInfo
 
 SETTINGS = Path(__file__).with_name('upload_settings.json')
 
-def load_settings(now=None, *, wildlife=False):
+def load_settings(now=None, *, wildlife=False, domain=None):
     settings = json.loads(SETTINGS.read_text())
     for env, field in [('UPLOAD_MODE','mode'),('PUBLISH_AT','publish_at'),('VIDEO_LANGUAGE','language'),
                        ('AUDIO_LANGUAGE','audio_language'),('VIDEO_CATEGORY_ID','category_id')]:
         if os.getenv(env):
             settings[field] = os.environ[env]
     if wildlife:
-        settings.update(language='en',audio_language='en',category_id='27',
+        category = '15' if domain == 'wildlife' else '27'
+        settings.update(language='en',audio_language='en',category_id=category,
                         made_for_kids=False,paid_product_placement=False)
     if settings['mode'] not in ('public', 'scheduled'):
         raise ValueError('Upload mode must be public or scheduled')

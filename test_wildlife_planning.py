@@ -51,6 +51,7 @@ class WildlifePlanningTests(unittest.TestCase):
         self.assertTrue(metadata['description'].startswith(package.premise))
         self.assertIn('0:00 The flood\n0:17 A new route\n1:22 The wetland', metadata['description'])
         self.assertIn('Background reading\nUSGS', metadata['description'])
+        self.assertTrue(metadata['description'].endswith('#simulation #rivers #ecology #whatif #animation'))
         self.assertEqual(metadata['tags'][:2], ['river changes course', 'wetland hydrology'])
         self.assertEqual(metadata['tags'].count('wetland hydrology'), 1)
 
@@ -60,6 +61,8 @@ class WildlifePlanningTests(unittest.TestCase):
         body = upload_body({'title': GOAT_PACKAGING.title}, 'Episode synopsis',
                            ['island ecology'], load_settings(wildlife=True))
         self.assertEqual(body['snippet']['categoryId'], '27')
+        self.assertEqual(load_settings(wildlife=True, domain='wildlife')['category_id'], '15')
+        self.assertEqual(load_settings(wildlife=True, domain='ocean')['category_id'], '27')
         self.assertEqual(body['snippet']['defaultLanguage'], 'en')
         self.assertEqual(body['snippet']['defaultAudioLanguage'], 'en')
         self.assertIs(body['status']['selfDeclaredMadeForKids'], False)
