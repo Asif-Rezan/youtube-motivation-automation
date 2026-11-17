@@ -3,7 +3,6 @@
 Runtime: NumPy, OpenCV, Pillow and FFmpeg. No neural inference or GPU needed.
 """
 import argparse
-import importlib.util
 import json
 import math
 from pathlib import Path
@@ -14,19 +13,13 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 from face_motion import FaceMotion
+from workout_plan import DEFAULT_PLAN, validate_plan
 
 ROOT=Path(__file__).resolve().parent
 W,H=520,620
-FPS=24
+FPS=48
 FRAME_SIZE=(1280,720)
 SHOT_SECONDS=4.5
-SHOTS=(
-    ("front","Bodyweight Squat","FRONT VIEW"),
-    ("side","Bodyweight Squat","SIDE VIEW"),
-    ("back","Bodyweight Squat","BACK VIEW"),
-    ("reach","Overhead Reach","FRONT VIEW"),
-    ("dance","Dance Step-Touch","FRONT VIEW"),
-)
 PARTS=(
     (11,12,28),(11,13,22),(12,14,22),(13,15,19),(14,16,19),
     (23,24,32),(11,23,65),(12,24,65),
@@ -77,17 +70,22 @@ def guides(image,points):
     return np.asarray(result,np.float32)
 
 
-def load_catalog():
+def load_catalog(extra=None):
     catalog=json.loads((ROOT/"pose_catalog.json").read_text())
+    locations={name:ROOT for name in catalog}
+    if extra:
+        new=json.loads(extra.read_text())
+        catalog.update(new)
+        locations.update({name:extra.parent for name in new})
     out={}
     for name,entries in catalog.items():
-        if len(entries)!=3:
-            raise ValueError(f"{name} needs start, middle, and end poses")
+        if len(entries)<3:
+            raise ValueError(f"{name} needs at least three authored poses")
         images=[]
         anchors=[]
         points=[np.asarray(entry["points"],np.float32) for entry in entries]
         for i,entry in enumerate(entries):
-            image=cv2.imread(str(ROOT/entry["image"]),cv2.IMREAD_UNCHANGED)
+            image=cv2.imread(str(locations[name]/entry["image"]),cv2.IMREAD_UNCHANGED)
             if image is None or image.shape!=(H,W,4):
                 raise ValueError(f"Invalid pose image {entry['image']}")
             images.append(image)
@@ -120,25 +118,24 @@ def warp_pair(first,second,source_a,source_b,target):
 
 
 def trajectory(poses,progress,lock_feet=True):
-    i=min(1,int(progress))
+    changes=np.diff(poses,axis=0)
+    i=min(len(poses)-2,int(progress))
     t=progress-i
-    first=poses[1]-poses[0]
-    second=poses[2]-poses[1]
-    middle=np.zeros_like(first)
-    signed=first*second>0
-    middle[signed]=2*first[signed]*second[signed]/(first[signed]+second[signed])
-    slopes=(first,middle,second)
+    slopes=np.zeros_like(poses)
+    slopes[0],slopes[-1]=changes[0],changes[-1]
+    for j,(previous,next_change) in enumerate(zip(changes[:-1],changes[1:]),1):
+        same_direction=previous*next_change>0
+        slopes[j,same_direction]=2*previous[same_direction]*next_change[same_direction]/(
+            previous[same_direction]+next_change[same_direction])
     p=((2*t**3-3*t*t+1)*poses[i]+(-2*t**3+3*t*t)*poses[i+1]
        +(t**3-2*t*t+t)*slopes[i]+(t**3-t*t)*slopes[i+1])
-    # Pin the ankle/heel/toe landmarks to the first pose for these
-    # stationary sequences. Standing and floor heights stay consistent.
     if lock_feet:
         for landmark in (27,28,29,30,31,32):
             p[POINTS.index(landmark)]=poses[0,POINTS.index(landmark)]
     return i,t,p
 
 
-def merge(a,b,t):
+def merge(a,b,t,kind):
     # The two poses may still reveal different parts of a swinging limb.
     # Use one opaque silhouette so a second hand or a doubled sleeve cannot
     # appear in mid-air; blend color only where both warps cover the pixel.
@@ -147,30 +144,20 @@ def merge(a,b,t):
     mb=other[...,3:4].astype(np.float32)/255
     mix=min(t,1-t)*.56*mb
     rgb=primary[...,:3]*(1-mix)+other[...,:3]*mix
-    alpha=np.clip((ma-.18)/.68,0,1)
+    intersection=np.count_nonzero((ma>.55)&(mb>.55))
+    union=np.count_nonzero((ma>.55)|(mb>.55))
+    if kind=="lunge":
+        transition=ease((t-.22)/.56)
+        matte=(a[...,3:4]*(1-transition)+b[...,3:4]*transition)/255.
+        left=(a[...,3:4]/255.)*(1-transition)
+        right=(b[...,3:4]/255.)*transition
+        rgb=(a[...,:3]*left+b[...,:3]*right)/np.maximum(left+right,1e-5)
+    elif union and intersection/union>.895:
+        matte=(a[...,3:4]*(1-t)+b[...,3:4]*t)/255.
+    else:
+        matte=ma
+    alpha=np.clip((matte-.18)/.68,0,1)
     return np.concatenate((rgb*alpha,255*alpha),axis=2).clip(0,255).astype(np.uint8)
-
-
-class SideSquat:
-    def __init__(self):
-        file=ROOT.parent/"cpu-motion/morph.py"
-        spec=importlib.util.spec_from_file_location("side_squat_warp",file)
-        self.warp=importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(self.warp)
-        self.images,self.anchors=self.warp.load_poses()
-        self.head=self.warp.feather_rows(self.images[0],98,121)
-
-    def frame(self,seconds):
-        progress=motion_time(seconds)
-        section,t,points=self.warp.curve_poses(self.anchors,progress)
-        a,b=self.warp.warp_pair(self.images[section],self.images[section+1],
-                                self.anchors[section],self.anchors[section+1],points)
-        image=cv2.addWeighted(a,1-t,b,t,0)
-        image=self.warp.preserve_head(image,self.head,self.anchors[0],points)
-        resized=cv2.resize(image,(415,578),interpolation=cv2.INTER_AREA)
-        output=np.zeros((H,W,4),np.uint8)
-        output[46:620,94:509]=resized[:574]
-        return output
 
 
 def ease(x):
@@ -179,26 +166,25 @@ def ease(x):
 
 
 def motion_time(seconds):
-    return 2*ease((seconds-.23)/1.52)*(1-ease((seconds-2.04)/1.85))
+    return ease((seconds-.23)/1.52)*(1-ease((seconds-2.04)/1.85))
 
 
-def actor_at(entry,seconds,name,face=None,now=0.,side=None):
-    if name=="side" and side:
-        return side.frame(seconds)
+def actor_at(entry,seconds,name,face=None,now=0.):
     images,poses=entry
     if name=="dance":
-        # Return through a neutral stance before stepping to the other side.
-        # This keeps the wrists from crossing through the opposite arm.
         section=min(1,int(seconds/(SHOT_SECONDS*.5)))
         local=seconds-section*SHOT_SECONDS*.5
         progress=ease((local-.07)/.83)*(1-ease((local-1.13)/1.02))
-        i,k,t=0,section+1,progress
-        target=poses[i]*(1-t)+poses[k]*t
+        half=(len(poses)-1)//2
+        indices=[0,*range(1+section*half,1+(section+1)*half)]
+        i,t,target=trajectory(poses[indices],half*progress,lock_feet=False)
+        i,k=indices[i],indices[i+1]
     else:
-        i,t,target=trajectory(poses,motion_time(seconds),lock_feet=True)
+        rooted=name in {"front","side","back","reach","lunge","stretch"}
+        i,t,target=trajectory(poses,(len(poses)-1)*motion_time(seconds),lock_feet=rooted)
         k=i+1
     a,b=warp_pair(images[i],images[k],poses[i],poses[k],target)
-    actor=merge(a,b,t)
+    actor=merge(a,b,t,name)
     return face.apply(actor,name,i,k,t,now,seconds) if face else actor
 
 
@@ -211,7 +197,7 @@ def background():
     return np.asarray(base.convert("RGB"))
 
 
-def show(base,actor,title,view,shot):
+def show(base,actor,title,view):
     rgba=cv2.cvtColor(actor,cv2.COLOR_BGRA2RGBA)
     frame=base.copy()
     x,y=190,19
@@ -224,7 +210,7 @@ def show(base,actor,title,view,shot):
     draw.rounded_rectangle((0,0,381,196),radius=23,fill=(10,33,25,231))
     draw.text((24,21),view,font=FONTS[20],fill="#eaff9b")
     draw.text((24,64),title,font=FONTS[30],fill="#fff9ee")
-    cue="STEP TO THE BEAT" if shot==4 else "MOVE WITH CONTROL"
+    cue="STEP TO THE BEAT" if title=="Dance Step-Touch" else "MOVE WITH CONTROL"
     draw.text((24,130),cue,font=FONTS[17],fill="#eaff9b")
     image.alpha_composite(card,(819,196))
     return image.convert("RGB")
@@ -233,26 +219,43 @@ def show(base,actor,title,view,shot):
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument("--check",action="store_true")
+    parser.add_argument("--plan",type=Path)
+    parser.add_argument("--pose-catalog",type=Path)
+    parser.add_argument("--audio",type=Path)
+    parser.add_argument("--phone-timing",type=Path)
+    parser.add_argument("--output",type=Path)
     args=parser.parse_args()
+    plan=json.loads(args.plan.read_text()) if args.plan else DEFAULT_PLAN
+    if bool(args.audio)!=bool(args.phone_timing):
+        parser.error("--audio and --phone-timing must be supplied together")
     cv2.setNumThreads(2)
-    catalog=load_catalog()
+    catalog=load_catalog(args.pose_catalog)
+    shots=validate_plan(plan,catalog)
     base=background()
     face=FaceMotion(ROOT)
-    side=SideSquat()
+    audio=args.audio if args.plan else args.audio or ROOT/"demo_audio.m4a"
+    if args.phone_timing:
+        face.phones=json.loads(args.phone_timing.read_text())
+    elif args.plan:
+        face.phones=[]
     if args.check:
-        for i,(name,title,view) in enumerate(SHOTS):
+        for i,(name,title,view) in enumerate(shots):
             for second in (0.,1.20,1.85,2.88):
-                show(base,actor_at(catalog[name],second,name,face,i*SHOT_SECONDS+second,side),title,view,i).save(
+                show(base,actor_at(catalog[name],second,name,face,i*SHOT_SECONDS+second),title,view).save(
                     f"/tmp/coral-library-{name}-{second:.2f}.jpg",quality=93)
         return
-    file=ROOT/"coral-multi-angle-workout.mp4"
+    file=args.output or ROOT/("coral-custom-workout.mp4" if args.plan else "coral-multi-angle-smooth-48fps.mp4")
     cmd=["ffmpeg","-v","error","-y","-f","rawvideo","-pix_fmt","rgb24","-s","1280x720","-r",str(FPS),
-         "-i","-","-i",str(ROOT/"demo_audio.m4a"),"-map","0:v","-map","1:a","-c:v","libx264","-threads","2","-preset","fast","-crf","18","-pix_fmt","yuv420p",
-         "-c:a","aac","-b:a","160k","-movflags","+faststart",str(file)]
+         "-i","-"]
+    if audio:
+        cmd+=["-i",str(audio),"-map","0:v","-map","1:a","-af","apad","-c:a","aac","-b:a","160k"]
+    cmd+=["-c:v","libx264","-threads","2","-preset","fast","-crf","18","-pix_fmt","yuv420p",
+          "-t",str(len(shots)*SHOT_SECONDS),"-metadata","title="+plan["title"],
+          "-movflags","+faststart",str(file)]
     with subprocess.Popen(cmd,stdin=subprocess.PIPE) as encoder:
-        for i,(name,title,view) in enumerate(SHOTS):
+        for i,(name,title,view) in enumerate(shots):
             for frame in range(round(FPS*SHOT_SECONDS)):
-                image=show(base,actor_at(catalog[name],frame/FPS,name,face,i*SHOT_SECONDS+frame/FPS,side),title,view,i)
+                image=show(base,actor_at(catalog[name],frame/FPS,name,face,i*SHOT_SECONDS+frame/FPS),title,view)
                 encoder.stdin.write(image.tobytes())
         encoder.stdin.close()
         if encoder.wait():

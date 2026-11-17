@@ -66,7 +66,9 @@ def main():
             cv2.imwrite(str(faces/(name+".png")),patch(pane,landmarks,"mouth"))
             if name=="smile":
                 cv2.imwrite(str(faces/"blink.png"),patch(pane,landmarks,"eyes"))
-        for name in ("front","reach","dance"):
+        for name in ("front","reach","dance","jack","stretch"):
+            if name not in catalog:
+                continue
             anchors[name]=[]
             for entry in catalog[name]:
                 image=cv2.imread(str(ROOT/entry["image"]))
