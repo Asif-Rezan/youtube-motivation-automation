@@ -1,0 +1,32 @@
+name: Fitness CPU motion preview
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Install CPU renderer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m pip install numpy==2.5.5 opencv-python-headless==5.0.0.93
+      - name: Render and validate preview
+        run: |
+          python demos/fitness-preview/cpu-motion/morph.py
+          video=demos/fitness-preview/cpu-motion/squat-cpu-preview.mp4
+          ffmpeg -v error -xerror -i "$video" -f null -
+          test "$(ffprobe -v error -show_entries stream=nb_frames -of csv=p=0 "$video")" = 144
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fitness-cpu-motion
+          path: demos/fitness-preview/cpu-motion/squat-cpu-preview.mp4
+          if-no-files-found: error
