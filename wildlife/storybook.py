@@ -12,15 +12,34 @@ from .thumbnail import SIZE, cover_font, draw_headline, save_thumbnail
 MARSH_SCRIPT = Path(__file__).with_name('blender_marsh.py')
 
 
-def render_marsh(output, **shot):
+class StorybookRenderError(RuntimeError):
+    """Blender could not produce a complete shot within its render budget."""
+
+
+def render_marsh(output, *, timeout=1200, **shot):
     output.mkdir(parents=True, exist_ok=True)
     settings = json.dumps(dict(shot, output=str(output.resolve())))
-    subprocess.run(
-        [os.environ['WILDLIFE_BLENDER'], '-b', '-t', '4', '--python-exit-code', '1',
-         '--python', str(MARSH_SCRIPT)],
-        env=dict(os.environ, WILDLIFE_BLENDER_SHOT=settings), check=True,
-        stdout=subprocess.DEVNULL, timeout=1200,
+    try:
+        subprocess.run(
+            [os.environ['WILDLIFE_BLENDER'], '-b', '-t', '4', '--python-exit-code', '1',
+             '--python', str(MARSH_SCRIPT)],
+            env=dict(os.environ, WILDLIFE_BLENDER_SHOT=settings), check=True,
+            stdout=subprocess.DEVNULL, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise StorybookRenderError(f'Blender exceeded its {timeout}-second shot deadline') from error
+    except subprocess.CalledProcessError as error:
+        raise StorybookRenderError(f'Blender exited with status {error.returncode}') from error
+    except OSError as error:
+        raise StorybookRenderError(f'Could not launch Blender ({error.strerror})') from error
+
+    expected = ('plate.png',) if shot.get('thumbnail') else (
+        f'{frame:04d}.png' for frame in range(1, shot['frames'] + 1)
     )
+    for filename in expected:
+        frame = output / filename
+        if not frame.is_file() or frame.stat().st_size == 0:
+            raise StorybookRenderError(f'Blender did not render {filename}')
 
 
 def render_marsh_thumbnail(beats, target, headline):
@@ -28,7 +47,7 @@ def render_marsh_thumbnail(beats, target, headline):
         plates = []
         for kind, level in (('close', min(b.forage for b in beats)), ('wide', max(b.forage for b in beats))):
             panel = Path(directory)/kind
-            render_marsh(panel, thumbnail=kind, start=level, end=level, frames=42)
+            render_marsh(panel, thumbnail=kind, start=level, end=level, frames=42, timeout=120)
             with Image.open(panel/'plate.png') as image:
                 plates.append(ImageOps.fit(image.convert('RGB'), (1095, SIZE[1])))
     cover = Image.new('RGB', SIZE)

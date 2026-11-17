@@ -90,6 +90,18 @@ jobs:
           path: output/wildlife-plan/plan.json
           if-no-files-found: error
           retention-days: 7
+      - name: Download and verify Blender for all tidal render jobs
+        if: steps.plan.outputs.topic == 'tides'
+        run: bash scripts/install-wildlife-blender.sh download output/wildlife-blender
+      - name: Share the verified Blender archive
+        if: steps.plan.outputs.topic == 'tides'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wildlife-blender
+          path: output/wildlife-blender/*.tar.xz
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 7
   audio:
     name: Generate and master narration
     needs: prepare
@@ -162,9 +174,15 @@ jobs:
         run: |
           pip install 'torch==2.7.1' --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements-images-cpu.txt
-      - name: Install headless Blender for the tidal storybook
+      - name: Download the shared Blender archive
         if: needs.prepare.outputs.topic == 'tides'
-        run: bash scripts/install-wildlife-blender.sh
+        uses: actions/download-artifact@v4
+        with:
+          name: wildlife-blender
+          path: output/wildlife-blender
+      - name: Verify and install headless Blender
+        if: needs.prepare.outputs.topic == 'tides'
+        run: bash scripts/install-wildlife-blender.sh install output/wildlife-blender
       - shell: bash
         env:
           SCENE_INDEX: ${{ matrix.scene }}
@@ -209,9 +227,15 @@ jobs:
         with:
           name: wildlife-plan
           path: output/wildlife-plan
-      - name: Install headless Blender for the tidal storybook
+      - name: Download the shared Blender archive
         if: needs.prepare.outputs.topic == 'tides'
-        run: bash scripts/install-wildlife-blender.sh
+        uses: actions/download-artifact@v4
+        with:
+          name: wildlife-blender
+          path: output/wildlife-blender
+      - name: Verify and install headless Blender
+        if: needs.prepare.outputs.topic == 'tides'
+        run: bash scripts/install-wildlife-blender.sh install output/wildlife-blender
       - shell: bash
         run: |
           args=(--episode "$EPISODE" --manifest output/wildlife-plan/plan.json)

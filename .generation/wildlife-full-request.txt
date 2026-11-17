@@ -1,3 +1,3 @@
 mode=fresh
 topic=tides
-2026-11-16 — Start a new full episode with polished documentary editing and the narration fix.
+2026-11-17 — Start a full tidal episode with verified Blender downloads and render recovery.

@@ -1,3 +1,8 @@
+import os
+from pathlib import Path
+import shutil
+import subprocess
+from tempfile import TemporaryDirectory
 import unittest
 from dataclasses import asdict, replace
 from unittest.mock import patch
@@ -22,6 +27,30 @@ class MemoryStore:
 
 
 class WildlifePlanningTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'), 'FFmpeg is required')
+    def test_tidal_scene_encodes_with_procedural_visuals_after_blender_timeout(self):
+        from wildlife import render, storybook
+
+        beats = [GOATS[0], GOATS[0]]
+        timeline = [{}, {'seconds': 0.5, 'edit': {'compare_to': 0, 'at': 0.1, 'duration': 0.2}}]
+        manifest = {'idea': {'domain': 'ocean', 'topic': 'tides'}}
+        with TemporaryDirectory() as directory, patch.dict(os.environ, {'WILDLIFE_BLENDER': 'blender'}):
+            work = Path(directory)
+            with patch.object(storybook.subprocess, 'run', side_effect=subprocess.TimeoutExpired('blender', 1200)), \
+                 patch.object(render, 'PREVIEW_SIZE', (320, 180)):
+                render.render_scene(beats, timeline, 1, work, True, manifest)
+            self.assertEqual(render.video_size(work / 'visual-01.mp4'), (320, 180))
+
+    def test_storybook_rejects_incomplete_frame_sequences(self):
+        from wildlife import storybook
+
+        with TemporaryDirectory() as directory, patch.dict(os.environ, {'WILDLIFE_BLENDER': 'blender'}):
+            output = Path(directory)
+            (output / '0001.png').write_bytes(b'frame')
+            with patch.object(storybook.subprocess, 'run'):
+                with self.assertRaisesRegex(storybook.StorybookRenderError, '0002.png'):
+                    storybook.render_marsh(output, frames=2)
+
     def test_edits_use_story_time_and_compare_the_final_scene_to_the_start(self):
         from wildlife.editing import scene_edit
         from wildlife.publication import is_generated

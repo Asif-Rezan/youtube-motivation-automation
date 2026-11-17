@@ -121,9 +121,10 @@ def encode_visuals(scene, seconds, size, target, *, edit=None, opening=None, ill
                 yield result
             return
         if domain == 'wildlife':
-            return frames(size,beat,length,fps,show_count=not (edit and 'counter' in edit),**options)
-        from .science_visuals import science_frames
-        return science_frames(size,beat,length,fps,domain=domain,**options)
+            yield from frames(size,beat,length,fps,show_count=not (edit and 'counter' in edit),**options)
+        else:
+            from .science_visuals import science_frames
+            yield from science_frames(size,beat,length,fps,domain=domain,**options)
 
     before = None
     if opening is not None:
@@ -268,18 +269,26 @@ def render_scene(beats, timeline, index, work, preview, manifest=None, *, genera
         storyboard = None
         opening_plate = None
         if artwork.get('topic') == 'tides' and os.environ.get('WILDLIFE_BLENDER'):
-            from .storybook import render_marsh
+            from .storybook import StorybookRenderError, render_marsh
 
-            storyboard = Path(directory)/'storybook'
-            render_marsh(storyboard, start=artwork.get('previous_level', beat.forage),
-                         end=beat.forage, camera=beat.camera, shot=index,
-                         frames=math.ceil(round(seconds*FPS)/2))
-            if 'compare_to' in edit:
+            shot_dir = Path(directory)/'storybook'
+            try:
+                render_marsh(shot_dir, start=artwork.get('previous_level', beat.forage),
+                             end=beat.forage, camera=beat.camera, shot=index,
+                             frames=math.ceil(round(seconds*FPS)/2))
+                storyboard = shot_dir
+            except StorybookRenderError as error:
+                print(f'Warning: Wildlife scene {index} is using procedural tidal visuals. {error}', flush=True)
+
+            if storyboard is not None and 'compare_to' in edit:
                 earlier = beats[edit['compare_to']]
                 opening_dir = Path(directory)/'earlier'
-                render_marsh(opening_dir, start=earlier.forage, end=earlier.forage, camera=earlier.camera,
-                             shot=edit['compare_to'], frames=1)
-                opening_plate = opening_dir/'0001.png'
+                try:
+                    render_marsh(opening_dir, start=earlier.forage, end=earlier.forage, camera=earlier.camera,
+                                 shot=edit['compare_to'], frames=1, timeout=120)
+                    opening_plate = opening_dir/'0001.png'
+                except StorybookRenderError as error:
+                    print(f'Warning: Wildlife scene {index} is using a procedural comparison frame. {error}', flush=True)
         if manifest is not None and generate_art:
             illustration = Path(directory)/'scene.png'
             generate_scene_illustration(manifest, index, illustration)
@@ -303,12 +312,17 @@ def assemble(episode, package, timeline, work, output, preview, manifest=None):
         if idea.get('domain','wildlife') == 'wildlife':
             render_thumbnail(beats,output/'thumbnail.jpg',label=thumbnail_hook(idea),
                              species=idea['species'],habitat=idea['habitat'],cue=cue)
-        elif idea['topic'] == 'tides' and os.environ.get('WILDLIFE_BLENDER'):
-            from .storybook import render_marsh_thumbnail
-
-            render_marsh_thumbnail(beats,output/'thumbnail.jpg',thumbnail_hook(idea))
         else:
-            render_science_thumbnail(beats,output/'thumbnail.jpg',idea,cue)
+            if idea['topic'] == 'tides' and os.environ.get('WILDLIFE_BLENDER'):
+                from .storybook import StorybookRenderError, render_marsh_thumbnail
+
+                try:
+                    render_marsh_thumbnail(beats,output/'thumbnail.jpg',thumbnail_hook(idea))
+                except StorybookRenderError as error:
+                    print(f'Warning: Using a procedural tidal thumbnail. {error}', flush=True)
+                    render_science_thumbnail(beats,output/'thumbnail.jpg',idea,cue)
+            else:
+                render_science_thumbnail(beats,output/'thumbnail.jpg',idea,cue)
         (output/'episode-plan.json').write_text(json.dumps(manifest,indent=2)+'\n')
     for label, kind, suffix in [('video', 'visual', 'mp4'), ('voice', 'voice', 'wav')]:
         (work/f'{label}.txt').write_text(''.join(
