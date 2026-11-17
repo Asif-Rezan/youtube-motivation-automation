@@ -30,7 +30,7 @@ class PosedWaistband:
         shirt_only.show_viewport=False
         shirt_only.show_render=True
 
-    def fit(self, root_shift):
+    def fit(self, root_shift, *, max_correction=None):
         # Resolve the collision against the deformed skin rather than
         # comparing the rest mesh or tinting visible skin green.
         original=[m.show_viewport for m in self.body_masks]
@@ -76,6 +76,8 @@ class PosedWaistband:
             safe=envelope+.006+.006*abs(outward.y)
             correction=max(0.,safe-radius)
             if correction>0:
+                if max_correction is not None:
+                    correction=min(correction,max_correction)
                 vertex.co+=outward*(correction*strength)
         prior=self.proxy.data
         self.proxy.data=mesh
