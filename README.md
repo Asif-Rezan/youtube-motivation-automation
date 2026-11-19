@@ -1,5 +1,16 @@
 # Wildlife simulation videos
 
+## Character editing and scheduling status
+
+Daily video generation is **disabled**. Manual workflow dispatch remains available.
+The hourly Drive cleanup workflow is unchanged.
+
+The current fitness character is designed in Daz Studio and animated in Blender:
+**Kat face and skin, Laura body, brown Eirgrid hair, black Base Bra and Leather Viking pants**.
+See [character/README.md](character/README.md) for files, setup, editing, rendering,
+asset dependencies, and current limitations. The fitness demo is separate from the existing
+wildlife publishing pipeline; it is not yet an automatic daily fitness generator.
+
 The **Wildlife simulation video** workflow renders narrated ecological thought experiments.
 The first episode follows two goats introduced to a hypothetical island. It uses a projected
 low-poly terrain, animated goat sprites, shoreline and aerial shots, and a population counter.
@@ -12,7 +23,7 @@ topic-specific description, and relevant tags. Full videos get chapters based on
 The run summary shows the exact title, description, and tags.
 The full workflow publishes to the configured YouTube channel and Facebook Page. It verifies
 both publications and deletes the temporary MP4 and thumbnail from private Drive, retaining
-publication receipts for deduplication. The daily schedule runs at 03:00 Asia/Dhaka. It resumes unfinished AI episodes or uses Qwen
+publication receipts for deduplication. The former 03:00 Asia/Dhaka daily schedule is disabled. Manual runs resume unfinished AI episodes or use Qwen
 to generate a fresh wildlife premise, script, SEO metadata, and twenty scene directions.
 Python renders the low-poly backgrounds, animal motion, population overlay, and thumbnail at their native output resolutions. Each plan is checkpointed on Drive to
 keep retries stable. The legacy Goat Island preview remains available for comparison. The previous nursery-rhyme schedule

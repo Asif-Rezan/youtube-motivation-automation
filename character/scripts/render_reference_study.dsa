@@ -1,0 +1,33 @@
+(function () {
+    for(var i=0;i<Scene.getNumNodes();i++){
+        var n=Scene.getNode(i);
+        if(n.getName()=='l_upperarm')n.getZRotControl().setValue(-50);
+        if(n.getName()=='r_upperarm')n.getZRotControl().setValue(50);
+    }
+    var camera = new DzBasicCamera();
+    camera.setName('FreeOutfitStudyCamera');
+    Scene.addNode(camera);
+    camera.getXRotControl().setValue(0);
+    camera.getYRotControl().setValue(0);
+    camera.getZRotControl().setValue(0);
+    camera.getXPosControl().setValue(0);
+    camera.getYPosControl().setValue(90);
+    camera.getZPosControl().setValue(370);
+    print('Study camera position ' + camera.getWSPos().x + ',' + camera.getWSPos().y + ',' + camera.getWSPos().z);
+    MainWindow.getViewportMgr().getActiveViewport().get3DViewport().setCamera(camera);
+    var manager = App.getRenderMgr(), options = manager.getRenderOptions();
+    options.isAspectConstrained = false;
+    options.imageSize = new Size(640, 960);
+    options.isCurrentFrameRender = true;
+    options.renderType = DzRenderOptions.Software;
+    options.renderViewport = false;
+    options.renderImgToId = DzRenderOptions.DirectToFile;
+    options.renderImgFilename = '/Users/asif/Documents/DAZ 3D/kat-black-outfit-preview-v2.png';
+    options.showPreview = false;
+    var io=App.getAssetIOMgr(),filter=io.getFilter(io.findFilter('DzSceneAssetFilter'));
+    var settings=new DzFileIOSettings();filter.getDefaultOptions(settings);
+    settings.setBoolValue('RunSilent',true);settings.setBoolValue('CompressOutput',true);
+    var saved=io.doSaveWithOptions(filter,settings,false,'/Users/asif/Documents/DAZ 3D/Studio/My Library/Scenes/Kat Black Training Outfit v2','/Users/asif/Documents/DAZ 3D/Studio/My Library','');
+    print('Kat outfit scene save result: '+saved);
+    manager.doRender(options);
+})();

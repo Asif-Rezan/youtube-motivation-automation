@@ -3,8 +3,6 @@ on:
   push:
     branches: [main]
     paths: [.generation/wildlife-full-request.txt]
-  schedule:
-    - cron: '0 21 * * *' # 03:00 Asia/Dhaka, next day
   workflow_dispatch:
     inputs:
       episode:

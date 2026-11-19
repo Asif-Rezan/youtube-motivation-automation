@@ -1,0 +1,62 @@
+// Reversible free-library outfit fitting study; source scene is preserved.
+(function () {
+    var figure = null, nodes = [];
+    for (var i = 0; i < Scene.getNumNodes(); ++i) {
+        var n = Scene.getNode(i);
+        if (n.getName() == 'Genesis9') figure = n;
+        nodes.push(n);
+    }
+    if (!figure) throw new Error('Open the trainer scene first');
+    var faceProperties = figure.getPropertyList();
+    var desired = {'Laura_figure_ctrl_Character':0, 'Kat_figure_ctrl_Character':0,
+        'Laura_head_bs_Head':0, 'Kat_head_bs_Head':1, 'Laura_body_bs_body':1};
+    for (var f=0;f<faceProperties.length;f++) {
+        var faceName=faceProperties[f].getName();
+        if(desired.hasOwnProperty(faceName)) faceProperties[f].setValue(desired[faceName]);
+    }
+    for (var j = 0; j < nodes.length; ++j) {
+        var name = nodes[j].getName();
+        if (/shirt|shorts/i.test(name)) nodes[j].setVisible(false);
+        if (name == 'ReferenceFittedOutfit') nodes[j].setVisible(false);
+        if (name == 'l_upperarm') nodes[j].getZRotControl().setValue(-65);
+        if (name == 'r_upperarm') nodes[j].getZRotControl().setValue(65);
+    }
+    var content = App.getContentMgr();
+    var root = '/Users/Shared/My DAZ 3D Library/People/Genesis 9/';
+    var outfits = ['Clothing/Daz Originals/Base Clothing/G9 Base Bra.duf',
+        'Clothing/Daz Originals/dForce Leather Viking Armor for Genesis 9/LVA Pant.duf'];
+    for (var k = 0; k < outfits.length; ++k) {
+        var existing = null;
+        for (var e = 0; e < Scene.getNumNodes(); ++e) {
+            var candidate = Scene.getNode(e);
+            if (candidate.inherits('DzFigure') && (k == 0 ? /Base.*Bra/i.test(candidate.getName()) : /LVA.*Pant/i.test(candidate.getName()))) existing = candidate;
+        }
+        if (existing) { existing.setVisible(true); continue; }
+        Scene.setPrimarySelection(figure);
+        var before = Scene.getNumNodes();
+        content.openFile(root + outfits[k], true);
+        for (var a = before; a < Scene.getNumNodes(); ++a) {
+            var item = Scene.getNode(a);
+            if (item.inherits('DzFigure')) item.setFollowTarget(figure);
+            var object = item.getObject();
+            if (!object) continue;
+            var shape = object.getCurrentShape();
+            if (!shape) continue;
+            for (var m = 0; m < shape.getNumMaterials(); ++m) {
+                var material = shape.getMaterial(m);
+                var controls = material.getPropertyList();
+                for (var p = 0; p < controls.length; ++p) {
+                    var control = controls[p], key = control.getName();
+                    if (key == 'Base Color' || key == 'Diffuse Color') {
+                        control.setValue(new Color(18, 19, 23));
+                        if (control.setMap) control.setMap(null);
+                    }
+                    if (key == 'Metallic Weight') control.setValue(0);
+                    if (key == 'Glossy Roughness' || key == 'Glossy Layered Weight') control.setValue(key == 'Glossy Roughness' ? 0.85 : 0.15);
+                }
+            }
+        }
+    }
+    Scene.setPrimarySelection(figure);
+    print('Free outfit fit study loaded. Existing source scene has not been overwritten.');
+})();

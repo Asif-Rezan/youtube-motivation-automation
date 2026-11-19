@@ -1,0 +1,23 @@
+(function(){
+ var figure=null;
+ for(var i=0;i<Scene.getNumNodes();i++){
+  var node=Scene.getNode(i);
+  if(node.getName()=='Genesis9')figure=node;
+ }
+ if(!figure)throw new Error('Trainer missing');
+ var props=figure.getPropertyList();
+ for(var p=0;p<props.length;p++)if(props[p].getName()=='facs_ctrl_MouthSmile')props[p].setValue(.3);
+ var exp=App.getExportMgr().findExporterByClassName('DzFbxExporter');
+ if(!exp)throw new Error('FBX exporter missing');
+ var settings=new DzFileIOSettings();exp.getOptions(settings,false,'');
+ settings.setBoolValue('doSelected',false);settings.setBoolValue('doVisible',true);
+ settings.setBoolValue('doFigures',true);settings.setBoolValue('doProps',false);
+ settings.setBoolValue('doLights',false);settings.setBoolValue('doCameras',false);
+ settings.setBoolValue('doAnimations',false);settings.setBoolValue('doMorphs',false);
+ settings.setBoolValue('doEmbed',false);settings.setBoolValue('doCopyTextures',true);
+ settings.setBoolValue('doMergeClothing',false);settings.setBoolValue('doStaticClothing',false);
+ settings.setBoolValue('doSubD',false);settings.setBoolValue('doCollapseUVTiles',false);
+ settings.setBoolValue('RunSilent',true);
+ var result=exp.writeFile('/Users/asif/Documents/DAZ 3D/kat-outfit-trainer.fbx',settings);
+ print('Trainer FBX export result: '+result);
+})();
