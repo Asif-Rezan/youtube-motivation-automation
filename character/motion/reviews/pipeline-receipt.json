@@ -1,0 +1,22 @@
+[
+  {
+    "stage": "finish_walk_performance.py",
+    "success": true
+  },
+  {
+    "stage": "retime_walk_footroll.py",
+    "success": true
+  },
+  {
+    "stage": "plan_walk_contacts.py",
+    "success": true
+  },
+  {
+    "stage": "stabilize_walk_knees.py",
+    "success": true
+  },
+  {
+    "stage": "audit_walk_continuity.py",
+    "success": true
+  }
+]

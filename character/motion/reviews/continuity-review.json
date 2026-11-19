@@ -1,0 +1,24 @@
+{
+  "frames": 240,
+  "fps": 24,
+  "camera_cuts": 0,
+  "source": "CMU 36_02 captured body; phase-corrected native foot roll",
+  "retargeter": "Official Rokoko Studio Live Blender 1.4.4 offline retargeting, clean native-proportion proxy, baked to original Daz rig.",
+  "max_root_step_m": 0.042287736100018444,
+  "max_bone_step_degrees": {
+    "hip": 6.112027192070314,
+    "l_thigh": 14.162056038842568,
+    "r_thigh": 20.119823917084698,
+    "l_shin": 20.602246042769544,
+    "r_shin": 21.448656683371006,
+    "l_foot": 12.473238574958438,
+    "r_foot": 23.528035401905083,
+    "l_toes": 14.779531368441456,
+    "r_toes": 17.999940220367073,
+    "neck1": 3.9511209692709657,
+    "neck2": 4.726617428636126,
+    "head": 2.6220943720972643
+  },
+  "minimum_sole_z_m": 0.000999502488411963,
+  "quaternion_sign_repairs": 0
+}

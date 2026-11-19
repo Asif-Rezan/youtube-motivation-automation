@@ -1,0 +1,11 @@
+{
+  "scene": "character/blender/kat-rokoko-walk-v1.blend",
+  "blender": "5.3.0",
+  "file_images": 45,
+  "unpacked_images": [],
+  "frames": [
+    1,
+    240
+  ],
+  "main_armature": "Genesis9"
+}

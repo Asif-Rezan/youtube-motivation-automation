@@ -13,6 +13,10 @@ jobs:
       - name: Install audio tools for regression tests
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: pip install -r requirements.txt
+      - name: Verify character assets and portable review scripts
+        run: |
+          python character/verify_assets.py
+          python character/prepare.py --scripts-only --daz-library /tmp/daz-library
       - run: python -m unittest -v
       - name: Verify bounded CPU worker on real Linux cgroups
         run: python check_worker_limits.py

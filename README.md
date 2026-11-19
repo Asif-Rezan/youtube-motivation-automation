@@ -7,6 +7,13 @@ The hourly Drive cleanup workflow is unchanged.
 
 The current fitness character is designed in Daz Studio and animated in Blender:
 **Kat face and skin, Laura body, brown Eirgrid hair, black Base Bra and Leather Viking pants**.
+
+The latest packed sources are `character/blender/kat-rokoko-walk-v1.blend` and
+`character/blender/kat-heel-raise-v1.blend`, with 1080p previews in `character/preview/`.
+The recommended free-Rokoko animation setup, contact corrections and rebuild instructions
+are in [character/ROKOKO_WORKFLOW.md](character/ROKOKO_WORKFLOW.md). Pull Git LFS assets
+before opening the scenes. The user requested additional Pilates/workout motions before
+starting full daily fitness production; this backup does not restart wildlife publishing.
 See [character/README.md](character/README.md) for files, setup, editing, rendering,
 asset dependencies, and current limitations. The fitness demo is separate from the existing
 wildlife publishing pipeline; it is not yet an automatic daily fitness generator.

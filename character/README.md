@@ -6,13 +6,19 @@
 - Body: Laura / Genesis 9 female.
 - Hair: brown Eirgrid Hair. The experimental perlk ponytail is hidden and is not the selected hairstyle.
 - Outfit: black G9 Base Bra and LVA Pant (Leather Viking Armor). These pants are intentionally the selected leather pants, not fitted leggings.
-- Demo: 6 seconds, 144 frames at 24 fps, 512 × 768, silent.
+- Current walking demo: 10 seconds, 240 frames at 24 fps, 1920 × 1080, fixed camera.
+- Current heel-raise demo: 12 seconds, 288 frames at 24 fps, 1920 × 1080.
 
 The Daz scene is the character-design source. Blender is the animation and rendering source.
-This is a motion sample, not a finished photorealistic workout production. The motion is limited
-to an arm/hand gesture and head movement. Lip-sync, a full exercise library, cloth simulation,
-and automatic fitness publishing have not been completed. Inspect skin, eyes, hair, clothing
-binding, and clipping before using a new pose in a production video.
+These are motion review samples, not a completed fitness publishing pipeline. The current
+Blender/Rokoko workflow includes captured walking/turning, native blink/smile, mouth-chain
+repair, relaxed fingers, hair follow-through, leg IK and heel/sole/toe contact cleanup.
+A broader Pilates/workout library and its form review are still pending. The user requested
+that additional movements be built before starting full daily fitness production. Inspect
+skin, eyes, hair, clothing binding, and contact before admitting any new motion.
+
+See [ROKOKO_WORKFLOW.md](ROKOKO_WORKFLOW.md) for the recommended current workflow and
+[PILATES_REVIEW.md](PILATES_REVIEW.md) for the heel-raise review.
 
 ## Pull the real files
 
@@ -25,18 +31,24 @@ git lfs pull
 git lfs fsck
 ```
 
-`blender/kat-animated.blend` is the editable animation scene with packed image textures.
+`blender/kat-rokoko-walk-v1.blend` is the current editable walking scene with packed textures.
+`blender/kat-heel-raise-v1.blend` is the current editable single-camera heel-raise scene.
+`blender/kat-animated.blend` preserves the earlier gesture scene with packed image textures.
 `blender/kat-outfit-trainer.fbx` is the Daz export used to construct it.
 `daz/` contains both saved Daz outfit scenes. Version 2 is the latest saved scene;
 the first version preserves the earlier pose for comparison.
-`preview/kat-blender-animation.mp4` is the rendered demo.
+`preview/kat-rokoko-walk-10s.mp4` and `preview/kat-heel-raise-12s.mp4` are the current demos.
+`preview/kat-blender-animation.mp4` preserves the earlier gesture demo.
+`motion/asset-manifest.json` records hashes and sizes; `python3 character/verify_assets.py`
+checks real assets or their Git LFS pointers. `motion/reviews/` contains verification receipts.
+`motion/sources/` contains the source walking capture and conversion notice.
 Files use ordinary Git LFS storage, with no encryption or recovery password.
 
 ## Open and update
 
-For Blender editing, open `blender/kat-animated.blend` in Blender 5.3 or newer.
+For Blender editing, open `blender/kat-rokoko-walk-v1.blend` in Blender 5.3 or newer.
 The original render used Blender 4.5.16; the portable texture-packed backup was saved with 5.3.
-The main armature is `Genesis9`. Pose bones and the saved timeline contain the gesture.
+The main armature is `Genesis9`. Pose bones and the saved timeline contain the baked motion.
 Adjust camera, lighting, skin/hair materials, or garment materials, save the blend file,
 and render again. Pack newly added external textures before committing.
 
@@ -96,5 +108,6 @@ git push
 
 The daily `Wildlife simulation video` cron trigger has been removed. Manual dispatch
 and its existing publication logic remain available. Hourly Drive cleanup remains on.
-The fitness character demo is not wired into that wildlife workflow. No new generation
-or publication run is started by this backup change.
+The fitness character is not wired into that wildlife workflow. Additional Pilates/workout
+motions were requested before full generation and daily fitness scheduling. This backup does
+not restart the old wildlife generator or publish a demo as a workout.

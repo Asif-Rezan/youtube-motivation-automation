@@ -1,0 +1,30 @@
+{
+  "version": "fitness-character-v1",
+  "assets": [
+    {
+      "path": "character/blender/kat-rokoko-walk-v1.blend",
+      "sha256": "7280750c834fc47493e6f2c70ecae10ac999cb10bcfce21b6049427d399d259b",
+      "bytes": 138625205
+    },
+    {
+      "path": "character/blender/kat-heel-raise-v1.blend",
+      "sha256": "5182b81d618c779596fcb4b76d886ffa904f201acd6e3fd8f3d9e1ba8853ec32",
+      "bytes": 135901638
+    },
+    {
+      "path": "character/preview/kat-rokoko-walk-10s.mp4",
+      "sha256": "ba2b04750d5d972f2ff093dd8a7538aacafc41f5e2985822f97dec2f5c1f7655",
+      "bytes": 2977143
+    },
+    {
+      "path": "character/preview/kat-heel-raise-12s.mp4",
+      "sha256": "e9d335f32411e67f4c30e6b97f847cf4fed00d67f74665af14478e192aef6561",
+      "bytes": 2481065
+    },
+    {
+      "path": "character/motion/sources/36_02.bvh",
+      "sha256": "2a6e9f62ee04428f9542f00f41439acc01a71b06acc24717c1b4a07e5d6ddf6a",
+      "bytes": 3205047
+    }
+  ]
+}
