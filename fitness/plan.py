@@ -100,7 +100,7 @@ def generate(out,run_id):
     out.mkdir(parents=True,exist_ok=True)
     (out/'plan.json').write_text(json.dumps(plan,indent=2))
     (out/'metadata.json').write_text(json.dumps(plan['youtube'],indent=2))
-    store.save('fitness/ideas.json',(history+[dict(run_id=run_id,title=plan['title'],idea=plan['idea'],thumbnail=plan['thumbnail']['headline'])])[-100:])
+    store.save('fitness/ideas.json',history+[dict(run_id=run_id,title=plan['title'],idea=plan['idea'],thumbnail=plan['thumbnail']['headline'])])
     store.save(checkpoint,plan)
     print(json.dumps(dict(title=plan['title'],duration=60,publish=False,models=plan['models'])),flush=True)
     return plan
