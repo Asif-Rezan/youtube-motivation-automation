@@ -11,18 +11,32 @@ sample is `preview/kat-rigify-walk-10s.mp4`. Verification reports are stored in
 
 ## Build a separate review scene
 
-Use Blender 5.3 with its bundled Rigify add-on. Set `FITNESS_RIGIFY_DIR` to an
-output directory; the scripts default to the local `fitness-rigify-review` folder.
+Use Blender 5.3 with its bundled Rigify add-on. Set `FITNESS_RIGIFY_DIR` to the
+same output directory for every stage. The complete runner defaults to the
+local `fitness-rigify-upright-review` folder.
+
+After preparing the portable scripts, `run_natural_gait_review.py` runs the
+complete build, source restoration, animation, contact cleanup, regression
+checks, render and composition. Set `BLENDER` to the Blender executable and use
+a Python environment with Pillow/NumPy plus ffmpeg on PATH. `--no-render` stops
+after the checked editable scene; `--from-controls` resumes from already
+prepared controls and their gait plan. Each stage records a log and receipt;
+a Python traceback stops the pipeline even when Blender exits with code zero.
 
 1. Open `character/blender/kat-rokoko-walk-v1.blend` and run
    `character/scripts/build_rigify_trainer.py`.
 2. Open the resulting `kat-rigify-controls.blend` and run
-   `character/scripts/animate_rigify_trainer.py`.
-3. Open `kat-rigify-motion.blend` and run `clean_rigify_contacts.py`.
-4. Open the resulting `kat-rigify-final.blend`; run `review_rigify_trainer.py`
-   to render inspection angles and measure the native-rig bridge.
-5. Run `audit_rigify_motion.py` on the final saved scene to check evaluated
-   rotations, packed textures and disabled leg stretch.
+   `prepare_natural_gait.py`. Keep the same `FITNESS_RIGIFY_DIR` for all stages.
+   This restores the untouched Rokoko bake from the versioned native-pose JSON,
+   detects stance/swing from the capture, and writes `gait-plan.json` plus an
+   updated `kat-rigify-controls.blend`. An original intermediate Rokoko blend
+   can optionally be supplied through `FITNESS_RAW_ROKOKO`.
+3. Open the updated controls file and run `animate_rigify_trainer.py`.
+4. Open `kat-rigify-motion.blend` and run `clean_rigify_contacts.py`.
+5. Open the resulting `kat-rigify-final.blend`; run `audit_walk_posture.py`,
+   `audit_rigify_motion.py` and `review_rigify_trainer.py`. These check the neck,
+   final hip height, trailing-foot release, arm swing, evaluated rotations,
+   packed textures, disabled leg stretch and actual control response.
 
 Blender can return exit code zero after a Python error. Check each log for a
 traceback and require the expected output file before continuing.
@@ -62,7 +76,18 @@ Rigify is a control system, not automatic human physics or proof of correct
 Pilates technique. Production fitness publishing and the daily schedule remain
 pending the expanded movement library requested by the user.
 
-The 240-frame review measured a minimum sole height of -1.22 mm, within the
-2 mm review tolerance, and root travel below 4.23 cm per frame. The ankle can
-depart from the original capture by up to 3.64 cm during contact cleanup.
-These measurements do not establish correct form for other exercises.
+The earlier version held the trailing foot at the clip boundary, forcing the
+pelvis down to 0.776 m. It also retained a forward neck angle of about 23 degrees
+and both arms behind the torso. The corrected version restores the unmodified
+Rokoko capture, detects toe-off from its motion, raises the ankle with heel roll,
+and limits pelvis height by actual leg reach. Foot pitch is smoothed across
+toe-off so it cannot jump from 35 to 10 degrees in one frame. Opposing arm swing follows the
+captured thigh phase; the head looks ahead and the chest stays over the pelvis.
+
+The corrected 240-frame review measured final hip height 0.900 m, neck lean
+below 7.64 degrees, opposite arm swings of about +/-16 degrees and trailing
+ankle travel of 10.5 cm over the final 12 frames. The maximum evaluated ankle
+rotation step decreased from about 25.7 to 10.1 degrees per frame. Minimum sole height was
+-0.077 mm, within the 2 mm review tolerance. A portable-capture rebuild matched
+the original gait plan to within 0.00014 mm. These checks catch the reported
+regressions; they do not establish correct form for other exercises.

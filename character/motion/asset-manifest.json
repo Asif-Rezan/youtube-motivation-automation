@@ -28,13 +28,18 @@
     },
     {
       "path": "character/blender/kat-rigify-walk-v1.blend",
-      "sha256": "988b242ee252ba2cf55aecf3c5ecc789f2f412dce3ac874cafadafac602fcf56",
-      "bytes": 139118043
+      "sha256": "459c4112126239df59f5c25e24c1e61e550fbf3d0007b4cf3a88ce4dbe7addbb",
+      "bytes": 139347876
     },
     {
       "path": "character/preview/kat-rigify-walk-10s.mp4",
-      "sha256": "042713fcdc88fff9a378e189f7e526a9cec99ebc4c90e4a966b3bdbd4bf32edb",
-      "bytes": 2971769
+      "sha256": "3e27daa579e552fdab8b9e3eef25c8cde9f16a27a55925ca8b341515c93a72ef",
+      "bytes": 2943371
+    },
+    {
+      "path": "character/motion/sources/rokoko-walk-native-bake.json",
+      "sha256": "68b05ee56a5b9e43d570c3e3b915011a9967d34123a0ae97841f22faf7e2eb5c",
+      "bytes": 1139020
     }
   ]
 }

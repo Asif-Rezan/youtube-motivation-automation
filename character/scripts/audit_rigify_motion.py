@@ -12,6 +12,8 @@ for frame in range(1,241):
         if n in previous:maximum[n]=max(maximum[n],math.degrees(2*math.acos(min(1,abs(q.dot(previous[n]))))))
         previous[n]=q
 assert max(maximum.values())<90,maximum
+if (out/'gait-plan.json').exists():
+    assert max(maximum['l_foot'],maximum['r_foot'])<20,('Walking ankle jerk returned',maximum)
 assert all(rig.pose.bones['thigh_parent.'+side]['IK_Stretch']==0 for side in ['L','R'])
 unpacked=[im.filepath for im in bpy.data.images if im.source=='FILE' and not im.packed_file]
 assert not unpacked,unpacked

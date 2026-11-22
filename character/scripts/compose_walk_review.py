@@ -29,6 +29,12 @@ with wave.open(str(P/'audio.wav'),'wb') as wav:
     wav.writeframes((np.clip(audio,-.95,.95)*32767).astype('<i2').tobytes())
 missing=[f for f in range(1,N+1) if not (P/'frames'/f'f-{f:04d}.png').exists()]
 if missing:raise RuntimeError(f'Missing frames {missing[:8]}')
+for f in range(1,N+1):
+    path=P/'frames'/f'f-{f:04d}.png'
+    try:
+        with Image.open(path) as frame:frame.load()
+    except (OSError,ValueError) as exc:
+        raise RuntimeError(f'Invalid rendered frame: {path}') from exc
 background=Image.open('/Users/asif/Documents/Projects/youtube-motivation-backup/environment/backgrounds/tropical-yoga-garden-v1.png').convert('RGBA').resize((W,H),Image.Resampling.LANCZOS)
 font=ImageFont.truetype('/System/Library/Fonts/Supplemental/Arial Bold.ttf',32)
 small=ImageFont.truetype('/System/Library/Fonts/Supplemental/Arial.ttf',24)

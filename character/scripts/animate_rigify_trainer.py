@@ -5,7 +5,7 @@ Legs use non-stretching IK with animated knee poles, not baked deform bones.
 """
 import bpy, json, os, math
 from pathlib import Path
-from mathutils import Matrix, Vector
+from mathutils import Matrix, Vector, Quaternion
 
 OUT=Path(os.environ.get('FITNESS_RIGIFY_DIR','/Users/asif/Documents/fitness-rigify-review'))
 s=bpy.context.scene; rig=bpy.data.objects['Trainer_Rigify']
@@ -43,12 +43,15 @@ for suffix in ['L','R']:
                                       'foot_ik','thigh_ik_target','toe_ik']]
 for name in controls:rig.pose.bones[name].rotation_mode='QUATERNION'
 errors=[]
+plan_path=OUT/'gait-plan.json'
+plan=json.loads(plan_path.read_text()) if plan_path.exists() else None
 for f in range(1,241):
     s.frame_set(f)
     # Reset control pose each frame so no iterative drift accumulates.
     for name in controls:rig.pose.bones[name].matrix_basis.identity()
     update()
     desired=target('hip','spine')
+    if plan:desired.translation.z=plan[f-1]['root_z']
     torso=rig.pose.bones['torso'];m=torso.matrix.copy()
     m.translation += desired.translation-rig.pose.bones['ORG-spine'].head
     torso.matrix=m;update()
@@ -63,6 +66,12 @@ for f in range(1,241):
                                 ('forearm','forearm','forearm_fk'),('hand','hand','hand_fk')]:
             orient(ctrl+'.'+suffix,org+'.'+suffix,target(side+'_'+native,org+'.'+suffix))
         foot=target(side+'_foot','foot.'+suffix)
+        if plan:
+            hip_delta=(source.matrix_world@source.pose.bones['hip'].matrix).to_quaternion()@rest['hip'].to_quaternion().inverted()
+            fw=hip_delta@Vector((0,-1,0));yaw=math.atan2(fw.x,-fw.y)
+            rotation=Quaternion((0,0,1),yaw)@Quaternion((1,0,0),plan[f-1]['feet'][side]['pitch'])
+            foot=(rotation.to_matrix().to_4x4()@rr['ORG-foot.'+suffix])
+            foot.translation=Vector(plan[f-1]['feet'][side]['goal'])
         # Foot control has its own rest axes and origin; solve its rigid delta.
         for _ in range(4):
             update();b=rig.pose.bones['foot_ik.'+suffix]
@@ -79,7 +88,40 @@ for f in range(1,241):
         b=rig.pose.bones['foot_ik.'+suffix]
         b.matrix=(foot@rig.pose.bones['ORG-foot.'+suffix].matrix.inverted())@b.matrix;update()
         orient('toe_ik.'+suffix,'toe.'+suffix,target(side+'_toes','toe.'+suffix))
+        if plan:
+            toe=rr['ORG-toe.'+suffix].copy()
+            toe=Quaternion((0,0,1),yaw).to_matrix().to_4x4()@toe
+            orient('toe_ik.'+suffix,'toe.'+suffix,toe)
         errors.append((rig.pose.bones['ORG-foot.'+suffix].head-foot.translation).length)
+    if plan:
+        delta=(source.matrix_world@source.pose.bones['hip'].matrix).to_quaternion()@rest['hip'].to_quaternion().inverted()
+        fw=delta@Vector((0,-1,0));fw.z=0;fw.normalize();right=Vector((0,0,1)).cross(fw).normalized()
+        yaw=math.atan2(fw.x,-fw.y)
+        # Keep the chest over the pelvis, retaining captured lateral sway.
+        for _ in range(3):
+            v=rig.pose.bones['ORG-spine.004'].head-rig.pose.bones['ORG-spine'].head
+            lean=math.atan2(v.dot(fw),v.z)
+            b=rig.pose.bones['spine_fk.002'];m=b.matrix.copy()
+            q=Quaternion(right,(math.radians(2)-lean)*1.65)@m.to_quaternion()
+            adjusted=q.to_matrix().to_4x4();adjusted.translation=m.translation;b.matrix=adjusted;update()
+        # Relaxed opposing arm swing follows the captured thigh phase. The old
+        # retarget left both upper arms behind the body with bent elbows.
+        for side,suffix,sign in [('l','L',1),('r','R',-1)]:
+            angle=plan[f-1]['arm_swing'][side]
+            for native,child,org,ctrl,theta in [('upperarm','forearm','upper_arm','upper_arm_fk',angle),
+                ('forearm','hand','forearm','forearm_fk',angle+math.radians(14)),('hand','mid1','hand','hand_fk',angle+math.radians(14))]:
+                direction=(right*sign*.10+fw*math.sin(theta)+Vector((0,0,-math.cos(theta)))).normalized()
+                original=(rest[side+'_'+child].translation-rest[side+'_'+native].translation).normalized()
+                desired_arm=original.rotation_difference(direction).to_matrix().to_4x4()@rr['ORG-'+org+'.'+suffix]
+                orient(ctrl+'.'+suffix,org+'.'+suffix,desired_arm)
+        for _ in range(3):
+            update();neck=rig.pose.bones['ORG-spine.004'].head;head=rig.pose.bones['ORG-spine.006'].head
+            v=head-neck;lean=math.atan2(v.dot(fw),v.z)
+            b=rig.pose.bones['neck'];m=b.matrix.copy()
+            q=Quaternion(right,math.radians(7)-lean)@m.to_quaternion()
+            m2=q.to_matrix().to_4x4();m2.translation=m.translation;b.matrix=m2;update()
+        head_target=Quaternion((0,0,1),yaw).to_matrix().to_4x4()@rr['ORG-spine.006']
+        orient('head','spine.006',head_target)
     for name in controls:key(name,f)
     if f%40==0:print('RIGIFY_FRAME',f,flush=True)
 

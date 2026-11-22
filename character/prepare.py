@@ -15,7 +15,7 @@ for source in (base / 'scripts').iterdir():
         continue
     text = source.read_text()
     text = text.replace('/Users/asif/Documents/Projects/youtube-motivation-backup',base.parent.as_posix())
-    for name in ('fitness-rigify-review','fitness-motion-library','fitness-rokoko-review','fitness-walk-review','fitness-pilates-review','fitness-garden-demo','fitness-mocap-sample'):
+    for name in ('fitness-rigify-upright-review','fitness-rigify-review','fitness-motion-library','fitness-rokoko-review','fitness-walk-review','fitness-pilates-review','fitness-garden-demo','fitness-mocap-sample'):
         text=text.replace('/Users/asif/Documents/'+name,(runtime/name).as_posix())
     text = text.replace('/Users/asif/Documents/DAZ 3D', runtime.as_posix())
     text = text.replace('/Users/Shared/My DAZ 3D Library', Path(args.daz_library).expanduser().as_posix())

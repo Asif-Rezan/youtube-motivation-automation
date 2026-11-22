@@ -1,8 +1,8 @@
 {
   "frames": 240,
-  "minimum_sole_z_m": -0.0012120312312617898,
-  "max_ankle_source_difference_m": 0.036371178090305385,
-  "max_root_step_m": 0.04228776808135003,
+  "minimum_sole_z_m": -7.699295383645222e-05,
+  "max_ankle_source_difference_m": 0.09684312378719866,
+  "max_root_step_m": 0.0405964112042251,
   "camera_cuts": 0,
   "note": "Geometry checks, not a certified exercise or full dynamics simulation."
 }

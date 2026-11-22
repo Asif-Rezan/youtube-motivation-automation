@@ -51,7 +51,11 @@ Files use ordinary Git LFS storage, with no encryption or recovery password.
 
 ## Open and update
 
-For Blender editing, open `blender/kat-rokoko-walk-v1.blend` in Blender 5.3 or newer.
+For Blender editing, open `blender/kat-rigify-walk-v1.blend` in Blender 5.3 or newer.
+Use `Trainer_Rigify` for body/foot controls and `Genesis9` for the retained native
+face/accessory rig. The current walking revision fixes the forward neck, missing
+arm counter-swing and frozen trailing foot that previously pulled the hips down.
+`blender/kat-rokoko-walk-v1.blend` remains the earlier baked source scene.
 The original render used Blender 4.5.16; the portable texture-packed backup was saved with 5.3.
 The main armature is `Genesis9`. Pose bones and the saved timeline contain the baked motion.
 Adjust camera, lighting, skin/hair materials, or garment materials, save the blend file,

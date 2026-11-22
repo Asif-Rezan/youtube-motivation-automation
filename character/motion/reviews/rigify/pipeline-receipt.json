@@ -1,0 +1,35 @@
+[
+  {
+    "stage": "animate",
+    "success": true
+  },
+  {
+    "stage": "contact",
+    "success": true
+  },
+  {
+    "stage": "review",
+    "success": true
+  },
+  {
+    "stage": "render",
+    "success": true
+  },
+  {
+    "stage": "render-repair",
+    "success": true,
+    "frames": [
+      139
+    ],
+    "reason": "PNG decompression failed; rerendered and decoded successfully"
+  },
+  {
+    "stage": "compose",
+    "success": true,
+    "frames": 240,
+    "fps": 24,
+    "width": 1920,
+    "height": 1080,
+    "duration_seconds": 10
+  }
+]

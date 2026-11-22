@@ -6,6 +6,8 @@ from bpy_extras.object_utils import world_to_camera_view
 OUT=Path(os.environ.get('FITNESS_RIGIFY_DIR','/Users/asif/Documents/fitness-rigify-review'))
 s=bpy.context.scene;rig=bpy.data.objects['Trainer_Rigify'];a=bpy.data.objects['Genesis9']
 src=bpy.data.objects['Rokoko_Baked_Source'];body=bpy.data.objects['Genesis9.Shape']
+plan_path=OUT/'gait-plan.json'
+plan=json.loads(plan_path.read_text()) if plan_path.exists() else None
 ids={side:[v.index for v in body.data.vertices if v.co.y<10 and (v.co.x>0)==(side=='l')] for side in ['l','r']}
 def update():bpy.context.view_layer.update()
 def soles():
@@ -28,7 +30,8 @@ for f in range(1,241):
     s.frame_set(f);update()
     for _ in range(3):
         for side,suffix in [('l','L'),('r','R')]:
-            goal=src.matrix_world@src.pose.bones[side+'_foot'].head
+            goal=(Vector(plan[f-1]['feet'][side]['goal']) if plan else
+                  src.matrix_world@src.pose.bones[side+'_foot'].head)
             actual=a.matrix_world@a.pose.bones[side+'_foot'].head
             b=rig.pose.bones['foot_ik.'+suffix];m=b.matrix.copy();m.translation+=goal-actual;b.matrix=m;update()
     # Skin movement differs slightly from control movement near full extension.

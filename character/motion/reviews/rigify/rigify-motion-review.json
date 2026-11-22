@@ -1,7 +1,7 @@
 {
   "frames": 240,
   "fps": 24,
-  "max_ankle_target_error_m": 0.07309199489144363,
+  "max_ankle_target_error_m": 0.07100713689060517,
   "leg_mode": "IK",
   "stretch": false,
   "controls_keyed": [
