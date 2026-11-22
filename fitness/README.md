@@ -77,3 +77,16 @@ recovery validates script/audio alignment, duration, thumbnail/title identity an
 non-publishing status. This resumes the same episode; fresh runs still create
 new AI ideas. Saved render checkpoints are restored when available. The final
 output still requires all 1,440 frames in the correct order and a full decode.
+
+
+AI workout prescription → native rig
+------------------------------------
+The AI package now prescribes each repetition's movement and duration, rather than
+writing copy over an independent fixed loop. `fitness/sequence.py` checks the
+exercise asset, allowed pace and exact 60-second total; it compiles output frames
+to fractional source frames. Voice cues, chapter times, overlays and rig animation
+all follow this prescription. The current verified asset supports heel raises at
+10/12/14 seconds per repetition. New exercise types need a reviewed motion asset
+before they can be executed. This is not automatic medical/form certification.
+The renderer is still Blender EEVEE; this sequencing change does not remove CPU
+render cost or promise realtime rendering. Fresh requests omit `source_run`.

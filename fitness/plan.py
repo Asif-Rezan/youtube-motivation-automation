@@ -18,7 +18,7 @@ SCHEMA=obj(idea=string(350),title=string(95),description=string(1800),
         angle=dict(type='string',enum=['front','three_quarter']),
         layout=dict(type='string',enum=['split','diagonal','inset'])),
     cycles=dict(type='array',minItems=5,maxItems=5,items=obj(
-        chapter=string(50),ready=TEXT,lift=TEXT,hold=TEXT,lower=TEXT,reset=TEXT)))
+        movement=dict(type='string',enum=['heel_raise']),duration=dict(type='integer',enum=[10,12,14]),chapter=string(50),ready=TEXT,lift=TEXT,hold=TEXT,lower=TEXT,reset=TEXT)))
 TIMING=[('ready',0,2.0),('lift',2.2,1.9),('hold',4.3,1.8),('lower',6.3,2.2),('reset',8.7,3.0)]
 
 def validate(plan):
@@ -32,6 +32,8 @@ def validate(plan):
     for cycle in plan['cycles']:
         for name,_,_ in TIMING:
             if not 2<=len(cycle[name].split())<=6:raise ValueError('Coaching cues need 2–6 words')
+    from fitness.sequence import compile_sequence
+    compile_sequence(plan)
     return plan
 
 def generate(out,run_id):
@@ -50,8 +52,8 @@ def generate(out,run_id):
         return saved
     seed=int.from_bytes(hashlib.sha256(run_id.encode()).digest()[:4],'big')%(2**31-3)
     prompt=('Create a fresh English adult fitness video package, NOT kids content. '
-        'The duration is exactly ONE MINUTE: five consecutive 12-second gentle standing '
-        'heel-raise repetitions. Only this reviewed motion is available for this preview. '
+        'The duration is exactly ONE MINUTE: five consecutive controlled standing '
+        'heel-raise repetitions. YOU choose each repetition duration: 10, 12 or 14 seconds, totaling exactly 60 seconds. Each cycle must set movement=heel_raise and duration. Select pacing to fit your title and coaching; avoid sudden fast movement. Only this reviewed motion is available for this preview. '
         'No squats, walking, floor exercises, jumping or movements absent from the animation. '
         'Choose a distinctive idea/audience/angle such as a desk break, morning reset, balance '
         'practice or a calm calf warm-up. All copy must match the actual gentle heel raises. '
@@ -59,7 +61,7 @@ def generate(out,run_id):
         'power word RESET, BOOST, WAKE, QUICK, EASY, SIMPLE or POWER. Write a useful original '
         'description prose (chapter timestamps are added automatically) and 8–15 distinct specific SEO tags (under 450 combined characters). '
         'Each cycle has a chapter and five spoken coaching cues: ready at 0s, lift at 2.2s, '
-        'hold at 4.3s, lower at 6.3s, reset at 8.7s. Every cue MUST have only 2–6 words; '
+        'hold at 4.3s, lower at 6.3s, reset at 8.7s on a 12-second reference cycle; cue timing scales with your chosen duration. Every cue MUST have only 2–6 words; '
         'use short natural language and vary the encouragement between repetitions. '
         'No promises of weight loss, a changed physique, cures, guaranteed results or invented research. '
         'The music prompt is ORIGINAL upbeat instrumental workout music, no vocals, suitable under speech. '
@@ -86,11 +88,13 @@ def generate(out,run_id):
         except (ValueError,ValidationError) as error:
             failures.append(' Correct this validation issue in the complete replacement JSON: '+str(error))
     else:raise ValueError('AI fitness plan failed bounded validation')
-    chapters='\n'.join(f'0:{i*12:02d} {c["chapter"]}' for i,c in enumerate(plan['cycles']))
+    from fitness.sequence import compile_sequence, narration
+    sequence=compile_sequence(plan)
+    chapters='\n'.join(f'0:{row["start_frame"]//24:02d} {c["chapter"]}' for row,c in zip(sequence,plan['cycles']))
     plan.update(run_id=run_id,seconds=60,fps=24,resolution=[1920,1080],movement='heel_raise',
         creative_seed=seed,publish=False,chapters=chapters,
-        narration=[dict(start=i*12+t,window=window,text=c[name],phase=name,rep=i+1)
-                   for i,c in enumerate(plan['cycles']) for name,t,window in TIMING],
+        workout_sequence=sequence,animation_pipeline='ai-sequence-to-native-rig-v1',
+        narration=narration(plan,TIMING),
         models=dict(planning='Qwen/Qwen3-4B-Instruct-2507',voice='hexgrad/Kokoro-82M',music='ACE-Step/Ace-Step1.5'))
     plan['description']+='\n\nChapters\n'+chapters+'\n\nAI-created virtual instructor, narration and original instrumental music.\n#StandingWorkout #CalfRaises #FitnessBreak'
     plan['youtube']=dict(snippet=dict(title=plan['title'],description=plan['description'],tags=plan['tags'],

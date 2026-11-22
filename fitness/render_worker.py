@@ -44,7 +44,7 @@ def execute_process(command,**kwargs):
 def run(out,index,blender,source,*,execute=execute_process,count=FRAMES_PER_SHARD,batch=BATCH_FRAMES,timeout=1800):
     if not 0<=index<SHARDS or not 1<=count<=FRAMES_PER_SHARD or batch<1:raise ValueError('Invalid render shard bounds')
     folder=out/f'render-{index:02d}';folder.mkdir(parents=True,exist_ok=True)
-    paths=[source,out/'speech-envelope.json',Path(__file__).with_name('render_character.py')]
+    paths=[source,out/'speech-envelope.json',Path(__file__).with_name('render_character.py'),Path(__file__).with_name('sequence.py')]
     plan=json.loads((out/'plan.json').read_text())
     for key in ['run_id','recovery_source_run']:plan.pop(key,None)
     identity_data=json.dumps(plan,sort_keys=True,separators=(',',':')).encode()

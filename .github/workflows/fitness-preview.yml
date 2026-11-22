@@ -295,7 +295,7 @@ jobs:
           run-id: ${{ needs.plan.outputs.source_run }}
           github-token: ${{ github.token }}
           path: ${{ env.FITNESS_OUTPUT }}/${{ env.FITNESS_RENDER_FOLDER }}/
-      - name: Render continuous source motion, voice-aligned face and skin contacts
+      - name: Animate AI workout sequence on the native rig and render validated contacts
         id: render
         run: |
           python -u -m fitness.render_worker --out "$FITNESS_OUTPUT" --index "$FITNESS_SHARD"
@@ -421,7 +421,7 @@ jobs:
           from pathlib import Path
           plan=json.loads(Path('output/fitness-preview/plan.json').read_text())
           with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
-              f.write('## '+plan['title']+'\n\n60 seconds · 1080p · 24 fps · 5 continuous gentle heel raises.\n\nQwen idea/script/SEO, Kokoro voice, original ACE-Step music, native face animation and AI-directed before/after thumbnail.\n\nDownload the production preview artifact. YouTube/Facebook publishing is disabled for this review.\n')
+              f.write('## '+plan['title']+'\n\n60 seconds · 1080p · 24 fps · AI-paced native-rig heel-raise sequence.\n\nQwen idea/script/SEO, Kokoro voice, original ACE-Step music, native face animation and AI-directed before/after thumbnail.\n\nDownload the production preview artifact. YouTube/Facebook publishing is disabled for this review.\n')
           PY
   archive:
     name: Archive and checksum-verify private Drive preview

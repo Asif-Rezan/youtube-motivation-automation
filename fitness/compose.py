@@ -29,7 +29,10 @@ def check_frame(path):
         im.load()
         if im.size!=SIZE:raise ValueError('Rendered character frame has wrong resolution: '+str(path))
 def ui(im,plan,frame):
-    t=frame/24;cycle=min(4,int(t//12));phase=t%12
+    from .sequence import compile_sequence
+    sequence=compile_sequence(plan)
+    row=next(r for r in sequence if r['start_frame']<=frame<r['start_frame']+r['frames'])
+    t=frame/24;cycle=row['rep']-1;phase=(frame-row['start_frame'])/row['frames']*12
     name=next((n for n,start,end in [('ready',0,2.2),('lift',2.2,4.3),('hold',4.3,6.3),('lower',6.3,8.7),('reset',8.7,12)] if start<=phase<end),'reset')
     layer=Image.new('RGBA',SIZE);d=ImageDraw.Draw(layer)
     d.rounded_rectangle((40,22,1880,88),20,fill=(12,29,26,225))

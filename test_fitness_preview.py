@@ -12,7 +12,7 @@ def package():
         music_prompt='Original upbeat instrumental with soft percussion and warm synths, no vocals.',bpm=112,
         thumbnail=dict(headline='READY TO RISE?',before_label='AT REST',after_label='HEELS UP',focus='full_body',accent_hue=190,
             before_frame=1,after_frame=120,angle='three_quarter',layout='diagonal'),
-        cycles=[dict(chapter='Controlled raise '+str(i+1),ready='Stand comfortably tall',lift='Lift heels slowly',hold='Pause at the top',lower='Lower with control',reset='Breathe and reset') for i in range(5)])
+        cycles=[dict(movement='heel_raise',duration=12,chapter='Controlled raise '+str(i+1),ready='Stand comfortably tall',lift='Lift heels slowly',hold='Pause at the top',lower='Lower with control',reset='Breathe and reset') for i in range(5)])
 def response(data):return dict(choices=[dict(message=dict(content=json.dumps(data)))])
 
 class FitnessPreviewTests(unittest.TestCase):

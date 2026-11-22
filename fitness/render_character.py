@@ -7,9 +7,10 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT));sys.path.insert(0,str(ROOT/'character/scripts'))
 from rig_repairs import repair_mouth_chain
 from fitness.timeline import FRAMES_PER_SHARD
+from fitness.sequence import source_frame, compile_sequence
 
 out=Path(os.environ.get('FITNESS_OUTPUT','output/fitness-preview'));index=int(os.environ.get('FITNESS_SHARD','0'))
-plan=json.loads((out/'plan.json').read_text());s=bpy.context.scene
+plan=json.loads((out/'plan.json').read_text());sequence=compile_sequence(plan);s=bpy.context.scene
 a=bpy.data.objects['Genesis9'];body=bpy.data.objects['Genesis9.Shape']
 repair_mouth_chain(a,bpy.data.objects['Genesis9Mouth.Shape'])
 assert bpy.app.version>=(5,3,0),'The packed character needs Blender 5.3+'
@@ -43,7 +44,8 @@ for frame in range(start,start+count):
     path=parts/f'f-{frame:04d}.png';checkpoint=parts/f'f-{frame:04d}.json'
     if path.exists() and checkpoint.exists():
         rows.append(json.loads(checkpoint.read_text()));continue
-    s.frame_set(frame%288+1);t=frame/24
+    source=source_frame(sequence,frame)
+    s.frame_set(int(source),subframe=source-int(source));t=frame/24
     amount=envelope[frame]*.22
     body.data.shape_keys.key_blocks['JawOpen'].value=amount
     for formula in formulas:
@@ -72,7 +74,7 @@ for frame in range(start,start+count):
         feet[side]=dict(height=low,points=points)
     ob.to_mesh_clear()
     if minimum<-.002:raise RuntimeError('Native foot mesh penetrates the yoga deck')
-    row=dict(frame=frame,feet=feet);rows.append(row)
+    row=dict(frame=frame,feet=feet,source_frame=source);rows.append(row)
     # Do not load each rendered PNG back into the live EEVEE image/GPU cache.
     # The separate Python supervisor fully decodes it after this worker exits.
     temporary=path.with_suffix('.partial.png');s.render.filepath=str(temporary)
