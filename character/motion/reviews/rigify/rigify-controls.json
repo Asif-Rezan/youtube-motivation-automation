@@ -1,0 +1,370 @@
+{
+  "root": {
+    "parent": null,
+    "properties": {}
+  },
+  "VIS_upper_arm_ik_pole.L": {
+    "parent": "root",
+    "properties": {}
+  },
+  "VIS_upper_arm_ik_pole.R": {
+    "parent": "root",
+    "properties": {}
+  },
+  "VIS_thigh_ik_pole.L": {
+    "parent": "root",
+    "properties": {}
+  },
+  "VIS_thigh_ik_pole.R": {
+    "parent": "root",
+    "properties": {}
+  },
+  "torso": {
+    "parent": "MCH-torso.parent",
+    "properties": {
+      "neck_follow": "0.5",
+      "head_follow": "0.0",
+      "torso_parent": "1"
+    }
+  },
+  "hips": {
+    "parent": "torso",
+    "properties": {}
+  },
+  "chest": {
+    "parent": "torso",
+    "properties": {}
+  },
+  "spine_fk.001": {
+    "parent": "MCH-spine.001",
+    "properties": {}
+  },
+  "spine_fk": {
+    "parent": "MCH-spine",
+    "properties": {}
+  },
+  "tweak_spine": {
+    "parent": "spine_fk",
+    "properties": {}
+  },
+  "foot_tweak.L": {
+    "parent": "MCH-foot_tweak.L",
+    "properties": {}
+  },
+  "shin_tweak.L": {
+    "parent": "MCH-shin_tweak.L",
+    "properties": {
+      "rubber_tweak": "0.0"
+    }
+  },
+  "shin_tweak.L.001": {
+    "parent": "MCH-shin_tweak.L.001",
+    "properties": {
+      "rubber_tweak": "1.0"
+    }
+  },
+  "thigh_tweak.L.001": {
+    "parent": "MCH-thigh_tweak.L.001",
+    "properties": {
+      "rubber_tweak": "1.0"
+    }
+  },
+  "foot_tweak.R": {
+    "parent": "MCH-foot_tweak.R",
+    "properties": {}
+  },
+  "shin_tweak.R": {
+    "parent": "MCH-shin_tweak.R",
+    "properties": {
+      "rubber_tweak": "0.0"
+    }
+  },
+  "shin_tweak.R.001": {
+    "parent": "MCH-shin_tweak.R.001",
+    "properties": {
+      "rubber_tweak": "1.0"
+    }
+  },
+  "thigh_tweak.R.001": {
+    "parent": "MCH-thigh_tweak.R.001",
+    "properties": {
+      "rubber_tweak": "1.0"
+    }
+  },
+  "thigh_parent.L": {
+    "parent": "ORG-spine",
+    "properties": {
+      "FK_limb_follow": "0.0",
+      "IK_FK": "0.0",
+      "IK_Stretch": "1.0",
+      "pole_vector": "False",
+      "IK_parent": "1",
+      "pole_parent": "3"
+    }
+  },
+  "thigh_fk.L": {
+    "parent": "MCH-thigh_parent.L",
+    "properties": {}
+  },
+  "shin_fk.L": {
+    "parent": "thigh_fk.L",
+    "properties": {}
+  },
+  "foot_fk.L": {
+    "parent": "MCH-foot_fk.L",
+    "properties": {}
+  },
+  "toe_fk.L": {
+    "parent": "MCH-toe_fk.L",
+    "properties": {}
+  },
+  "thigh_ik.L": {
+    "parent": "MCH-thigh_ik_swing.L",
+    "properties": {}
+  },
+  "thigh_tweak.L": {
+    "parent": "MCH-thigh_tweak.L",
+    "properties": {}
+  },
+  "thigh_parent.R": {
+    "parent": "ORG-spine",
+    "properties": {
+      "FK_limb_follow": "0.0",
+      "IK_FK": "0.0",
+      "IK_Stretch": "1.0",
+      "pole_vector": "False",
+      "IK_parent": "1",
+      "pole_parent": "3"
+    }
+  },
+  "thigh_fk.R": {
+    "parent": "MCH-thigh_parent.R",
+    "properties": {}
+  },
+  "shin_fk.R": {
+    "parent": "thigh_fk.R",
+    "properties": {}
+  },
+  "foot_fk.R": {
+    "parent": "MCH-foot_fk.R",
+    "properties": {}
+  },
+  "toe_fk.R": {
+    "parent": "MCH-toe_fk.R",
+    "properties": {}
+  },
+  "thigh_ik.R": {
+    "parent": "MCH-thigh_ik_swing.R",
+    "properties": {}
+  },
+  "thigh_tweak.R": {
+    "parent": "MCH-thigh_tweak.R",
+    "properties": {}
+  },
+  "tweak_spine.001": {
+    "parent": "spine_fk",
+    "properties": {}
+  },
+  "spine_fk.002": {
+    "parent": "MCH-spine.002",
+    "properties": {}
+  },
+  "tweak_spine.002": {
+    "parent": "MCH-pivot",
+    "properties": {}
+  },
+  "spine_fk.003": {
+    "parent": "MCH-spine.003",
+    "properties": {}
+  },
+  "neck": {
+    "parent": "MCH-ROT-neck",
+    "properties": {}
+  },
+  "head": {
+    "parent": "MCH-ROT-head",
+    "properties": {}
+  },
+  "tweak_spine.004": {
+    "parent": "neck",
+    "properties": {}
+  },
+  "tweak_spine.005": {
+    "parent": "MCH-spine.005",
+    "properties": {}
+  },
+  "tweak_spine.003": {
+    "parent": "spine_fk.003",
+    "properties": {}
+  },
+  "hand_tweak.L": {
+    "parent": "MCH-hand_tweak.L",
+    "properties": {}
+  },
+  "forearm_tweak.L": {
+    "parent": "MCH-forearm_tweak.L",
+    "properties": {
+      "rubber_tweak": "0.0"
+    }
+  },
+  "forearm_tweak.L.001": {
+    "parent": "MCH-forearm_tweak.L.001",
+    "properties": {
+      "rubber_tweak": "1.0"
+    }
+  },
+  "upper_arm_tweak.L.001": {
+    "parent": "MCH-upper_arm_tweak.L.001",
+    "properties": {
+      "rubber_tweak": "1.0"
+    }
+  },
+  "upper_arm_parent.L": {
+    "parent": "ORG-shoulder.L",
+    "properties": {
+      "FK_limb_follow": "0.0",
+      "IK_FK": "0.0",
+      "IK_Stretch": "1.0",
+      "pole_vector": "False",
+      "IK_parent": "1",
+      "pole_parent": "6"
+    }
+  },
+  "upper_arm_fk.L": {
+    "parent": "MCH-upper_arm_parent.L",
+    "properties": {}
+  },
+  "forearm_fk.L": {
+    "parent": "upper_arm_fk.L",
+    "properties": {}
+  },
+  "hand_fk.L": {
+    "parent": "MCH-hand_fk.L",
+    "properties": {}
+  },
+  "upper_arm_ik.L": {
+    "parent": "MCH-upper_arm_ik_swing.L",
+    "properties": {}
+  },
+  "upper_arm_tweak.L": {
+    "parent": "MCH-upper_arm_tweak.L",
+    "properties": {}
+  },
+  "hand_tweak.R": {
+    "parent": "MCH-hand_tweak.R",
+    "properties": {}
+  },
+  "forearm_tweak.R": {
+    "parent": "MCH-forearm_tweak.R",
+    "properties": {
+      "rubber_tweak": "0.0"
+    }
+  },
+  "forearm_tweak.R.001": {
+    "parent": "MCH-forearm_tweak.R.001",
+    "properties": {
+      "rubber_tweak": "1.0"
+    }
+  },
+  "upper_arm_tweak.R.001": {
+    "parent": "MCH-upper_arm_tweak.R.001",
+    "properties": {
+      "rubber_tweak": "1.0"
+    }
+  },
+  "upper_arm_parent.R": {
+    "parent": "ORG-shoulder.R",
+    "properties": {
+      "FK_limb_follow": "0.0",
+      "IK_FK": "0.0",
+      "IK_Stretch": "1.0",
+      "pole_vector": "False",
+      "IK_parent": "1",
+      "pole_parent": "6"
+    }
+  },
+  "upper_arm_fk.R": {
+    "parent": "MCH-upper_arm_parent.R",
+    "properties": {}
+  },
+  "forearm_fk.R": {
+    "parent": "upper_arm_fk.R",
+    "properties": {}
+  },
+  "hand_fk.R": {
+    "parent": "MCH-hand_fk.R",
+    "properties": {}
+  },
+  "upper_arm_ik.R": {
+    "parent": "MCH-upper_arm_ik_swing.R",
+    "properties": {}
+  },
+  "upper_arm_tweak.R": {
+    "parent": "MCH-upper_arm_tweak.R",
+    "properties": {}
+  },
+  "shoulder.L": {
+    "parent": "ORG-spine.003",
+    "properties": {}
+  },
+  "shoulder.R": {
+    "parent": "ORG-spine.003",
+    "properties": {}
+  },
+  "hand_ik.L": {
+    "parent": "MCH-hand_ik.parent.L",
+    "properties": {}
+  },
+  "upper_arm_ik_target.L": {
+    "parent": "MCH-upper_arm_ik_target.parent.L",
+    "properties": {}
+  },
+  "hand_ik.R": {
+    "parent": "MCH-hand_ik.parent.R",
+    "properties": {}
+  },
+  "upper_arm_ik_target.R": {
+    "parent": "MCH-upper_arm_ik_target.parent.R",
+    "properties": {}
+  },
+  "foot_ik.L": {
+    "parent": "MCH-foot_ik.parent.L",
+    "properties": {}
+  },
+  "foot_spin_ik.L": {
+    "parent": "foot_ik.L",
+    "properties": {}
+  },
+  "foot_heel_ik.L": {
+    "parent": "foot_spin_ik.L",
+    "properties": {}
+  },
+  "toe_ik.L": {
+    "parent": "MCH-toe_ik_parent.L",
+    "properties": {}
+  },
+  "thigh_ik_target.L": {
+    "parent": "MCH-thigh_ik_target.parent.L",
+    "properties": {}
+  },
+  "foot_ik.R": {
+    "parent": "MCH-foot_ik.parent.R",
+    "properties": {}
+  },
+  "foot_spin_ik.R": {
+    "parent": "foot_ik.R",
+    "properties": {}
+  },
+  "foot_heel_ik.R": {
+    "parent": "foot_spin_ik.R",
+    "properties": {}
+  },
+  "toe_ik.R": {
+    "parent": "MCH-toe_ik_parent.R",
+    "properties": {}
+  },
+  "thigh_ik_target.R": {
+    "parent": "MCH-thigh_ik_target.parent.R",
+    "properties": {}
+  }
+}

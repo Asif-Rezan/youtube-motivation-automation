@@ -19,6 +19,8 @@ skin, eyes, hair, clothing binding, and contact before admitting any new motion.
 
 See [ROKOKO_WORKFLOW.md](ROKOKO_WORKFLOW.md) for the recommended current workflow and
 [PILATES_REVIEW.md](PILATES_REVIEW.md) for the heel-raise review.
+The new [Rigify workflow](RIGIFY_WORKFLOW.md) adds editable body controls while
+retaining the native Daz face, hair and garment bindings.
 
 ## Pull the real files
 
@@ -33,6 +35,9 @@ git lfs fsck
 
 `blender/kat-rokoko-walk-v1.blend` is the current editable walking scene with packed textures.
 `blender/kat-heel-raise-v1.blend` is the current editable single-camera heel-raise scene.
+`blender/kat-rigify-walk-v1.blend` adds the fitted Rigify control rig, independent
+Rokoko source and editable leg IK/poles. Its review video is
+`preview/kat-rigify-walk-10s.mp4`.
 `blender/kat-animated.blend` preserves the earlier gesture scene with packed image textures.
 `blender/kat-outfit-trainer.fbx` is the Daz export used to construct it.
 `daz/` contains both saved Daz outfit scenes. Version 2 is the latest saved scene;

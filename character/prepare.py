@@ -15,7 +15,7 @@ for source in (base / 'scripts').iterdir():
         continue
     text = source.read_text()
     text = text.replace('/Users/asif/Documents/Projects/youtube-motivation-backup',base.parent.as_posix())
-    for name in ('fitness-rokoko-review','fitness-walk-review','fitness-pilates-review','fitness-garden-demo','fitness-mocap-sample'):
+    for name in ('fitness-rigify-review','fitness-motion-library','fitness-rokoko-review','fitness-walk-review','fitness-pilates-review','fitness-garden-demo','fitness-mocap-sample'):
         text=text.replace('/Users/asif/Documents/'+name,(runtime/name).as_posix())
     text = text.replace('/Users/asif/Documents/DAZ 3D', runtime.as_posix())
     text = text.replace('/Users/Shared/My DAZ 3D Library', Path(args.daz_library).expanduser().as_posix())
@@ -35,12 +35,13 @@ for name in ('kat-animated.blend', 'eyes-composite.png'):
         raise SystemExit(f'{source.name} is still a Git LFS pointer; run git lfs pull first.')
     shutil.copy2(source, demo / name)
 shutil.copy2(base / 'blender/kat-outfit-trainer.fbx', runtime / 'kat-outfit-trainer.fbx')
-for name,asset in [('fitness-rokoko-review','kat-rokoko-walk-v1.blend'),('fitness-walk-review','kat-rokoko-walk-v1.blend'),('fitness-pilates-review','kat-heel-raise-v1.blend')]:
+for name,asset in [('fitness-rigify-review','kat-rigify-walk-v1.blend'),('fitness-rokoko-review','kat-rokoko-walk-v1.blend'),('fitness-walk-review','kat-rokoko-walk-v1.blend'),('fitness-pilates-review','kat-heel-raise-v1.blend')]:
     source=base/'blender'/asset
     if source.stat().st_size<200:
         raise SystemExit(f'{asset} is still a Git LFS pointer; run git lfs pull first.')
     folder=runtime/name;folder.mkdir(exist_ok=True)
-    filename='kat-heel-raise-final.blend' if name=='fitness-pilates-review' else 'kat-continuous-walk-final.blend'
+    filename=('kat-rigify-final.blend' if name=='fitness-rigify-review' else
+              'kat-heel-raise-final.blend' if name=='fitness-pilates-review' else 'kat-continuous-walk-final.blend')
     shutil.copy2(source,folder/filename)
 sources=runtime/'fitness-walk-review/sources';sources.mkdir(exist_ok=True)
 shutil.copy2(base/'motion/sources/36_02.bvh',sources/'36_02.bvh')

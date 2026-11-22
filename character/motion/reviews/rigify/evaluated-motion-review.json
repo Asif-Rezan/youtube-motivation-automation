@@ -1,0 +1,15 @@
+{
+  "evaluated_max_rotation_step_degrees": {
+    "hip": 6.334987452291472,
+    "head": 12.177899178014092,
+    "l_thigh": 16.867735363716562,
+    "r_thigh": 22.780302978810898,
+    "l_shin": 16.664691455796376,
+    "r_shin": 13.383452303277865,
+    "l_foot": 17.563621516841028,
+    "r_foot": 28.532455765106025
+  },
+  "packed_file_images": true,
+  "stretch_disabled": true,
+  "motion_source_preserved": true
+}

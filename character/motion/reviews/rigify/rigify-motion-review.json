@@ -1,0 +1,31 @@
+{
+  "frames": 240,
+  "fps": 24,
+  "max_ankle_target_error_m": 0.07309199489144363,
+  "leg_mode": "IK",
+  "stretch": false,
+  "controls_keyed": [
+    "torso",
+    "spine_fk",
+    "spine_fk.001",
+    "spine_fk.002",
+    "spine_fk.003",
+    "neck",
+    "head",
+    "shoulder.L",
+    "upper_arm_fk.L",
+    "forearm_fk.L",
+    "hand_fk.L",
+    "foot_ik.L",
+    "thigh_ik_target.L",
+    "toe_ik.L",
+    "shoulder.R",
+    "upper_arm_fk.R",
+    "forearm_fk.R",
+    "hand_fk.R",
+    "foot_ik.R",
+    "thigh_ik_target.R",
+    "toe_ik.R"
+  ],
+  "review_status": "Requires visual and sole-contact review"
+}

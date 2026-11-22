@@ -4,8 +4,10 @@ import json,math,subprocess,wave,os
 import numpy as np
 from PIL import Image,ImageDraw,ImageFont,ImageFilter
 P=Path(os.environ.get('FITNESS_REVIEW_DIR','/Users/asif/Documents/fitness-walk-review'));FPS=24;N=240;W,H=1920,1080;RATE=48000
-rows=json.loads((P/'walk-metrics.json').read_text())
 contacts=json.loads((P/'contact-shadows.json').read_text())
+metrics=P/'walk-metrics.json'
+rows=(json.loads(metrics.read_text()) if metrics.exists() else
+      [{'feet':{side:{'contact':feet[side]['height']<.015} for side in ['l','r']}} for feet in contacts])
 audio=np.zeros(RATE*10,dtype=np.float32)
 for beat in range(17):
     start=round(beat*.6*RATE)
@@ -30,7 +32,7 @@ if missing:raise RuntimeError(f'Missing frames {missing[:8]}')
 background=Image.open('/Users/asif/Documents/Projects/youtube-motivation-backup/environment/backgrounds/tropical-yoga-garden-v1.png').convert('RGBA').resize((W,H),Image.Resampling.LANCZOS)
 font=ImageFont.truetype('/System/Library/Fonts/Supplemental/Arial Bold.ttf',32)
 small=ImageFont.truetype('/System/Library/Fonts/Supplemental/Arial.ttf',24)
-output=P/'kat-continuous-human-walk-10s.mp4'
+output=P/os.environ.get('FITNESS_VIDEO_NAME','kat-continuous-human-walk-10s.mp4')
 proc=subprocess.Popen(['ffmpeg','-y','-v','error','-f','rawvideo','-pix_fmt','rgb24','-s','1920x1080','-r','24','-i','-',
     '-i',str(P/'audio.wav'),'-c:v','libx264','-threads','3','-preset','fast','-crf','17','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-t','10','-movflags','+faststart',str(output)],stdin=subprocess.PIPE)
 for f,row in enumerate(rows,1):
@@ -44,7 +46,7 @@ for f,row in enumerate(rows,1):
     ui=Image.new('RGBA',(W,H));d=ImageDraw.Draw(ui)
     d.rounded_rectangle((42,30,815,124),radius=16,fill=(14,35,29,225))
     d.text((66,43),'WALK · TURN · WALK BACK',font=font,fill=(255,246,222))
-    d.text((68,87),'Captured body motion · Fixed camera',font=small,fill=(214,231,216))
+    d.text((68,87),os.environ.get('FITNESS_REVIEW_LABEL','Captured body motion · Fixed camera'),font=small,fill=(214,231,216))
     d.rounded_rectangle((42,1007,912,1059),radius=14,fill=(14,35,29,215))
     d.text((62,1018),'CMU body motion · Heel-to-toe foot roll · Foot contact IK',font=small,fill='white')
     im.alpha_composite(ui);proc.stdin.write(im.convert('RGB').tobytes())
