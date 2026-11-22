@@ -1,0 +1,92 @@
+[
+  {
+    "bone": "lowerjaw",
+    "channel": "translation/z",
+    "coefficient": 0.45
+  },
+  {
+    "bone": "lowerjaw",
+    "channel": "rotation/x",
+    "coefficient": 20
+  },
+  {
+    "bone": "l_lipcorner",
+    "channel": "translation/x",
+    "coefficient": -0.25
+  },
+  {
+    "bone": "l_lipcorner",
+    "channel": "translation/y",
+    "coefficient": 1.5
+  },
+  {
+    "bone": "l_lipcorner",
+    "channel": "translation/z",
+    "coefficient": -0.5
+  },
+  {
+    "bone": "l_liplower",
+    "channel": "translation/y",
+    "coefficient": -0.2
+  },
+  {
+    "bone": "l_liplower",
+    "channel": "translation/z",
+    "coefficient": -0.1
+  },
+  {
+    "bone": "liplowermiddle",
+    "channel": "translation/y",
+    "coefficient": -0.2
+  },
+  {
+    "bone": "liplowermiddle",
+    "channel": "translation/z",
+    "coefficient": -0.2
+  },
+  {
+    "bone": "r_liplower",
+    "channel": "translation/y",
+    "coefficient": -0.2
+  },
+  {
+    "bone": "r_liplower",
+    "channel": "translation/z",
+    "coefficient": -0.1
+  },
+  {
+    "bone": "r_lipcorner",
+    "channel": "translation/x",
+    "coefficient": 0.25
+  },
+  {
+    "bone": "r_lipcorner",
+    "channel": "translation/y",
+    "coefficient": 1.5
+  },
+  {
+    "bone": "r_lipcorner",
+    "channel": "translation/z",
+    "coefficient": -0.5
+  },
+  {
+    "bone": "r_cheeklower",
+    "channel": "translation/x",
+    "coefficient": 0.787813
+  },
+  {
+    "bone": "r_cheeklower",
+    "channel": "translation/z",
+    "coefficient": -1
+  },
+  {
+    "bone": "l_lipupper",
+    "channel": "translation/y",
+    "coefficient": -0.3797468
+  },
+  {
+    "bone": "r_lipupper",
+    "channel": "translation/y",
+    "coefficient": -0.2
+  }
+]

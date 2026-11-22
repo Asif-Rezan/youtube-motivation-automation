@@ -1,0 +1,346 @@
+name: Fitness production preview · 60 seconds
+run-name: AI fitness preview · ${{ github.run_id }} · no publishing
+on:
+  push:
+    branches: [main]
+    paths: [.generation/fitness-preview-request.json]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: fitness-production-preview
+  cancel-in-progress: false
+env:
+  FITNESS_OUTPUT: output/fitness-preview
+  HF_HUB_DISABLE_XET: '1'
+  HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+  OMP_NUM_THREADS: '2'
+jobs:
+  plan:
+    name: AI idea, coaching script, SEO and unique thumbnail brief
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt -r requirements-lyrics.txt
+      - name: Generate fresh one-minute fitness episode with Qwen
+        run: python -u -m fitness.plan --out "$FITNESS_OUTPUT" --run-id "$GITHUB_RUN_ID"
+      - uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: fitness-plan
+          path: output/fitness-preview/*.json
+          retention-days: 1
+          if-no-files-found: error
+  character:
+    name: Verify packed character and real headless Blender render
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Download only the selected packed character from Git LFS
+        run: |
+          git lfs pull --include='character/blender/kat-heel-raise-v1.blend' --exclude=''
+          python character/verify_assets.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install verified Blender and software display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libegl1 libgl1 libxkbcommon0 libxi6 libxrender1 libxxf86vm1 mesa-vulkan-drivers
+          bash scripts/install-fitness-blender.sh
+      - name: Render a real character frame before spawning workers
+        run: |
+          mkdir -p output/fitness-preflight
+          xvfb-run -a "$FITNESS_BLENDER" -b character/blender/kat-heel-raise-v1.blend --python-expr "import bpy; s=bpy.context.scene; s.render.engine='BLENDER_EEVEE'; s.eevee.taa_render_samples=16; s.render.resolution_percentage=25; s.render.filepath='output/fitness-preflight/character.png'; bpy.ops.render.render(write_still=True)" > output/fitness-preflight/blender.log 2>&1
+          if grep -q 'Traceback (most recent call last)' output/fitness-preflight/blender.log; then cat output/fitness-preflight/blender.log; exit 1; fi
+          test -s output/fitness-preflight/character.png
+      - uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: fitness-character
+          path: character/blender/kat-heel-raise-v1.blend
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          overwrite: true
+          name: fitness-character-preflight
+          path: output/fitness-preflight/
+          retention-days: 1
+  voice:
+    name: AI coaching voice and synchronized speech envelope
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg espeak-ng
+          pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt -r requirements-wildlife.txt soundfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: fitness-plan
+          path: output/fitness-preview
+      - run: python -u -m fitness.audio voice --out "$FITNESS_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: fitness-voice
+          path: |
+            output/fitness-preview/voice.wav
+            output/fitness-preview/speech-envelope.json
+            output/fitness-preview/voice-cues.json
+          if-no-files-found: error
+          retention-days: 1
+  music:
+    name: Original AI instrumental background music
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    env:
+      ACESTEP_SOURCE_DIR: ${{ github.workspace }}/.vendor/ace-step
+      ACESTEP_CHECKPOINTS_DIR: .models/acestep
+      ACESTEP_INIT_LLM: 'false'
+      CUDA_VISIBLE_DEVICES: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ace-step/ACE-Step-1.5
+          ref: ca1e85fe9430179831e6bc6be790c332190a3866
+          path: .vendor/ace-step
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare CPU music runtime and swap
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libsndfile1
+          sudo fallocate -l 16G /swapfile-fitness-music
+          sudo chmod 600 /swapfile-fitness-music
+          sudo mkswap /swapfile-fitness-music
+          sudo swapon /swapfile-fitness-music
+          pip install --no-cache-dir torch==2.10.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install --no-cache-dir -r requirements.txt -r requirements-music-cpu.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: fitness-plan
+          path: output/fitness-preview
+      - run: python -u -m fitness.audio music --out "$FITNESS_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          overwrite: true
+          name: fitness-music
+          path: |
+            output/fitness-preview/music*.wav
+            output/fitness-preview/music-state.json
+          retention-days: 1
+  visuals:
+    name: Blender scene · ${{ matrix.shard }}
+    needs: [plan, character, voice]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    env:
+      FITNESS_SHARD: ${{ matrix.shard }}
+      LIBGL_ALWAYS_SOFTWARE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg xvfb libegl1 libgl1 libxkbcommon0 libxi6 libxrender1 libxxf86vm1 mesa-vulkan-drivers fonts-dejavu-core
+          pip install -r requirements-wildlife-render.txt
+          bash scripts/install-fitness-blender.sh
+      - uses: actions/download-artifact@v4
+        with:
+          name: fitness-character
+          path: character/blender
+      - uses: actions/download-artifact@v4
+        with:
+          name: fitness-plan
+          path: output/fitness-preview
+      - uses: actions/download-artifact@v4
+        with:
+          name: fitness-voice
+          path: output/fitness-preview
+      - name: Render continuous source motion, voice-aligned face and skin contacts
+        run: |
+          xvfb-run -a "$FITNESS_BLENDER" -b character/blender/kat-heel-raise-v1.blend --python fitness/render_character.py > "$FITNESS_OUTPUT/blender-$FITNESS_SHARD.log" 2>&1
+          if grep -q 'Traceback (most recent call last)' "$FITNESS_OUTPUT/blender-$FITNESS_SHARD.log"; then cat "$FITNESS_OUTPUT/blender-$FITNESS_SHARD.log"; exit 1; fi
+          python -u -m fitness.compose shard --out "$FITNESS_OUTPUT" --index "$FITNESS_SHARD"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          overwrite: true
+          name: fitness-scene-${{ matrix.shard }}
+          path: |
+            output/fitness-preview/visual-*.mp4
+            output/fitness-preview/render-*/render-review.json
+            output/fitness-preview/blender-*.log
+          retention-days: 1
+          if-no-files-found: error
+  thumbnail:
+    name: AI-directed BEFORE / AFTER thumbnail
+    needs: [plan, character]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      LIBGL_ALWAYS_SOFTWARE: '1'
+      FITNESS_THUMBNAIL: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libegl1 libgl1 libxkbcommon0 libxi6 libxrender1 libxxf86vm1 mesa-vulkan-drivers fonts-dejavu-core
+          pip install -r requirements-wildlife-render.txt
+          bash scripts/install-fitness-blender.sh
+      - uses: actions/download-artifact@v4
+        with:
+          name: fitness-character
+          path: character/blender
+      - uses: actions/download-artifact@v4
+        with:
+          name: fitness-plan
+          path: output/fitness-preview
+      - run: |
+          xvfb-run -a "$FITNESS_BLENDER" -b character/blender/kat-heel-raise-v1.blend --python fitness/render_character.py > "$FITNESS_OUTPUT/thumbnail-render.log" 2>&1
+          if grep -q 'Traceback (most recent call last)' "$FITNESS_OUTPUT/thumbnail-render.log"; then cat "$FITNESS_OUTPUT/thumbnail-render.log"; exit 1; fi
+          python -m fitness.compose thumbnail --out "$FITNESS_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          overwrite: true
+          name: fitness-thumbnail
+          path: |
+            output/fitness-preview/thumbnail*.jpg
+            output/fitness-preview/thumbnail*.png
+            output/fitness-preview/thumbnail*.json
+            output/fitness-preview/thumbnail-render.log
+          retention-days: 1
+  assemble:
+    name: Master voice + AI music, verify 60 seconds, export preview
+    needs: [plan, voice, music, visuals, thumbnail]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          pip install -r requirements-wildlife-render.txt
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: fitness-*
+          merge-multiple: true
+          path: output/fitness-preview
+      - run: python -u -m fitness.compose assemble --out "$FITNESS_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: fitness-production-preview-${{ github.run_id }}
+          path: |
+            output/fitness-preview/fitness-preview.mp4
+            output/fitness-preview/thumbnail.jpg
+            output/fitness-preview/thumbnail.png
+            output/fitness-preview/plan.json
+            output/fitness-preview/metadata.json
+            output/fitness-preview/quality-report.json
+            output/fitness-preview/voice-cues.json
+            output/fitness-preview/thumbnail-brief.json
+          retention-days: 14
+          if-no-files-found: error
+      - name: Write preview review summary
+        run: |
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          plan=json.loads(Path('output/fitness-preview/plan.json').read_text())
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
+              f.write('## '+plan['title']+'\n\n60 seconds · 1080p · 24 fps · 5 continuous gentle heel raises.\n\nQwen idea/script/SEO, Kokoro voice, original ACE-Step music, native face animation and AI-directed before/after thumbnail.\n\nDownload the production preview artifact. YouTube/Facebook publishing is disabled for this review.\n')
+          PY
+  archive:
+    name: Archive and checksum-verify private Drive preview
+    needs: assemble
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: fitness-production-preview-${{ github.run_id }}
+          path: output/fitness-preview
+      - run: |
+          python -u -m fitness.archive archive --out "$FITNESS_OUTPUT" --run-id "$GITHUB_RUN_ID"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          overwrite: true
+          name: fitness-archive-${{ github.run_id }}
+          path: |
+            output/fitness-preview/archive-receipt.json
+          retention-days: 14
+  cleanup:
+    name: Drive cleanup · preserve the verified final preview
+    needs: archive
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: python -u -m fitness.archive cleanup --out "$FITNESS_OUTPUT" --run-id "$GITHUB_RUN_ID"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          overwrite: true
+          name: fitness-cleanup-${{ github.run_id }}
+          path: output/fitness-preview/cleanup-report.json
+          retention-days: 14

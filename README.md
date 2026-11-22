@@ -1,5 +1,25 @@
 # Wildlife simulation videos
 
+## One-minute AI fitness production preview
+
+**Fitness production preview · 60 seconds** is the new review workflow. It uses
+the saved Kat character, continuous standing heel raises and the approved garden.
+Qwen generates a fresh idea, timed coaching script, title, description, chapters,
+SEO tags and before/after thumbnail brief. Kokoro generates the female coaching
+voice; ACE-Step synthesizes original instrumental music. Blender renders native
+blink/jaw movement and 12 parallel five-second 1080p shards. The final master
+ducks music under speech, checks all 1,440 frames, creates a 1920×1080 thumbnail,
+archives the private preview in Drive and runs the separate cleanup audit.
+
+Every new run has a fresh AI brief. Drive history rejects repeated titles and
+thumbnail headlines; thumbnail layout, pose frames, focus, camera angle, palette
+and text come from that episode's brief. Re-running the same run restores its
+saved plan, so partial retries do not combine different ideas.
+
+This preview **does not publish to YouTube or Facebook**, enable daily scheduling,
+or start the later ten-minute episode. Review the artifact first. See
+[fitness/README.md](fitness/README.md) for the workflow and limits.
+
 ## Character editing and scheduling status
 
 Daily video generation is **disabled**. Manual workflow dispatch remains available.
