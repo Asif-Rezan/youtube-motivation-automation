@@ -2,6 +2,7 @@
 import argparse,colorsys,json,math,subprocess
 from pathlib import Path
 from PIL import Image,ImageDraw,ImageFont,ImageFilter,ImageEnhance,ImageOps
+from .timeline import FRAMES_PER_SHARD,SHARDS
 ROOT=Path(__file__).resolve().parents[1]
 SIZE=(1920,1080)
 def font(size):
@@ -31,8 +32,8 @@ def ui(im,plan,frame):
     t=frame/24;cycle=min(4,int(t//12));phase=t%12
     name=next((n for n,start,end in [('ready',0,2.2),('lift',2.2,4.3),('hold',4.3,6.3),('lower',6.3,8.7),('reset',8.7,12)] if start<=phase<end),'reset')
     layer=Image.new('RGBA',SIZE);d=ImageDraw.Draw(layer)
-    d.rounded_rectangle((40,28,1880,118),24,fill=(12,29,26,225))
-    title=plan['title'];d.text((68,49),title,font=textfit(d,title,1780,39),fill='white')
+    d.rounded_rectangle((40,22,1880,88),20,fill=(12,29,26,225))
+    title=plan['title'];d.text((68,35),title,font=textfit(d,title,1780,33),fill='white')
     d.rounded_rectangle((1340,210,1875,600),28,fill=(13,34,29,225))
     d.text((1370,239),f'REP {cycle+1} / 5',font=font(37),fill=(255,219,104))
     cue=plan['cycles'][cycle][name];words=cue.split();lines=['']
@@ -49,6 +50,8 @@ def ui(im,plan,frame):
 def shard(out,index):
     plan=json.loads((out/'plan.json').read_text());folder=out/f'render-{index:02d}'
     contacts=json.loads((folder/'contacts.json').read_text());bg=background()
+    expected=list(range(index*FRAMES_PER_SHARD,(index+1)*FRAMES_PER_SHARD))
+    if [row['frame'] for row in contacts]!=expected:raise ValueError('Missing, duplicated or out-of-order render frames')
     for row in contacts:check_frame(folder/f'f-{row["frame"]:04d}.png')
     target=out/f'visual-{index:02d}.mp4'
     proc=subprocess.Popen(['ffmpeg','-v','error','-y','-f','rawvideo','-pix_fmt','rgb24','-s','1920x1080','-r','24','-i','-',
@@ -64,7 +67,7 @@ def shard(out,index):
             im=ui(im,plan,row['frame']);proc.stdin.write(im.convert('RGB').tobytes())
     finally:proc.stdin.close()
     if proc.wait():raise RuntimeError('Fitness video encoding failed')
-    if len(contacts)!=120:raise ValueError('A production shard must contain exactly 120 frames')
+    if len(contacts)!=FRAMES_PER_SHARD:raise ValueError(f'A production shard must contain exactly {FRAMES_PER_SHARD} frames')
 
 def thumbnail(out):
     plan=json.loads((out/'plan.json').read_text());brief=plan['thumbnail'];bg=background();im=Image.new('RGB',SIZE)
@@ -115,7 +118,7 @@ def thumbnail(out):
 
 def assemble(out):
     listing=out/'visuals.txt'
-    listing.write_text(''.join(f"file '{(out/f'visual-{i:02d}.mp4').resolve()}'\n" for i in range(12)))
+    listing.write_text(''.join(f"file '{(out/f'visual-{i:02d}.mp4').resolve()}'\n" for i in range(SHARDS)))
     subprocess.run(['ffmpeg','-v','error','-y','-f','concat','-safe','0','-i',str(listing),'-i',str(out/'voice.wav'),'-i',str(out/'music.wav'),
         '-filter_complex','[1:a]highpass=f=70,loudnorm=I=-17:TP=-2:LRA=7,asplit=2[v][side];[2:a]volume=0.18[m];[m][side]sidechaincompress=threshold=0.025:ratio=6:attack=20:release=400[duck];[v][duck]amix=inputs=2:normalize=0,loudnorm=I=-16:TP=-1:LRA=8[a]',
         '-map','0:v','-map','[a]','-c:v','copy','-c:a','aac','-b:a','192k','-ar','48000','-t','60','-movflags','+faststart',str(out/'fitness-preview.mp4')],check=True)

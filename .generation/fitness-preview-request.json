@@ -1,7 +1,9 @@
 {
-  "requested_at": "2026-11-22T05:48:54.842010+00:00",
+  "requested_at": "2026-11-22T09:41:48.990307+00:00",
   "seconds": 60,
   "mode": "production-preview",
   "publish": false,
-  "thumbnail": "fresh-ai-directed-before-after"
+  "thumbnail": "fresh-ai-directed-before-after",
+  "source_run": "44991138121",
+  "reason": "Recover Blender native crash with checkpointed short render batches"
 }

@@ -5,7 +5,7 @@ changing `.generation/fitness-preview-request.json` on main also starts a fresh
 run. Daily scheduling remains disabled; no publishing credentials are used.
 
 The graph runs Qwen planning and a real Linux Blender preflight, followed by
-Kokoro voice, ACE-Step music, 12 Blender workers, the title-specific thumbnail,
+Kokoro voice, ACE-Step music, 20 Blender workers, the title-specific thumbnail,
 final assembly, private Drive archive and a separate Drive cleanup audit.
 
 The preview is exactly 60 seconds, 1920×1080, 24 fps, with five continuous
@@ -54,3 +54,26 @@ The uploaded metadata marks English audio, Sports category, not made for kids,
 no paid product placement and synthetic content. Privacy is private, and the
 preview never calls either publishing API. The later ten-minute publish run
 requires the user's review and request.
+
+## Native render crash recovery
+
+The first Linux run hit Blender exit 139 after roughly 30 frames in a long
+process. The renderer now starts a fresh Blender process every 12 frames, uses
+32 EEVEE samples at the same 1080p/24 fps, and avoids loading rendered PNGs back
+into the live EEVEE image cache. Independent Python code fully decodes each PNG
+and checks its geometry metadata before accepting it.
+
+Each frame and its contact metadata are written atomically. A crashed batch
+restarts only missing/invalid frames, up to three attempts. Complete validated
+outputs may survive an abnormal renderer shutdown; a Python traceback or
+semantic error always stops the job. Timeouts terminate the process group,
+including the Blender/Xvfb children. Input fingerprints prevent mixing caches
+from different scripts, characters or voice envelopes. Failure artifacts keep
+completed checkpoints and per-attempt logs.
+
+The `source_run` manual input, or the same field in the push request, restores
+successful plan, voice, music and thumbnail artifacts from a failed run. The
+recovery validates script/audio alignment, duration, thumbnail/title identity and
+non-publishing status. This resumes the same episode; fresh runs still create
+new AI ideas. Saved render checkpoints are restored when available. The final
+output still requires all 1,440 frames in the correct order and a full decode.

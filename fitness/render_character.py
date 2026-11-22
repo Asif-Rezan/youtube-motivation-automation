@@ -6,6 +6,7 @@ from bpy_extras.object_utils import world_to_camera_view
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT));sys.path.insert(0,str(ROOT/'character/scripts'))
 from rig_repairs import repair_mouth_chain
+from fitness.timeline import FRAMES_PER_SHARD
 
 out=Path(os.environ.get('FITNESS_OUTPUT','output/fitness-preview'));index=int(os.environ.get('FITNESS_SHARD','0'))
 plan=json.loads((out/'plan.json').read_text());s=bpy.context.scene
@@ -16,7 +17,7 @@ assert not [im.name for im in bpy.data.images if im.source=='FILE' and not im.pa
 for im in bpy.data.images:
     if im.source=='FILE' and max(im.size)>2048:
         scale=2048/max(im.size);im.scale(round(im.size[0]*scale),round(im.size[1]*scale))
-s.render.engine='BLENDER_EEVEE';s.eevee.taa_render_samples=48
+s.render.engine='BLENDER_EEVEE';s.eevee.taa_render_samples=32
 s.render.resolution_x=1920;s.render.resolution_y=1080;s.render.resolution_percentage=100
 s.render.film_transparent=True;s.render.image_settings.file_format='PNG';s.render.image_settings.color_mode='RGBA'
 thumb=os.environ.get('FITNESS_THUMBNAIL')=='1'
@@ -36,8 +37,12 @@ formulas=json.loads((ROOT/'fitness/facial-rig.json').read_text())
 parts=out/f'render-{index:02d}';parts.mkdir(parents=True,exist_ok=True)
 rows=[];minimum=1e6;indices={side:[v.index for v in body.data.vertices if v.co.y<10 and (v.co.x>0)==(side=='l')] for side in ['l','r']}
 seed=plan['creative_seed']%100/100
-start=index*120;count=int(os.environ.get('FITNESS_FRAME_COUNT','120'))
+start=int(os.environ.get('FITNESS_FRAME_FIRST',str(index*FRAMES_PER_SHARD)))
+count=int(os.environ.get('FITNESS_FRAME_COUNT',str(FRAMES_PER_SHARD)))
 for frame in range(start,start+count):
+    path=parts/f'f-{frame:04d}.png';checkpoint=parts/f'f-{frame:04d}.json'
+    if path.exists() and checkpoint.exists():
+        rows.append(json.loads(checkpoint.read_text()));continue
     s.frame_set(frame%288+1);t=frame/24
     amount=envelope[frame]*.22
     body.data.shape_keys.key_blocks['JawOpen'].value=amount
@@ -67,17 +72,14 @@ for frame in range(start,start+count):
         feet[side]=dict(height=low,points=points)
     ob.to_mesh_clear()
     if minimum<-.002:raise RuntimeError('Native foot mesh penetrates the yoga deck')
-    rows.append(dict(frame=frame,feet=feet))
-    path=parts/f'f-{frame:04d}.png';s.render.filepath=str(path)
-    for attempt in range(2):
-        bpy.ops.render.render(write_still=True)
-        # Loading through Blender catches truncated PNGs before shipping the shard.
-        try:
-            test=bpy.data.images.load(str(path),check_existing=False);_ = test.pixels[0]
-            bpy.data.images.remove(test);break
-        except RuntimeError:
-            if attempt:raise
-    if (frame-start)%24==0:print('FITNESS_FRAME',frame,flush=True)
+    row=dict(frame=frame,feet=feet);rows.append(row)
+    # Do not load each rendered PNG back into the live EEVEE image/GPU cache.
+    # The separate Python supervisor fully decodes it after this worker exits.
+    temporary=path.with_suffix('.partial.png');s.render.filepath=str(temporary)
+    bpy.ops.render.render(write_still=True)
+    os.replace(temporary,path)
+    meta=checkpoint.with_suffix('.json.part');meta.write_text(json.dumps(row));os.replace(meta,checkpoint)
+    print('FITNESS_FRAME_CHECKPOINT',frame,flush=True)
 (parts/'contacts.json').write_text(json.dumps(rows))
 (parts/'render-review.json').write_text(json.dumps(dict(frames=count,first_frame=start,minimum_sole_z_m=minimum,
     fps=24,resolution=[1920,1080],speech_animation='Audio-aligned native jaw and corrective morph; timed eyelid blink')))

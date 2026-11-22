@@ -7,7 +7,7 @@ the saved Kat character, continuous standing heel raises and the approved garden
 Qwen generates a fresh idea, timed coaching script, title, description, chapters,
 SEO tags and before/after thumbnail brief. Kokoro generates the female coaching
 voice; ACE-Step synthesizes original instrumental music. Blender renders native
-blink/jaw movement and 12 parallel five-second 1080p shards. The final master
+blink/jaw movement and 20 parallel three-second 1080p shards. The final master
 ducks music under speech, checks all 1,440 frames, creates a 1920×1080 thumbnail,
 archives the private preview in Drive and runs the separate cleanup audit.
 
