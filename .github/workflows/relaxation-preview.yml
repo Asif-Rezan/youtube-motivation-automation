@@ -1,0 +1,202 @@
+name: AI relaxation preview · rain garden
+run-name: Relaxation preview · ${{ github.run_id }} · no publishing
+on:
+  push:
+    branches: [main]
+    paths: [.generation/relaxation-preview-request.json]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: relaxation-preview
+  cancel-in-progress: false
+env:
+  RELAX_OUT: output/relaxation-preview
+  HF_HUB_DISABLE_XET: '1'
+  HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+  OMP_NUM_THREADS: '4'
+  MKL_NUM_THREADS: '4'
+jobs:
+  plan:
+    name: Prepare six-scene private relaxation preview
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install numpy Pillow
+      - run: python -m relaxation.preview plan --out "$RELAX_OUT" --run-id "$GITHUB_RUN_ID"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: relaxation-plan
+          path: output/relaxation-preview/plan.json
+          overwrite: true
+          retention-days: 7
+  images:
+    name: AI nature background · ${{ matrix.scene }}
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        scene: [0, 1, 2, 3, 4, 5]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned CPU image runtime
+        run: |
+          sudo fallocate -l 8G /swapfile-relax-images
+          sudo chmod 600 /swapfile-relax-images
+          sudo mkswap /swapfile-relax-images
+          sudo swapon /swapfile-relax-images
+          pip install --no-cache-dir torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install --no-cache-dir -r requirements-relaxation.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: relaxation-plan
+          path: output/relaxation-preview
+      - name: Generate original AI landscape on CPU
+        env:
+          SCENE_INDEX: ${{ matrix.scene }}
+        run: python -u -m relaxation.preview image --out "$RELAX_OUT" --index "$SCENE_INDEX"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: relaxation-scene-${{ matrix.scene }}
+          path: output/relaxation-preview/scene-*.png
+          overwrite: true
+          retention-days: 7
+  music:
+    name: AI ambient piano and pads · ACE-Step CPU
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    env:
+      ACESTEP_SOURCE_DIR: ${{ github.workspace }}/.vendor/ace-step
+      ACESTEP_CHECKPOINTS_DIR: .models/acestep
+      ACESTEP_INIT_LLM: 'false'
+      CUDA_VISIBLE_DEVICES: ''
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: ace-step/ACE-Step-1.5
+          ref: ca1e85fe9430179831e6bc6be790c332190a3866
+          path: .vendor/ace-step
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare CPU audio runtime and swap
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libsndfile1
+          sudo fallocate -l 16G /swapfile-relax-music
+          sudo chmod 600 /swapfile-relax-music
+          sudo mkswap /swapfile-relax-music
+          sudo swapon /swapfile-relax-music
+          pip install --no-cache-dir torch==2.10.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install --no-cache-dir -r requirements.txt -r requirements-music-cpu.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: relaxation-plan
+          path: output/relaxation-preview
+      - run: python -u -m relaxation.preview music --out "$RELAX_OUT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: relaxation-ai-music
+          path: |
+            output/relaxation-preview/music-original.wav
+            output/relaxation-preview/music-state.json
+            output/relaxation-preview/worker-resources.txt
+          overwrite: true
+          retention-days: 7
+  nature:
+    name: AI gentle rain · AudioLDM CPU · private evaluation
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install CPU nature sound model runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsndfile1
+          sudo fallocate -l 8G /swapfile-relax-rain
+          sudo chmod 600 /swapfile-relax-rain
+          sudo mkswap /swapfile-relax-rain
+          sudo swapon /swapfile-relax-rain
+          pip install --no-cache-dir torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install --no-cache-dir -r requirements-relaxation.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: relaxation-plan
+          path: output/relaxation-preview
+      - run: python -u -m relaxation.preview nature --out "$RELAX_OUT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: relaxation-ai-rain
+          path: |
+            output/relaxation-preview/rain-original.wav
+            output/relaxation-preview/nature-license.txt
+          overwrite: true
+          retention-days: 7
+  assemble:
+    name: Mix, dissolve every ten seconds, validate and deliver sample
+    needs: [plan, images, music, nature]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libsndfile1
+          pip install numpy Pillow scipy soundfile
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: relaxation-*
+          merge-multiple: true
+          path: output/relaxation-preview
+      - run: python -u -m relaxation.preview compose --out "$RELAX_OUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: relaxation-preview-60s-${{ github.run_id }}
+          path: |
+            output/relaxation-preview/rain-garden-60s.mp4
+            output/relaxation-preview/scene-preview.jpg
+            output/relaxation-preview/plan.json
+            output/relaxation-preview/quality-report.json
+            output/relaxation-preview/nature-license.txt
+          overwrite: true
+          retention-days: 14
+      - name: Summarize private preview
+        run: |
+          python - <<'PY'
+          import os
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
+              f.write('## Rain Garden relaxation preview\n\n60 seconds · 720p · 24 FPS · six distinct AI images, changing every 10 seconds with soft dissolves.\n\nACE-Step instrumental + AudioLDM rain, crossfaded to full length. No narration, Blender, publication or recurring schedule.\n\nDownload the relaxation-preview-60s artifact. AudioLDM rain uses CC-BY-NC-SA-4.0; private noncommercial evaluation only. Replace this sound model or obtain suitable rights before commercial production.\n')
+          PY
