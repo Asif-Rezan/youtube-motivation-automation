@@ -108,7 +108,7 @@ def generate(out,run,seed_fn,seconds=60,image_count=6):
   nature_license='CC-BY-NC-SA-4.0: noncommercial evaluation only; do not publish or monetize this preview',
   audio_design='Original AI piano plus three distinct AI rain takes with quality-screened segments and long overlaps',image_source_size=[1024,576],art_style=STYLE_ID,version=2)
  for i,s in enumerate(data['scenes']):
-  s.update(index=i,start=i*10,duration=10,seed=seed_fn(run,i),prompt=f"{ART_DIRECTION} {data['environment']}. {data['lighting']}. Colours: {data['palette']}. Gentle rain, same coherent location and weather. {s['view']}. Balanced storybook proportions, refined 3D detail, no people, no writing.")
+  s.update(index=i,start=i*10,duration=10,seed=seed_fn(run,i),prompt=f"Bright polished 3D storybook nature illustration, vivid colours. {data['environment']}. {s['view']}. Soft luminous light, dimensional foliage, rich balanced colours, layered depth. {data['lighting']}. Palette: {data['palette']}. Gentle rain, no people or text.")
  data['music_prompt']='Gentle sparse felt piano, warm ambient pads, slow peaceful tempo, no drums, no vocals or speech. '+data['music_prompt']
  if seconds==60:
   data['chapters']='\n'.join(f'0:{i*10:02d} {s["chapter"]}' for i,s in enumerate(data['scenes']))
