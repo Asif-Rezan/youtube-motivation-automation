@@ -225,7 +225,7 @@ def compose(out):
  sheet.save(out/'scene-preview.jpg',quality=92);print(json.dumps(report),flush=True)
 
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('stage',choices=['plan','image','music','nature','compose']);p.add_argument('--out',type=Path,default=Path('output/relaxation-preview'));p.add_argument('--run-id',default='local');p.add_argument('--index',type=int,choices=range(6),default=0)
+ p=argparse.ArgumentParser();p.add_argument('stage',choices=['plan','image','music','nature','compose']);p.add_argument('--out',type=Path,default=Path('output/relaxation-preview'));p.add_argument('--run-id',default='local');p.add_argument('--index',type=int,choices=range(20),default=0)
  a=p.parse_args();a.out.mkdir(parents=True,exist_ok=True)
  if a.stage=='plan':plan(a.out,a.run_id)
  elif a.stage=='image':image(a.out,a.index)

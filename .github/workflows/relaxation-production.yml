@@ -1,0 +1,267 @@
+name: Three-hour AI relaxation draft · 20 parallel workers
+run-name: Three-hour relaxation draft · ${{ github.run_id }} · no publishing
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: relaxation-production-draft
+  cancel-in-progress: false
+env:
+  RELAX_OUT: output/relaxation-production
+  HF_HUB_DISABLE_XET: '1'
+  HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+  OMP_NUM_THREADS: '4'
+  MKL_NUM_THREADS: '4'
+jobs:
+  plan:
+    name: AI three-hour concept, twenty views, twelve chapters and SEO
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    env:
+      DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt -r requirements-lyrics.txt
+      - run: python -u -m relaxation.production plan --out "$RELAX_OUT" --run-id "$GITHUB_RUN_ID"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: long-plan
+          path: output/relaxation-production/*.json
+          overwrite: true
+          retention-days: 7
+  images:
+    name: AI landscape and depth · ${{ matrix.image }}
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        image: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          sudo fallocate -l 8G /swapfile-relax-image
+          sudo chmod 600 /swapfile-relax-image
+          sudo mkswap /swapfile-relax-image
+          sudo swapon /swapfile-relax-image
+          pip install --no-cache-dir torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install --no-cache-dir -r requirements-relaxation.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: long-plan
+          path: output/relaxation-production
+      - env:
+          IMAGE_INDEX: ${{ matrix.image }}
+        run: python -u -m relaxation.preview image --out "$RELAX_OUT" --index "$IMAGE_INDEX"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: long-image-${{ matrix.image }}
+          path: |
+            output/relaxation-production/scene-*.png
+            output/relaxation-production/depth-*.png
+          overwrite: true
+          retention-days: 7
+  music:
+    name: Original AI piano · parallel with images and rain
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    env:
+      ACESTEP_SOURCE_DIR: ${{ github.workspace }}/.vendor/ace-step
+      ACESTEP_CHECKPOINTS_DIR: .models/acestep
+      ACESTEP_INIT_LLM: 'false'
+      CUDA_VISIBLE_DEVICES: ''
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: ace-step/ACE-Step-1.5
+          ref: ca1e85fe9430179831e6bc6be790c332190a3866
+          path: .vendor/ace-step
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libsndfile1
+          sudo fallocate -l 16G /swapfile-relax-music
+          sudo chmod 600 /swapfile-relax-music
+          sudo mkswap /swapfile-relax-music
+          sudo swapon /swapfile-relax-music
+          pip install --no-cache-dir torch==2.10.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install --no-cache-dir -r requirements.txt -r requirements-music-cpu.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: long-plan
+          path: output/relaxation-production
+      - run: python -u -m relaxation.preview music --out "$RELAX_OUT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: long-music
+          path: |
+            output/relaxation-production/music-original.wav
+            output/relaxation-production/music-state.json
+          overwrite: true
+          retention-days: 7
+  rain:
+    name: AI rain candidates · parallel with piano and images
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libsndfile1
+          pip install --no-cache-dir torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install --no-cache-dir -r requirements-relaxation.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: long-plan
+          path: output/relaxation-production
+      - run: python -u -m relaxation.preview nature --out "$RELAX_OUT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: long-rain
+          path: |
+            output/relaxation-production/rain*.wav
+            output/relaxation-production/rain-review.json
+            output/relaxation-production/nature-license.txt
+          overwrite: true
+          retention-days: 7
+  clips:
+    name: Reusable visual clips · ${{ matrix.image }}
+    needs: [plan, images]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        image: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          pip install numpy Pillow
+      - uses: actions/download-artifact@v4
+        with:
+          name: long-plan
+          path: output/relaxation-production
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: long-image-*
+          merge-multiple: true
+          path: output/relaxation-production
+      - env:
+          IMAGE_INDEX: ${{ matrix.image }}
+        run: python -u -m relaxation.production clips --out "$RELAX_OUT" --index "$IMAGE_INDEX"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: long-clips-${{ matrix.image }}
+          path: output/relaxation-production/clip-*.mp4
+          overwrite: true
+          retention-days: 7
+  audio:
+    name: Continuous three-hour audio · parallel with clip rendering
+    needs: [plan, music, rain]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libsndfile1
+          pip install numpy Pillow scipy soundfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: long-plan
+          path: output/relaxation-production
+      - uses: actions/download-artifact@v4
+        with:
+          name: long-music
+          path: output/relaxation-production
+      - uses: actions/download-artifact@v4
+        with:
+          name: long-rain
+          path: output/relaxation-production
+      - run: python -u -m relaxation.production audio --out "$RELAX_OUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: long-audio
+          path: |
+            output/relaxation-production/production-audio.m4a
+            output/relaxation-production/nature-license.txt
+          overwrite: true
+          retention-days: 7
+  assemble:
+    name: Fast concat · 3 hours · chapters and metadata · no publishing
+    needs: [plan, images, clips, audio]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          pip install numpy Pillow
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: long-*
+          merge-multiple: true
+          path: output/relaxation-production
+      - run: python -u -m relaxation.production assemble --out "$RELAX_OUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: three-hour-relaxation-draft-${{ github.run_id }}
+          path: |
+            output/relaxation-production/relaxation-3-hours.mp4
+            output/relaxation-production/thumbnail.jpg
+            output/relaxation-production/metadata.json
+            output/relaxation-production/plan.json
+            output/relaxation-production/chapters.txt
+            output/relaxation-production/production-report.json
+            output/relaxation-production/nature-license.txt
+          compression-level: 0
+          retention-days: 7

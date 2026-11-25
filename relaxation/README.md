@@ -64,3 +64,29 @@ Successful generation can be reused through `relaxation-recover.yml` by setting
 its recovery request to the source run ID. Old version-1 assets remain readable
 by the compositor. Model inference still takes CPU time; no real-time inference
 or guaranteed rain-quality claim is made.
+
+
+## Three-hour draft workflow (manual only)
+
+`relaxation-production.yml` is configured for exactly 10,800 seconds, with up to
+20 parallel image/depth workers and up to 20 parallel reusable-clip workers,
+subject to account concurrency limits. Music and rain generation run alongside
+images; long audio rendering runs alongside reusable visual rendering.
+
+Qwen creates a fresh full-length package, twenty coherent views and twelve
+content-appropriate chapter titles. The 1,080 ten-second slots reuse twenty
+images (54 times each), never on consecutive slots. Four pan/zoom variants per
+image give eighty reusable ten-second clips. The image order is shuffled once
+per episode and then cycles, making its two-second transitions reusable too.
+Final assembly concatenates already encoded clips without rendering all three
+hours again. Chapters start at 00:00, 15:00, …, 02:45:00 and appear both in the
+AI description and embedded MP4 chapter metadata. Titles must match the actual
+shared piano/rain theme; no invented ocean/waterfall audio is claimed.
+
+The draft reuses the generated short piano/rain beds to cover three hours; it
+does not generate three hours of distinct original composition. Intermediate
+artifacts expire in seven days. This workflow has no publishing or schedule and
+was not triggered when adding these settings: the one-minute review remains
+the current preview. Signal/schedule tests and a synthetic full-duration concat test validate
+three-hour timing and embedded chapters; a real three-hour AI production render
+has not been run. The noncommercial nature-model restriction still applies.

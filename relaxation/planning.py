@@ -1,5 +1,5 @@
 """Fresh Qwen relaxation concepts, coherent art direction and persisted diversity."""
-import json,re
+import json,re,copy
 from difflib import SequenceMatcher
 from pathlib import Path
 from jsonschema import validate as check,ValidationError
@@ -14,23 +14,34 @@ SCHEMA=obj(idea=text(300),concept_id=text(90),title=text(95),description=text(16
  water_region=dict(type='string',enum=['none','lower_left','lower_center','lower_right']))))
 INITIAL_HISTORY=[dict(title='Rain Garden — Gentle Piano & Soft Rain',idea='Tropical rainforest garden, lotus pond and bamboo with gentle piano and rain',concept_id='tropical-rain-garden',environment='tropical rainforest garden')]
 def normalize(s):return ' '.join(re.findall(r'[a-z0-9]+',s.lower()))
-def validate(data,history):
- check(data,SCHEMA)
- if not re.search(r'(?:1[ -]minute|one[ -]minute|60[ -]seconds?)',data['title'],re.I):raise ValueError('Title must accurately state the one-minute preview length')
+def schema_for(seconds=60,image_count=6):
+ schema=copy.deepcopy(SCHEMA)
+ schema['properties']['scenes'].update(minItems=image_count,maxItems=image_count)
+ schema['properties']['thumbnail']['properties']['scene_index']['maximum']=image_count-1
+ if seconds>60:
+  count=(seconds+899)//900
+  schema['properties']['chapter_titles']=dict(type='array',items=text(50),minItems=count,maxItems=count)
+  schema['required'].append('chapter_titles')
+ return schema
+
+def validate(data,history,seconds=60,image_count=6):
+ check(data,schema_for(seconds,image_count))
+ duration_pattern=r'(?:1[ -]minute|one[ -]minute|60[ -]seconds?)' if seconds==60 else r'(?:3[ -]hours?|three[ -]hours?|180[ -]minutes?)'
+ if not re.search(duration_pattern,data['title'],re.I):raise ValueError('Title must accurately state the video length')
  if len(','.join(data['tags']))>450:raise ValueError('SEO tags exceed 450 characters')
  if len({normalize(t) for t in data['tags']})!=len(data['tags']):raise ValueError('Repeated SEO tags')
- if len({normalize(s['view']) for s in data['scenes']})!=6:raise ValueError('Six distinct camera views are required')
+ if len({normalize(s['view']) for s in data['scenes']})!=image_count:raise ValueError('Distinct camera views are required for the image pool')
  for old in history:
   if normalize(old['concept_id'])==normalize(data['concept_id']):raise ValueError('Repeated episode concept')
   if SequenceMatcher(None,normalize(old['title']),normalize(data['title'])).ratio()>.85:raise ValueError('Title too close to a previous episode')
   if SequenceMatcher(None,normalize(old['idea']),normalize(data['idea'])).ratio()>.85:raise ValueError('Idea too close to a previous episode')
  return data
 
-def generate(out,run,seed_fn):
+def generate(out,run,seed_fn,seconds=60,image_count=6):
  from storage import Store
  from lyrics_cpu import request_story,MODEL_ID
  store=Store();key='relaxation/ideas.json';history=store.load(key,INITIAL_HISTORY)
- checkpoint=f'relaxation/previews/{run}/plan.json';saved=store.load(checkpoint,None)
+ checkpoint=f'relaxation/{"previews" if seconds==60 else "production-drafts"}/{run}/plan.json';saved=store.load(checkpoint,None)
  if saved:
   if saved.get('run_id')!=run or saved.get('publish') is not False:raise ValueError('Saved plan identity mismatch')
   out.mkdir(parents=True,exist_ok=True);(out/'plan.json').write_text(json.dumps(saved,indent=2));(out/'metadata.json').write_text(json.dumps(saved['youtube'],indent=2));return saved
@@ -46,23 +57,43 @@ def generate(out,run,seed_fn):
   'Description is original prose; timestamps will be added. Tags are 8-15 unique relevant search phrases under 450 total characters. '
   'Thumbnail headline is 2-5 concise words, coherent with title, not sensational medical claims. concept_id is a meaningful unique slug. '
   'Creative seed '+str(seed_fn(run,500))+'. Avoid recent episode concepts and similar titles: '+json.dumps(history[-30:]))
+ if seconds>60:
+  prompt=('Create a fresh THREE-HOUR relaxation piano and nature-rain video package, not a one-minute preview. '
+   'Stay in the calming piano and nature ambience niche. Choose ONE coherent outdoor setting, lighting, gentle rainy weather and colour palette, different from recent history. '
+   'Write an original 3 Hours or 180 Minutes title, original description, 8-15 unique relevant SEO tags under 450 combined characters, meaningful concept_id, environment, lighting, palette, '
+   'gentle sparse felt piano/warm pads music_prompt, steady gentle rain_prompt, thumbnail brief, TWENTY distinct reusable scene views, and TWELVE chapter_titles. '
+   'Chapters start every 15 minutes. They describe visual/mood progression within this same setting; do not claim ocean/waterfall/birds audio unless it is actually present. '
+   '20 AI images are reused over 1080 ten-second slots, with varied slow pan/zoom. Use camera enum and conservative water_region (none for dry ground, rocks, or flowing creeks). '
+   'Do not write 1080 image prompts. All twenty views are the SAME location, weather and lighting, no people, no indoor scenes. '
+   'No medical claims, guaranteed sleep, miracle frequencies, voices, thunder, loud sounds or drums. Keep a new gentle piano melody front and quiet steady rain below. '
+   'Use one uppercase mood word in the title, e.g. CALM. Chapters and all packaging must describe this actual piano/rain content, not an unrelated montage. '
+   'Thumbnail scene_index is 0-19. Chapter timestamps are added automatically. Creative seed '+str(seed_fn(run,500))+
+   '. Avoid these recent concepts and close titles: '+json.dumps(history[-30:]))
+ schema=schema_for(seconds,image_count)
  errors=[]
  for attempt in range(3):
-  response=request_story('chat/completions',dict(messages=[dict(role='user',content=prompt+' Corrections: '+'; '.join(errors))],response_format=dict(type='json_schema',json_schema=dict(schema=SCHEMA)),seed=seed_fn(run,500+attempt),max_completion_tokens=2500,validation_attempts=2))
+  response=request_story('chat/completions',dict(messages=[dict(role='user',content=prompt+' Corrections: '+'; '.join(errors))],response_format=dict(type='json_schema',json_schema=dict(schema=schema)),seed=seed_fn(run,500+attempt),max_completion_tokens=2500 if seconds==60 else 6000,validation_attempts=2))
   data=json.loads(response['choices'][0]['message']['content'])
   data['tags']=list(dict.fromkeys(' '.join(t.lower().split()) for t in data['tags']))
-  try:validate(data,history);break
+  try:validate(data,history,seconds,image_count);break
   except (ValueError,ValidationError) as e:errors.append(str(e)[:300])
  else:raise ValueError('AI relaxation package failed validation after three attempts')
- data.update(run_id=run,seconds=60,fps=24,resolution=[1280,720],publish=False,
+ data.update(run_id=run,seconds=seconds,fps=24,resolution=[1280,720],publish=False,
   models=dict(planning=MODEL_ID,images='segmind/SSD-1B',music='ACE-Step/Ace-Step1.5',nature='cvssp/audioldm-s-full-v2',depth='depth-anything/Depth-Anything-V2-Small-hf'),
   nature_license='CC-BY-NC-SA-4.0: noncommercial evaluation only; do not publish or monetize this preview',
   audio_design='Original AI piano plus three distinct AI rain takes with quality-screened segments and long overlaps',image_source_size=[1024,576],version=2)
  for i,s in enumerate(data['scenes']):
   s.update(index=i,start=i*10,duration=10,seed=seed_fn(run,i),prompt=f"Photorealistic cinematic nature landscape. {data['environment']}. {data['lighting']}. Colours: {data['palette']}. Gentle rain, same coherent location and weather. {s['view']}. Natural proportions, refined detail, no people, no writing.")
  data['music_prompt']='Gentle sparse felt piano, warm ambient pads, slow peaceful tempo, no drums, no vocals or speech. '+data['music_prompt']
- data['chapters']='\n'.join(f'0:{i*10:02d} {s["chapter"]}' for i,s in enumerate(data['scenes']))
- data['description']+='\n\nChapters\n'+data['chapters']+'\n\nAI-generated imagery, piano music and nature ambience. One-minute noncommercial evaluation preview; no therapeutic claims.'
+ if seconds==60:
+  data['chapters']='\n'.join(f'0:{i*10:02d} {s["chapter"]}' for i,s in enumerate(data['scenes']))
+ else:
+  from .production import build_timeline,chapter_text
+  data['timeline']=build_timeline(image_count,seconds,seed_fn(run,900))
+  data['chapters']=chapter_text(data['chapter_titles'],seconds)
+  for scene in data['scenes']:
+   scene.pop('start',None);scene.pop('duration',None)
+ data['description']+='\n\nChapters\n'+data['chapters']+'\n\nAI-generated imagery, piano music and nature ambience. Noncommercial evaluation draft; no therapeutic claims.'
  data['youtube']=dict(snippet=dict(title=data['title'],description=data['description'],tags=data['tags'],categoryId='10',defaultLanguage='en',defaultAudioLanguage='en'),status=dict(privacyStatus='private',selfDeclaredMadeForKids=False,containsSyntheticMedia=True),paidProductPlacementDetails=dict(hasPaidProductPlacement=False))
  data['publishing_blocked']='Review only; AudioLDM nature model is noncommercial'
  out.mkdir(parents=True,exist_ok=True);(out/'plan.json').write_text(json.dumps(data,indent=2));(out/'metadata.json').write_text(json.dumps(data['youtube'],indent=2))
