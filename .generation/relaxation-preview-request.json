@@ -1,7 +1,9 @@
 {
-  "requested_at": "2026-11-25T09:54:28.927954+00:00",
+  "requested_at": "2026-11-25T10:16:04.651004+00:00",
   "seconds": 60,
   "mode": "private-relaxation-preview",
   "publish": false,
-  "scene_interval": 10
+  "scene_interval": 10,
+  "version": 2,
+  "reason": "AI unique idea and metadata, coherent higher-resolution scenes, three AI rain takes, depth-aware atmosphere and calm editing"
 }

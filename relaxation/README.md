@@ -1,32 +1,66 @@
-# Relaxation preview
+# AI relaxation previews
 
 Run `.github/workflows/relaxation-preview.yml` manually or update
-`.generation/relaxation-preview-request.json` on main. This creates a private
-60-second sample, with no scheduled generation, YouTube/Facebook publication,
-or changes to the fitness workflow. The existing Drive cleanup workflow is
-unchanged; this sample uses expiring GitHub artifacts and no Drive uploads.
+`.generation/relaxation-preview-request.json` on main. This creates a 60-second
+review sample without YouTube/Facebook publishing or a recurring schedule.
+Existing production publishing and Drive cleanup workflows are unchanged.
 
-Six independent SSD-1B jobs generate 768×432 landscape images from different
-nature prompts. Composition scales them to a 1280×720, 24 FPS MP4. A new scene
-arrives every ten seconds with a 0.8-second dissolve. Image generation is real
-CPU inference, not a static preselected image collection.
+## Episode planning and diversity
 
-A separate pinned ACE-Step 1.5 job creates a 24-second original ambient piano
-instrumental. A pinned AudioLDM small-v2 job creates ten seconds of gentle rain.
-The mixer extends both with overlapping crossfades, balances the levels, fades
-the ends and limits peaks. No ungenerated procedural sound is substituted if a
-model fails. Prompt adherence, naturalness and absence of vocals require human
-listening review; numeric audio checks cannot establish those properties.
+`relaxation/planning.py` uses the existing pinned Qwen CPU backend to generate a
+new idea, meaningful concept ID, title, description, tags, environment, lighting,
+palette, six views, piano/rain prompts, camera choices and thumbnail brief.
+`relaxation/ideas.json` in the existing private Drive Store holds history. The
+previous tropical garden sample seeds that history. Recent concepts/titles go
+into the prompt; duplicate IDs, close titles/ideas, duplicate views/tags and
+incorrect duration labels fail bounded validation. This reduces repetition;
+it cannot prove that every image or melody is perceptually unique.
 
-**The AudioLDM checkpoint is CC-BY-NC-SA-4.0. This sample is only for private
-noncommercial evaluation. Do not publish or monetize it.** Replace the nature
-sound model with a suitably licensed option or obtain the necessary rights
-before commercial rollout. The model card is
-https://huggingface.co/cvssp/audioldm-s-full-v2 .
+All scenes describe the same physical setting, rain, lighting and palette.
+Chapters are generated from scene times and added to the AI description.
+`metadata.json` contains category Music, English language, not made for kids,
+no paid promotion, and synthetic media disclosure. It is a packaging draft;
+publication remains blocked for the review and sound-model license.
 
-All successful intermediate outputs are kept as artifacts for seven days; the
-final sample is kept for fourteen days. Native model generation can still take
-substantial CPU time; this pipeline avoids per-frame 3D rendering but does not
-claim that model inference is instantaneous. Source code does not use secrets,
-paid inference APIs, narration, generated claims of therapeutic benefits, or
-Blender assets.
+## Image and video quality
+
+Six independent SSD-1B jobs generate 1024×576 landscape images at 20 steps.
+Depth Anything V2 Small (pinned Apache-2.0 checkpoint) generates a depth mask
+per image. The 1280×720 output is scaled from that source, not native 1080p.
+A new scene arrives every ten seconds with a two-second smooth dissolve.
+Camera pan/zoom varies by AI scene. Subtle rain uses depth-dependent visibility;
+distant mist uses inverse depth. Small ripple overlays use conservative
+AI-specified lower water regions, image texture/colour screening, and soft
+masks. These are approximations, not validated water segmentation or actual
+simulation. Inspect visual masks before production. No text is drawn on the
+relaxation film; a separate 1920×1080 thumbnail uses the AI brief.
+
+## Sound
+
+Keep the successful sparse felt-piano/warm-pad style while generating a new
+ACE-Step 24-second instrumental. AudioLDM produces three distinct accepted
+15-second rain takes (up to four candidates, 40 inference steps). Each take is
+trimmed to its steadiest ten-second window. Numerical screening rejects silence,
+large peaks and unstable energy; it cannot reliably reject voices or establish
+naturalness. Original takes and the review report are kept for listening.
+
+A gentle 90–5800 Hz filter softens rumble/hiss; soft peak control reduces
+spikes. Three selected clips overlap for four seconds each, yielding a
+22-second bed, which is extended with further overlaps. Piano is foreground,
+rain quieter; the full mix gets three-second fades and peak limiting. No
+procedural replacement sound or static fallback package is silently used.
+
+**AudioLDM small-v2 is CC-BY-NC-SA-4.0. This is a noncommercial evaluation
+sample. Do not publish or monetize it.** Replace this sound model with a
+suitably licensed source or obtain rights before commercial rollout.
+Source: https://huggingface.co/cvssp/audioldm-s-full-v2 .
+
+## Outputs and recovery
+
+Intermediate artifacts last seven days; final MP4, thumbnail, metadata, plan,
+contact sheet and quality report last fourteen days. No sample media is sent
+to Drive; only idea history and plan checkpoints use existing Drive storage.
+Successful generation can be reused through `relaxation-recover.yml` by setting
+its recovery request to the source run ID. Old version-1 assets remain readable
+by the compositor. Model inference still takes CPU time; no real-time inference
+or guaranteed rain-quality claim is made.

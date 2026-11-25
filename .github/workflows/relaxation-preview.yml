@@ -1,4 +1,4 @@
-name: AI relaxation preview · rain garden
+name: AI relaxation preview · fresh ideas and nature music
 run-name: Relaxation preview · ${{ github.run_id }} · no publishing
 on:
   push:
@@ -18,9 +18,12 @@ env:
   MKL_NUM_THREADS: '4'
 jobs:
   plan:
-    name: Prepare six-scene private relaxation preview
+    name: AI fresh idea, coherent scenes, SEO and thumbnail brief
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 90
+    env:
+      DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,12 +31,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install numpy Pillow
-      - run: python -m relaxation.preview plan --out "$RELAX_OUT" --run-id "$GITHUB_RUN_ID"
+      - run: pip install -r requirements.txt -r requirements-lyrics.txt
+      - run: python -u -m relaxation.preview plan --out "$RELAX_OUT" --run-id "$GITHUB_RUN_ID"
       - uses: actions/upload-artifact@v4
         with:
           name: relaxation-plan
-          path: output/relaxation-preview/plan.json
+          path: output/relaxation-preview/*.json
           overwrite: true
           retention-days: 7
   images:
@@ -73,7 +76,9 @@ jobs:
         if: always()
         with:
           name: relaxation-scene-${{ matrix.scene }}
-          path: output/relaxation-preview/scene-*.png
+          path: |
+            output/relaxation-preview/scene-*.png
+            output/relaxation-preview/depth-*.png
           overwrite: true
           retention-days: 7
   music:
@@ -156,7 +161,8 @@ jobs:
         with:
           name: relaxation-ai-rain
           path: |
-            output/relaxation-preview/rain-original.wav
+            output/relaxation-preview/rain*.wav
+            output/relaxation-preview/rain-review.json
             output/relaxation-preview/nature-license.txt
           overwrite: true
           retention-days: 7
@@ -188,6 +194,8 @@ jobs:
           path: |
             output/relaxation-preview/rain-garden-60s.mp4
             output/relaxation-preview/scene-preview.jpg
+            output/relaxation-preview/thumbnail.jpg
+            output/relaxation-preview/metadata.json
             output/relaxation-preview/plan.json
             output/relaxation-preview/quality-report.json
             output/relaxation-preview/nature-license.txt
@@ -196,7 +204,9 @@ jobs:
       - name: Summarize private preview
         run: |
           python - <<'PY'
-          import os
+          import os,json
+          from pathlib import Path
+          data=json.loads(Path('output/relaxation-preview/plan.json').read_text())
           with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
-              f.write('## Rain Garden relaxation preview\n\n60 seconds · 720p · 24 FPS · six distinct AI images, changing every 10 seconds with soft dissolves.\n\nACE-Step instrumental + AudioLDM rain, crossfaded to full length. No narration, Blender, publication or recurring schedule.\n\nDownload the relaxation-preview-60s artifact. AudioLDM rain uses CC-BY-NC-SA-4.0; private noncommercial evaluation only. Replace this sound model or obtain suitable rights before commercial production.\n')
+              f.write('## '+data['title']+'\n\n60 seconds · 720p · 24 FPS · six AI-directed coherent 1024×576 images, changing every 10 seconds with two-second dissolves, slow varied cameras and depth-aware effects.\n\nNew Qwen idea/title/description/tags/thumbnail and saved idea history. ACE-Step piano + three quality-screened AudioLDM rain takes, softly filtered below the music and crossfaded to full length. No narration, Blender, publication or recurring schedule.\n\nDownload the relaxation-preview-60s artifact. AudioLDM rain uses CC-BY-NC-SA-4.0; private noncommercial evaluation only. Replace this sound model or obtain suitable rights before commercial production.\n')
           PY
