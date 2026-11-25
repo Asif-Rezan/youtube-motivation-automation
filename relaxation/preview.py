@@ -72,6 +72,7 @@ def validate_audio(pcm,rate,expected):
 
 def extend(pcm,rate,seconds=60,fade_seconds=1.5):
  if pcm.ndim==1:pcm=np.column_stack([pcm,pcm])
+ elif pcm.ndim==2 and pcm.shape[1]==1:pcm=np.repeat(pcm,2,axis=1)
  if pcm.shape[1]!=2:raise ValueError('Expected mono/stereo source')
  n=round(rate*seconds);fade=min(round(rate*fade_seconds),len(pcm)//4)
  if fade<2:raise ValueError('Clip too short for a smooth loop')

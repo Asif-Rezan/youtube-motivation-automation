@@ -1,0 +1,55 @@
+name: Recover relaxation sample from saved AI assets
+run-name: Relaxation sample recovery · no repeated AI generation
+on:
+  push:
+    branches: [main]
+    paths: [.generation/relaxation-recovery-request.json]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  recover:
+    name: Retain original AI generation, then compose corrected mix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install lightweight compositor
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libsndfile1
+          pip install numpy Pillow scipy soundfile
+      - id: source
+        name: Wait for the original nine AI artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -u -m relaxation.recover_wait
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ steps.source.outputs.source_run }}
+          github-token: ${{ github.token }}
+          pattern: relaxation-*
+          merge-multiple: true
+          path: output/relaxation-preview
+      - name: Compose mono-compatible original AI music and rain
+        run: python -u -m relaxation.preview compose --out output/relaxation-preview
+      - uses: actions/upload-artifact@v4
+        with:
+          name: relaxation-preview-60s-${{ github.run_id }}
+          path: |
+            output/relaxation-preview/rain-garden-60s.mp4
+            output/relaxation-preview/scene-preview.jpg
+            output/relaxation-preview/plan.json
+            output/relaxation-preview/quality-report.json
+            output/relaxation-preview/nature-license.txt
+          overwrite: true
+          retention-days: 14
+      - run: |
+          echo '## Relaxation preview ready' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Original AI images, music and rain reused. Download the relaxation-preview-60s artifact. This noncommercial review sample is not published.' >> "$GITHUB_STEP_SUMMARY"

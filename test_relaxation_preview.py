@@ -9,6 +9,7 @@ class RelaxationTests(unittest.TestCase):
    p=plan(Path(d),'episode');self.assertEqual([s['start'] for s in p['scenes']],[0,10,20,30,40,50]);self.assertEqual(len({s['seed'] for s in p['scenes']}),6);self.assertFalse(p['publish'])
  def test_loop_crossfade_and_exact_stereo_duration(self):
   pcm=np.sin(np.arange(1000)*.02).astype('float32');result=extend(pcm,100)
+  self.assertEqual(extend(pcm[:,None],100).shape,(6000,2))
   self.assertEqual(result.shape,(6000,2));self.assertTrue(np.isfinite(result).all());self.assertLess(np.abs(np.diff(result[:,0])).max(),.1)
  def test_invalid_neural_outputs_rejected(self):
   for pcm in [np.zeros(1000),np.full(1000,np.nan),np.ones(20)]:
