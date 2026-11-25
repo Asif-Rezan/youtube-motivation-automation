@@ -15,7 +15,7 @@ env:
   MKL_NUM_THREADS: '4'
 jobs:
   plan:
-    name: AI three-hour concept, twenty views, twelve chapters and SEO
+    name: AI three-hour concept, one hundred views, twelve chapters and SEO
     runs-on: ubuntu-24.04
     timeout-minutes: 100
     env:
@@ -37,7 +37,7 @@ jobs:
           overwrite: true
           retention-days: 7
   images:
-    name: AI landscape and depth · ${{ matrix.image }}
+    name: AI landscape batch · ${{ matrix.shard }} · five images
     needs: plan
     runs-on: ubuntu-24.04
     timeout-minutes: 100
@@ -45,7 +45,7 @@ jobs:
       fail-fast: false
       max-parallel: 20
       matrix:
-        image: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -65,12 +65,12 @@ jobs:
           name: long-plan
           path: output/relaxation-production
       - env:
-          IMAGE_INDEX: ${{ matrix.image }}
-        run: python -u -m relaxation.preview image --out "$RELAX_OUT" --index "$IMAGE_INDEX"
+          IMAGE_INDEX: ${{ matrix.shard }}
+        run: python -u -m relaxation.production images --out "$RELAX_OUT" --index "$IMAGE_INDEX"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: long-image-${{ matrix.image }}
+          name: long-image-${{ matrix.shard }}
           path: |
             output/relaxation-production/scene-*.png
             output/relaxation-production/depth-*.png
@@ -155,15 +155,15 @@ jobs:
           overwrite: true
           retention-days: 7
   clips:
-    name: Reusable visual clips · ${{ matrix.image }}
+    name: Reusable clips · ${{ matrix.shard }} · five images × four takes
     needs: [plan, images]
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       max-parallel: 20
       matrix:
-        image: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -185,11 +185,11 @@ jobs:
           merge-multiple: true
           path: output/relaxation-production
       - env:
-          IMAGE_INDEX: ${{ matrix.image }}
+          IMAGE_INDEX: ${{ matrix.shard }}
         run: python -u -m relaxation.production clips --out "$RELAX_OUT" --index "$IMAGE_INDEX"
       - uses: actions/upload-artifact@v4
         with:
-          name: long-clips-${{ matrix.image }}
+          name: long-clips-${{ matrix.shard }}
           path: output/relaxation-production/clip-*.mp4
           overwrite: true
           retention-days: 7

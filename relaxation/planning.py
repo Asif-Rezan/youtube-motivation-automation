@@ -69,15 +69,38 @@ def generate(out,run,seed_fn,seconds=60,image_count=6):
    'Use one uppercase mood word in the title, e.g. CALM. Chapters and all packaging must describe this actual piano/rain content, not an unrelated montage. '
    'Thumbnail scene_index is 0-19. Chapter timestamps are added automatically. Creative seed '+str(seed_fn(run,500))+
    '. Avoid these recent concepts and close titles: '+json.dumps(history[-30:]))
- schema=schema_for(seconds,image_count)
+ if seconds>60 and image_count>20:
+  prompt=prompt.replace('TWENTY distinct reusable scene views','the first TWENTY distinct anchor scene views of a 100-image pool').replace('20 AI images are reused','100 AI images will be reused')
+ planning_count=min(image_count,20) if seconds>60 else image_count
+ schema=schema_for(seconds,planning_count)
  errors=[]
  for attempt in range(3):
   response=request_story('chat/completions',dict(messages=[dict(role='user',content=prompt+' Corrections: '+'; '.join(errors))],response_format=dict(type='json_schema',json_schema=dict(schema=schema)),seed=seed_fn(run,500+attempt),max_completion_tokens=2500 if seconds==60 else 6000,validation_attempts=2))
   data=json.loads(response['choices'][0]['message']['content'])
   data['tags']=list(dict.fromkeys(' '.join(t.lower().split()) for t in data['tags']))
-  try:validate(data,history,seconds,image_count);break
+  try:validate(data,history,seconds,planning_count);break
   except (ValueError,ValidationError) as e:errors.append(str(e)[:300])
  else:raise ValueError('AI relaxation package failed validation after three attempts')
+ if image_count>len(data['scenes']):
+  # Expand in bounded batches instead of asking for 100 views in one response.
+  batch_schema=obj(scenes=SCHEMA['properties']['scenes'])
+  batch_schema['properties']['scenes']=copy.deepcopy(SCHEMA['properties']['scenes'])
+  batch_schema['properties']['scenes'].update(minItems=20,maxItems=20)
+  while len(data['scenes'])<image_count:
+   previous={normalize(s['view']) for s in data['scenes']}
+   extra_prompt=('Create 20 additional DISTINCT scene views for this same relaxation location: '+data['environment']+
+    '. Same lighting: '+data['lighting']+'. Same palette: '+data['palette']+
+    '. Gentle rain. No people or indoor scenes. Each view needs chapter (short shot label), view (under 250 characters), camera and water_region. '
+    'Use none water_region when no still pond/lake water is visible. Avoid existing compositions: '+json.dumps([s['view'] for s in data['scenes']]))
+   for attempt in range(3):
+    response=request_story('chat/completions',dict(messages=[dict(role='user',content=extra_prompt)],response_format=dict(type='json_schema',json_schema=dict(schema=batch_schema)),seed=seed_fn(run,len(data['scenes'])+attempt+1500),max_completion_tokens=3000,validation_attempts=2))
+    extra=json.loads(response['choices'][0]['message']['content']);check(extra,batch_schema)
+    views=[normalize(s['view']) for s in extra['scenes']]
+    if len(set(views))==20 and not set(views)&previous:break
+   else:raise ValueError('AI additional view batch repeated existing compositions')
+   data['scenes'].extend(extra['scenes'])
+  if len(data['scenes'])!=image_count:raise ValueError('Incorrect expanded image budget')
+  # The package thumbnail may still select any of the first twenty anchor views.
  data.update(run_id=run,seconds=seconds,fps=24,resolution=[1280,720],publish=False,
   models=dict(planning=MODEL_ID,images='segmind/SSD-1B',music='ACE-Step/Ace-Step1.5',nature='cvssp/audioldm-s-full-v2',depth='depth-anything/Depth-Anything-V2-Small-hf'),
   nature_license='CC-BY-NC-SA-4.0: noncommercial evaluation only; do not publish or monetize this preview',

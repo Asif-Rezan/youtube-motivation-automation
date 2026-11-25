@@ -69,14 +69,15 @@ or guaranteed rain-quality claim is made.
 ## Three-hour draft workflow (manual only)
 
 `relaxation-production.yml` is configured for exactly 10,800 seconds, with up to
-20 parallel image/depth workers and up to 20 parallel reusable-clip workers,
-subject to account concurrency limits. Music and rain generation run alongside
+20 parallel image/depth workers (five images per worker) and up to 20 parallel reusable-clip workers,
+subject to account concurrency limits. Each image worker loads the image model
+once, generates its five distinct images, then generates their depth maps. Music and rain generation run alongside
 images; long audio rendering runs alongside reusable visual rendering.
 
-Qwen creates a fresh full-length package, twenty coherent views and twelve
-content-appropriate chapter titles. The 1,080 ten-second slots reuse twenty
-images (54 times each), never on consecutive slots. Four pan/zoom variants per
-image give eighty reusable ten-second clips. The image order is shuffled once
+Qwen creates a fresh full-length package and twelve content-appropriate chapter
+titles. One hundred coherent views are planned in bounded batches of twenty. The 1,080 ten-second slots reuse one hundred
+images (10 or 11 times each), never on consecutive slots. Four pan/zoom variants per
+image give four hundred reusable ten-second clips. The image order is shuffled once
 per episode and then cycles, making its two-second transitions reusable too.
 Final assembly concatenates already encoded clips without rendering all three
 hours again. Chapters start at 00:00, 15:00, …, 02:45:00 and appear both in the

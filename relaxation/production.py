@@ -1,4 +1,4 @@
-"""Three-hour draft: 20 AI images, reusable ten-second clips and timed chapters.
+"""Three-hour draft: 100 AI images, reusable ten-second clips and timed chapters.
 
 No publication. Music/rain source license still prevents commercial rollout.
 """
@@ -8,7 +8,7 @@ from .preview import seed,image_at,atmospheric,thumbnail,extend
 from PIL import Image
 import numpy as np
 
-def build_timeline(image_count=20,seconds=10800,seed_value=0):
+def build_timeline(image_count=100,seconds=10800,seed_value=0):
  if type(seconds)is not int or seconds<10 or seconds%10:raise ValueError('Duration must contain complete ten-second slots')
  if not 2<=image_count<=100:raise ValueError('At least two images are needed to avoid adjacent repeats')
  rng=random.Random(seed_value);order=list(range(image_count));rng.shuffle(order);rows=[]
@@ -19,6 +19,26 @@ def build_timeline(image_count=20,seconds=10800,seed_value=0):
   rows.append(dict(start=start,duration=10,image=image,variant=variant,chapter=start//900))
 
  return rows
+
+def shard_images(shard,image_count=100,workers=20):
+ if type(shard)is not int or not 0<=shard<workers:raise ValueError('Invalid image shard')
+ if image_count%workers:raise ValueError('Image count must divide evenly across workers')
+ count=image_count//workers
+ return list(range(shard*count,(shard+1)*count))
+
+def image_shard(out,shard):
+ import gc
+ from .preview import image_pipeline,image,depth_mask
+ data=json.loads((out/'plan.json').read_text());indices=shard_images(shard,len(data['scenes']))
+ pipeline=image_pipeline()
+ for index in indices:image(out,index,pipeline=pipeline,make_depth=False)
+ del pipeline;gc.collect()
+ for index in indices:depth_mask(out,index,out/f'scene-{index:02d}.png')
+ print('FIVE_IMAGES_AND_DEPTH_READY',shard,indices,flush=True)
+
+def clip_shard(out,shard):
+ data=json.loads((out/'plan.json').read_text())
+ for index in shard_images(shard,len(data['scenes'])):clip_worker(out,index)
 
 def timestamp(seconds):
  h,rest=divmod(seconds,3600);m,s=divmod(rest,60)
@@ -33,7 +53,7 @@ def clip_worker(out,index):
  with Image.open(out/f'scene-{index:02d}.png') as im:source=im.convert('RGB')
  with Image.open(out/f'depth-{index:02d}.png') as d:depth=d.convert('L')
  rng=np.random.default_rng(seed(data['run_id'],index+1100));points=[(float(rng.uniform(0,1280)),float(rng.uniform(0,720)),float(rng.uniform(100,240))) for _ in range(70)]
- order=[r['image'] for r in data['timeline'][:20]];position=order.index(index);next_index=order[(position+1)%20]
+ count=len(data['scenes']);order=[r['image'] for r in data['timeline'][:count]];position=order.index(index);next_index=order[(position+1)%count]
  with Image.open(out/f'scene-{next_index:02d}.png') as im:next_source=im.convert('RGB')
  with Image.open(out/f'depth-{next_index:02d}.png') as d:next_depth=d.convert('L')
  cameras=['pan_left','pan_right','zoom_in','zoom_out']
@@ -41,7 +61,7 @@ def clip_worker(out,index):
   row=dict(scene,camera=camera);target=out/f'clip-{index:02d}-{variant}.mp4'
   cmd=['ffmpeg','-v','error','-y','-f','rawvideo','-pix_fmt','rgb24','-s','1280x720','-r','24','-i','pipe:0','-an','-c:v','libx264','-preset','fast','-crf','20','-pix_fmt','yuv420p','-video_track_timescale','24000',str(target)]
   proc=subprocess.Popen(cmd,stdin=subprocess.PIPE)
-  next_variant=(variant+1)%4 if position==19 else variant
+  next_variant=(variant+1)%4 if position==count-1 else variant
   next_row=dict(data['scenes'][next_index],camera=cameras[next_variant])
   next_frame=image_at([next_source]*6,0,[next_row]*6)
   next_frame=atmospheric(next_frame,image_at([next_depth]*6,0,[next_row]*6),0,next_row,points)
@@ -104,13 +124,14 @@ def assemble(out):
  video=next(s for s in probe['streams'] if s['codec_type']=='video')
  if int(video['nb_frames'])!=259200:raise ValueError('Wrong production video frame count')
  if len(probe.get('chapters',[]))!=12:raise ValueError('Embedded chapters are missing')
- images=[Image.open(out/f'scene-{i:02d}.png').convert('RGB') for i in range(20)];thumbnail(out,images,data)
+ images=[Image.open(out/f'scene-{i:02d}.png').convert('RGB') for i in range(len(data['scenes']))];thumbnail(out,images,data)
  (out/'chapters.txt').write_text(data['chapters']+'\n')
- (out/'production-report.json').write_text(json.dumps(dict(seconds=10800,frames=259200,unique_images=20,reusable_clips=80,slots=1080,adjacent_duplicate_images=False,chapters=12,publication=False,transitions='Two-second smooth dissolves baked into reusable clips'),indent=2))
+ (out/'production-report.json').write_text(json.dumps(dict(seconds=10800,frames=259200,unique_images=len(data['scenes']),reusable_clips=len(data['scenes'])*4,slots=1080,adjacent_duplicate_images=False,chapters=12,publication=False,transitions='Two-second smooth dissolves baked into reusable clips'),indent=2))
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('stage',choices=['plan','clips','audio','assemble']);p.add_argument('--out',type=Path,default=Path('output/relaxation-production'));p.add_argument('--run-id',default='local');p.add_argument('--index',type=int,choices=range(20),default=0);a=p.parse_args();a.out.mkdir(parents=True,exist_ok=True)
+ p=argparse.ArgumentParser();p.add_argument('stage',choices=['plan','images','clips','audio','assemble']);p.add_argument('--out',type=Path,default=Path('output/relaxation-production'));p.add_argument('--run-id',default='local');p.add_argument('--index',type=int,choices=range(20),default=0);a=p.parse_args();a.out.mkdir(parents=True,exist_ok=True)
  if a.stage=='plan':
   from .planning import generate
-  generate(a.out,a.run_id,seed,seconds=10800,image_count=20)
- elif a.stage=='clips':clip_worker(a.out,a.index)
+  generate(a.out,a.run_id,seed,seconds=10800,image_count=100)
+ elif a.stage=='images':image_shard(a.out,a.index)
+ elif a.stage=='clips':clip_shard(a.out,a.index)
  else:globals()[a.stage](a.out)

@@ -10,15 +10,20 @@ def plan(out,run):
  from .planning import generate
  return generate(out,run,seed)
 
-def image(out,index):
+def image_pipeline():
  from image_cpu import MODEL,REVISION
  import torch
  from diffusers import DiffusionPipeline,DPMSolverMultistepScheduler
  torch.set_num_threads(min(4,os.cpu_count() or 2))
- data=json.loads((out/'plan.json').read_text());scene=data['scenes'][index]
  p=DiffusionPipeline.from_pretrained(MODEL,revision=REVISION,torch_dtype=torch.float32,use_safetensors=True,trust_remote_code=False,token=False)
  p.scheduler=DPMSolverMultistepScheduler.from_config(p.scheduler.config,algorithm_type='dpmsolver++',use_karras_sigmas=True)
  p.to('cpu');p.enable_attention_slicing();p.enable_vae_slicing()
+ return p
+
+def image(out,index,pipeline=None,make_depth=True):
+ import torch
+ data=json.loads((out/'plan.json').read_text());scene=data['scenes'][index]
+ p=pipeline if pipeline is not None else image_pipeline()
  for attempt in range(3):
   with torch.inference_mode():r=p(scene['prompt'],negative_prompt='text, typography, watermark, logo, person, people, human, cartoon, illustration, blurry, low quality, collage, border',width=1024,height=576,num_inference_steps=20,guidance_scale=7,generator=torch.Generator(device='cpu').manual_seed(scene['seed']+attempt))
   if any(getattr(r,'nsfw_content_detected',None) or []):continue
@@ -27,8 +32,8 @@ def image(out,index):
    check.load()
    if check.size!=(1024,576) or np.asarray(check).std()<3:raise ValueError('Invalid/blank AI image')
   tmp.replace(target)
-  del p
-  depth_mask(out,index,target)
+  if pipeline is None:del p
+  if make_depth:depth_mask(out,index,target)
   print('AI_IMAGE_READY',index,flush=True);return
  raise RuntimeError('Image safety checker rejected all three attempts; no fallback artwork')
 
@@ -225,7 +230,7 @@ def compose(out):
  sheet.save(out/'scene-preview.jpg',quality=92);print(json.dumps(report),flush=True)
 
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('stage',choices=['plan','image','music','nature','compose']);p.add_argument('--out',type=Path,default=Path('output/relaxation-preview'));p.add_argument('--run-id',default='local');p.add_argument('--index',type=int,choices=range(20),default=0)
+ p=argparse.ArgumentParser();p.add_argument('stage',choices=['plan','image','music','nature','compose']);p.add_argument('--out',type=Path,default=Path('output/relaxation-preview'));p.add_argument('--run-id',default='local');p.add_argument('--index',type=int,choices=range(100),default=0)
  a=p.parse_args();a.out.mkdir(parents=True,exist_ok=True)
  if a.stage=='plan':plan(a.out,a.run_id)
  elif a.stage=='image':image(a.out,a.index)
