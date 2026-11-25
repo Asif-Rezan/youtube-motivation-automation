@@ -3,6 +3,7 @@ import json,re,copy
 from difflib import SequenceMatcher
 from pathlib import Path
 from jsonschema import validate as check,ValidationError
+from .art_style import STYLE_ID,ART_DIRECTION
 
 def obj(**fields):return dict(type='object',properties=fields,required=list(fields),additionalProperties=False)
 def text(n):return dict(type='string',minLength=1,maxLength=n)
@@ -71,6 +72,7 @@ def generate(out,run,seed_fn,seconds=60,image_count=6):
    '. Avoid these recent concepts and close titles: '+json.dumps(history[-30:]))
  if seconds>60 and image_count>20:
   prompt=prompt.replace('TWENTY distinct reusable scene views','the first TWENTY distinct anchor scene views of a 100-image pool').replace('20 AI images are reused','100 AI images will be reused')
+ prompt+=' Visual art direction: '+ART_DIRECTION+' Plan bright, vivid but relaxing lighting and palette; keep one consistent storybook look across all views.'
  planning_count=min(image_count,20) if seconds>60 else image_count
  schema=schema_for(seconds,planning_count)
  errors=[]
@@ -90,7 +92,7 @@ def generate(out,run,seed_fn,seconds=60,image_count=6):
    previous={normalize(s['view']) for s in data['scenes']}
    extra_prompt=('Create 20 additional DISTINCT scene views for this same relaxation location: '+data['environment']+
     '. Same lighting: '+data['lighting']+'. Same palette: '+data['palette']+
-    '. Gentle rain. No people or indoor scenes. Each view needs chapter (short shot label), view (under 250 characters), camera and water_region. '
+    '. Visual style: '+ART_DIRECTION+'. Gentle rain. No people or indoor scenes. Each view needs chapter (short shot label), view (under 250 characters), camera and water_region. '
     'Use none water_region when no still pond/lake water is visible. Avoid existing compositions: '+json.dumps([s['view'] for s in data['scenes']]))
    for attempt in range(3):
     response=request_story('chat/completions',dict(messages=[dict(role='user',content=extra_prompt)],response_format=dict(type='json_schema',json_schema=dict(schema=batch_schema)),seed=seed_fn(run,len(data['scenes'])+attempt+1500),max_completion_tokens=3000,validation_attempts=2))
@@ -104,9 +106,9 @@ def generate(out,run,seed_fn,seconds=60,image_count=6):
  data.update(run_id=run,seconds=seconds,fps=24,resolution=[1280,720],publish=False,
   models=dict(planning=MODEL_ID,images='segmind/SSD-1B',music='ACE-Step/Ace-Step1.5',nature='cvssp/audioldm-s-full-v2',depth='depth-anything/Depth-Anything-V2-Small-hf'),
   nature_license='CC-BY-NC-SA-4.0: noncommercial evaluation only; do not publish or monetize this preview',
-  audio_design='Original AI piano plus three distinct AI rain takes with quality-screened segments and long overlaps',image_source_size=[1024,576],version=2)
+  audio_design='Original AI piano plus three distinct AI rain takes with quality-screened segments and long overlaps',image_source_size=[1024,576],art_style=STYLE_ID,version=2)
  for i,s in enumerate(data['scenes']):
-  s.update(index=i,start=i*10,duration=10,seed=seed_fn(run,i),prompt=f"Photorealistic cinematic nature landscape. {data['environment']}. {data['lighting']}. Colours: {data['palette']}. Gentle rain, same coherent location and weather. {s['view']}. Natural proportions, refined detail, no people, no writing.")
+  s.update(index=i,start=i*10,duration=10,seed=seed_fn(run,i),prompt=f"{ART_DIRECTION} {data['environment']}. {data['lighting']}. Colours: {data['palette']}. Gentle rain, same coherent location and weather. {s['view']}. Balanced storybook proportions, refined 3D detail, no people, no writing.")
  data['music_prompt']='Gentle sparse felt piano, warm ambient pads, slow peaceful tempo, no drums, no vocals or speech. '+data['music_prompt']
  if seconds==60:
   data['chapters']='\n'.join(f'0:{i*10:02d} {s["chapter"]}' for i,s in enumerate(data['scenes']))

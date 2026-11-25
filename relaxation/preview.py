@@ -3,6 +3,7 @@ import argparse,hashlib,json,math,os,subprocess,time
 from pathlib import Path
 import numpy as np
 from PIL import Image,ImageDraw,ImageFont,ImageChops
+from .art_style import negative_prompt
 SECONDS=60;FPS=24;SIZE=(1280,720)
 RAIN_MODEL='cvssp/audioldm-s-full-v2';RAIN_REV='feeb3d14203495a4b6ac0893cbdedb2159b4819c'
 def seed(run,index):return int(hashlib.sha256(f'{run}:{index}'.encode()).hexdigest()[:8],16)%(2**31-1)
@@ -25,7 +26,7 @@ def image(out,index,pipeline=None,make_depth=True):
  data=json.loads((out/'plan.json').read_text());scene=data['scenes'][index]
  p=pipeline if pipeline is not None else image_pipeline()
  for attempt in range(3):
-  with torch.inference_mode():r=p(scene['prompt'],negative_prompt='text, typography, watermark, logo, person, people, human, cartoon, illustration, blurry, low quality, collage, border',width=1024,height=576,num_inference_steps=20,guidance_scale=7,generator=torch.Generator(device='cpu').manual_seed(scene['seed']+attempt))
+  with torch.inference_mode():r=p(scene['prompt'],negative_prompt=negative_prompt(data.get('art_style')),width=1024,height=576,num_inference_steps=20,guidance_scale=7,generator=torch.Generator(device='cpu').manual_seed(scene['seed']+attempt))
   if any(getattr(r,'nsfw_content_detected',None) or []):continue
   im=r.images[0];target=out/f'scene-{index:02d}.png';tmp=target.with_suffix('.partial.png');im.save(tmp)
   with Image.open(tmp) as check:

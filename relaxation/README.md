@@ -24,7 +24,13 @@ publication remains blocked for the review and sound-model license.
 
 ## Image and video quality
 
-Six independent SSD-1B jobs generate 1024×576 landscape images at 20 steps.
+New episodes use a shared bright 3D storybook nature style: dimensional foliage
+and rocks, luminous greens, clear water, warm soft lighting and vivid balanced
+colours. The image negative prompt permits illustration and rejects photographic,
+flat, gloomy or washed-out looks. This visual style does not change the piano,
+relaxation niche, audience flags or saved episodes.
+
+Six independent SSD-1B preview jobs generate 1024×576 images at 20 steps.
 Depth Anything V2 Small (pinned Apache-2.0 checkpoint) generates a depth mask
 per image. The 1280×720 output is scaled from that source, not native 1080p.
 A new scene arrives every ten seconds with a two-second smooth dissolve.
