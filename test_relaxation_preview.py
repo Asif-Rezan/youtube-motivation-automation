@@ -14,7 +14,7 @@ class RelaxationTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d,patch('storage.Store') as store,patch('lyrics_cpu.request_story') as ai:
    store.return_value.load.side_effect=[INITIAL_HISTORY,None];ai.return_value={'choices':[{'message':{'content':json.dumps(package())}}]}
    p=plan(Path(d),'episode');self.assertEqual([s['start'] for s in p['scenes']],[0,10,20,30,40,50]);self.assertEqual(len({s['seed'] for s in p['scenes']}),6);self.assertFalse(p['publish'])
-   self.assertTrue(ai.called);self.assertIn('tropical-rain-garden',ai.call_args.args[1]['messages'][0]['content']);self.assertIn('0:50',p['youtube']['snippet']['description']);self.assertEqual(p['youtube']['snippet']['categoryId'],'10');self.assertFalse(p['youtube']['status']['selfDeclaredMadeForKids']);self.assertTrue((Path(d)/'metadata.json').exists());self.assertEqual(p['art_style'],'bright-3d-storybook-v1');self.assertTrue(all(s['prompt'].startswith('Bright polished 3D storybook') for s in p['scenes']))
+   self.assertTrue(ai.called);self.assertIn('tropical-rain-garden',ai.call_args.args[1]['messages'][0]['content']);self.assertIn('0:50',p['youtube']['snippet']['description']);self.assertEqual(p['youtube']['snippet']['categoryId'],'10');self.assertFalse(p['youtube']['status']['selfDeclaredMadeForKids']);self.assertTrue((Path(d)/'metadata.json').exists());self.assertEqual(p['art_style'],'natural-photorealistic-v1');self.assertTrue(all(s['prompt'].startswith('Ultra-realistic nature photograph') for s in p['scenes']))
  def test_rejects_repeated_concept_or_title(self):
   p=package();history=[dict(title=p['title'],idea=p['idea'],concept_id=p['concept_id'])]
   with self.assertRaises(ValueError):validate(p,history)

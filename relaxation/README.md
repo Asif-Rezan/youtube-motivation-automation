@@ -24,11 +24,13 @@ publication remains blocked for the review and sound-model license.
 
 ## Image and video quality
 
-New episodes use a shared bright 3D storybook nature style: dimensional foliage
-and rocks, luminous greens, clear water, warm soft lighting and vivid balanced
-colours. The image negative prompt permits illustration and rejects photographic,
-flat, gloomy or washed-out looks. This visual style does not change the piano,
-relaxation niche, audience flags or saved episodes.
+New episodes use ultra-realistic nature photography prompts: real botanical textures,
+believable water/reflections, natural daylight, camera perspective and true-to-life
+colours. Negative prompts reject CGI, cartoon, storybook and plastic-looking scenes.
+Video colour grading is gentle; thumbnail-only colour/contrast/brightness enhancement
+and bright complementary outlined text improve readability. These are generation
+instructions, not a guarantee that every AI image will be indistinguishable from a photo.
+Saved episodes retain their original visual style and assets.
 
 Six independent SSD-1B preview jobs generate 1024×576 images at 20 steps.
 Depth Anything V2 Small (pinned Apache-2.0 checkpoint) generates a depth mask
@@ -84,7 +86,7 @@ Depth/colour/texture masks are approximations. A still image does not contain
 hidden surfaces or actual plant/water geometry. Keep shifts small and review
 mask placement before production; this is gentle 2.5D motion, not physically
 accurate 3D animation or a transformation of old photographs into new artwork.
-New AI generations retain the requested bright 3D storybook visual direction.
+New AI generations use the natural photographic direction described above.
 
 ## Outputs and recovery
 
@@ -160,3 +162,19 @@ that source run ID so Drive checkpoints and duplicate-upload protection retain t
 original episode identity. Recovery waits up to 95 minutes for all 20 image artifacts,
 plan, piano and rain, validates completeness, then performs rendering, assembly,
 YouTube/Facebook publication and guarded Drive cleanup using updated code.
+
+### Search-friendly packaging and upload details
+
+AI packaging prompts lead with accurate piano/rain search intent, then the distinct
+episode setting/mood and duration. Descriptions explain actual content early; tags
+mix relevant broad and setting-specific phrases without keyword stuffing. Twelve
+chapter names describe the real visual/mood progression and include natural relevant
+phrases without claiming sound sources absent from the mix. Thumbnail text remains
+short and episode-specific. These changes aim to improve clarity and appeal; search
+ranking, CTR and virality are not guaranteed.
+
+Production publishes Music category 10, English title/audio metadata, not made for
+kids, no paid promotion, AI disclosure, standard YouTube license, embedding and
+public statistics enabled. Platform readback checks verify configured upload details,
+thumbnail and publication before cleanup. Chapters and CC BY rain credits remain
+in the actual uploaded description.

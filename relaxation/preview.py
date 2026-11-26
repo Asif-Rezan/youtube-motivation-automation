@@ -188,13 +188,23 @@ def atmospheric(im,depth,t,scene,rng_points):
  im.alpha_composite(layer);return im.convert('RGB')
 
 def thumbnail(out,images,data):
- from PIL import ImageFilter,ImageStat
+ from PIL import ImageFilter,ImageStat,ImageEnhance
+ import colorsys
  i=data['thumbnail']['scene_index'];im=images[i].resize((1920,1080),Image.Resampling.LANCZOS)
+ # Thumbnail-only punch: video images retain natural photographic colours.
+ im=ImageEnhance.Color(im).enhance(1.18)
+ im=ImageEnhance.Contrast(im).enhance(1.12)
+ im=ImageEnhance.Brightness(im).enhance(1.06)
  headline=data['thumbnail']['headline'];fontpath=next(p for p in [Path('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'),Path('/System/Library/Fonts/Supplemental/Arial Bold.ttf')] if p.exists())
  f=ImageFont.truetype(str(fontpath),100);draw=ImageDraw.Draw(im)
  while draw.textbbox((0,0),headline,font=f)[2]>1700:f=ImageFont.truetype(str(fontpath),f.size-2)
  candidates=[(90,85),(90,845)];chosen=min(candidates,key=lambda p:ImageStat.Stat(im.crop((p[0],p[1],p[0]+1700,p[1]+150)).convert('L').filter(ImageFilter.FIND_EDGES)).mean[0])
- draw.text(chosen,headline,font=f,fill='#fff2cf',stroke_width=7,stroke_fill='#132d2a')
+ # Bright complementary lettering changes with the actual image palette.
+ rgb=ImageStat.Stat(im.crop((chosen[0],chosen[1],chosen[0]+1700,chosen[1]+150))).mean[:3]
+ hue=colorsys.rgb_to_hsv(*(v/255 for v in rgb))[0]
+ accent=tuple(round(v*255) for v in colorsys.hsv_to_rgb((hue+.5)%1,.28,1.0))
+ draw.text((chosen[0]+3,chosen[1]+5),headline,font=f,fill='#101820',stroke_width=10,stroke_fill='#101820')
+ draw.text(chosen,headline,font=f,fill=accent,stroke_width=7,stroke_fill='#101820')
  im.save(out/'thumbnail.jpg',quality=95)
 
 def compose(out):

@@ -77,7 +77,8 @@ def generate(out,run,seed_fn,seconds=60,image_count=6):
   if seconds>60 and image_count>20:
    prompt=prompt.replace('TWENTY distinct reusable scene views','the first TWENTY distinct anchor scene views of a 100-image pool').replace('20 AI images are reused','100 AI images will be reused')
   prompt+=' Rain sound is a licensed real field recording, not AI synthesis; do not claim AI-generated rain. Source attribution will be added automatically.'
-  prompt+=' Visual art direction: '+ART_DIRECTION+' Plan bright, vivid but relaxing lighting and palette; keep one consistent storybook look across all views.'
+  prompt+=' Visual art direction: '+ART_DIRECTION+' Use natural photographic exposure and lifelike colours; keep consistent real-world weather and lighting across all views.'
+  prompt+=' SEO: write for people searching for relaxing piano music with gentle rain and nature sounds. Lead the title with a clear relevant search phrase, then this episode-specific setting or mood and exact duration; keep it readable and original, with one uppercase mood word. The first two description sentences must naturally explain the actual piano, recorded rain, setting and duration. Include relevant relaxation, reading, study or unwinding use cases only when appropriate; no guaranteed outcomes, keyword stuffing, fabricated claims or invented audio. Tags should combine a few accurate broad terms with setting-specific long-tail searches. Chapter titles should each be distinct, readable search-friendly phrases describing this chapter’s actual nature views or calm piano/rain mood, not a repeated keyword list. Never label chapters ocean, waterfall, birds or other sound sources not present in the audio.'
   planning_count=min(image_count,20) if seconds>60 else image_count
   schema=schema_for(seconds,planning_count)
   errors=[]
@@ -146,7 +147,8 @@ def generate(out,run,seed_fn,seconds=60,image_count=6):
   nature_license='CC-BY-4.0; attribution required',nature_backend='field_recording',rain_seconds=60,
   audio_design='Original AI piano plus verified licensed real rain, quiet-window selection and long overlaps',image_source_size=[1024,576],art_style=STYLE_ID,editing_profile='nature-polish-v1',version=3)
  for i,s in enumerate(data['scenes']):
-  s.update(index=i,start=i*10,duration=10,seed=seed_fn(run,i),prompt=f"Bright polished 3D storybook nature illustration, vivid colours. {data['environment']}. {s['view']}. Soft luminous light, dimensional foliage, rich balanced colours, layered depth. {data['lighting']}. Palette: {data['palette']}. Gentle rain, no people or text.")
+  s['art_style']=STYLE_ID
+  s.update(index=i,start=i*10,duration=10,seed=seed_fn(run,i),prompt=f"Ultra-realistic nature photograph. {data['environment']}. {s['view']}. {data['lighting']}. Natural colours, realistic vegetation and reflections, accurate soft light, authentic photographic detail. Gentle rain, no people or text.")
  data['music_prompt']='Gentle sparse felt piano, warm ambient pads, slow peaceful tempo, no drums, no vocals or speech. '+data['music_prompt']
  if seconds==60:
   data['chapters']='\n'.join(f'0:{i*10:02d} {s["chapter"]}' for i,s in enumerate(data['scenes']))

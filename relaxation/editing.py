@@ -30,7 +30,8 @@ class SceneRenderer:
  def __init__(self,source,depth,scene,seed=0,water_mask=None):
   self.scene=scene;self.seed=seed;self.width,self.height=SIZE
   im=source.convert('RGB').resize(SIZE,Image.Resampling.LANCZOS)
-  im=ImageEnhance.Color(im).enhance(1.13);im=ImageEnhance.Brightness(im).enhance(1.07);im=ImageEnhance.Contrast(im).enhance(1.025)
+  photographic=scene.get('art_style')=='natural-photorealistic-v1'
+  im=ImageEnhance.Color(im).enhance(1.02 if photographic else 1.13);im=ImageEnhance.Brightness(im).enhance(1.025 if photographic else 1.07);im=ImageEnhance.Contrast(im).enhance(1.015 if photographic else 1.025)
   self.base=im;self.depth=depth.convert('L').resize(SIZE,Image.Resampling.BILINEAR)
   a=np.asarray(im.resize((320,180)),dtype=float);dep=np.asarray(self.depth.resize((320,180)),dtype=float)/255
   # Green foliage, excluding distant/sky regions; not a semantic tree detector.
