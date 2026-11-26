@@ -1,6 +1,8 @@
 name: Three-hour relaxation · publish and cleanup
 run-name: Three-hour relaxation · ${{ github.run_id }} · YouTube + Facebook
 on:
+  schedule:
+    - cron: '0 21 * * *' # Daily 03:00 Asia/Dhaka (UTC+6)
   workflow_dispatch:
   push:
     branches: [main]

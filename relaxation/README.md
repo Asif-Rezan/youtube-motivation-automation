@@ -119,7 +119,7 @@ shared piano/rain theme; no invented ocean/waterfall audio is claimed.
 
 The production video reuses generated short piano/rain beds to cover three hours;
 it does not generate three hours of distinct original composition. Intermediate
-artifacts expire in seven days. No recurring schedule is enabled by this workflow.
+artifacts expire in seven days. Daily generation is enabled at 21:00 UTC (03:00 Asia/Dhaka), retaining the previous project schedule.
 
 ### Full publication and cleanup
 
@@ -178,3 +178,13 @@ kids, no paid promotion, AI disclosure, standard YouTube license, embedding and
 public statistics enabled. Platform readback checks verify configured upload details,
 thumbnail and publication before cleanup. Chapters and CC BY rain credits remain
 in the actual uploaded description.
+
+### Daily schedule
+
+The full production workflow runs every day at **03:00 Asia/Dhaka (21:00 UTC)**,
+using the latest code on main: AI idea/metadata, 100 photographic images, three-hour
+video, YouTube and Facebook publishing, then verified Drive cleanup. GitHub may
+delay scheduled jobs during load. This is the generation start time; publishing
+follows successful processing. The concurrency group prevents overlapping full
+production runs from executing simultaneously. Recovery and preview workflows
+remain manual/marker-triggered.
