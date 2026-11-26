@@ -43,66 +43,103 @@ def generate(out,run,seed_fn,seconds=60,image_count=6):
  from lyrics_cpu import request_story,MODEL_ID
  store=Store();key='relaxation/ideas.json';history=store.load(key,INITIAL_HISTORY)
  checkpoint=f'relaxation/{"previews" if seconds==60 else "production-drafts"}/{run}/plan.json';saved=store.load(checkpoint,None)
- if saved:
+ if saved and not saved.get('planning_in_progress'):
   if saved.get('run_id')!=run or saved.get('publish') is not False:raise ValueError('Saved plan identity mismatch')
   out.mkdir(parents=True,exist_ok=True);(out/'plan.json').write_text(json.dumps(saved,indent=2));(out/'metadata.json').write_text(json.dumps(saved['youtube'],indent=2));return saved
- prompt=('Create ONE original one-minute relaxation music preview, adults/general audience. '
-  'Niche stays calming piano music and nature rain ambience. Fresh idea, title, description, search-specific tags, setting, lighting, palette, six scene views and thumbnail headline. '
-  'All six views MUST belong to ONE coherent physical environment, weather and lighting, like six views of the same peaceful place. '
-  'Choose a NEW environment/concept unlike the history; alternatives include a misty highland lake, quiet coastal pine garden, Japanese maple courtyard, rainy cabin landscape or fern-lined mountain stream. '
-  'All scenes outdoors with gentle rain; no people, no indoor shelter/windows. No unrelated travel montage. '
-  'Keep MUSIC STYLE gentle sparse felt piano and warm pads, slow tempo, no drums, no vocals, no speech, no sudden loud notes. This successful piano style is required, but compose a new melody. '
-  'The rain prompt must describe only soft steady rain on leaves or water, no music, voices or thunder. '
-  'For every view, water_region specifies a conservative LOWER image region containing calm pond/lake water suitable for tiny ripples; use none for dry ground, rocks, strong waterfalls or flowing creeks. '
-  'Use varied slow camera movements. Six scenes of ten seconds each. Title must accurately say 1 Minute or 60 Seconds, with one uppercase mood power word such as CALM, PEACEFUL or SOOTHING; no cure, treatment, guaranteed sleep, frequency claims or fabricated research. '
-  'Description is original prose; timestamps will be added. Tags are 8-15 unique relevant search phrases under 450 total characters. '
-  'Thumbnail headline is 2-5 concise words, coherent with title, not sensational medical claims. concept_id is a meaningful unique slug. '
-  'Creative seed '+str(seed_fn(run,500))+'. Avoid recent episode concepts and similar titles: '+json.dumps(history[-30:]))
- if seconds>60:
-  prompt=('Create a fresh THREE-HOUR relaxation piano and nature-rain video package, not a one-minute preview. '
-   'Stay in the calming piano and nature ambience niche. Choose ONE coherent outdoor setting, lighting, gentle rainy weather and colour palette, different from recent history. '
-   'Write an original 3 Hours or 180 Minutes title, original description, 8-15 unique relevant SEO tags under 450 combined characters, meaningful concept_id, environment, lighting, palette, '
-   'gentle sparse felt piano/warm pads music_prompt, steady gentle rain_prompt, thumbnail brief, TWENTY distinct reusable scene views, and TWELVE chapter_titles. '
-   'Chapters start every 15 minutes. They describe visual/mood progression within this same setting; do not claim ocean/waterfall/birds audio unless it is actually present. '
-   '20 AI images are reused over 1080 ten-second slots, with varied slow pan/zoom. Use camera enum and conservative water_region (none for dry ground, rocks, or flowing creeks). '
-   'Do not write 1080 image prompts. All twenty views are the SAME location, weather and lighting, no people, no indoor scenes. '
-   'No medical claims, guaranteed sleep, miracle frequencies, voices, thunder, loud sounds or drums. Keep a new gentle piano melody front and quiet steady rain below. '
-   'Use one uppercase mood word in the title, e.g. CALM. Chapters and all packaging must describe this actual piano/rain content, not an unrelated montage. '
-   'Thumbnail scene_index is 0-19. Chapter timestamps are added automatically. Creative seed '+str(seed_fn(run,500))+
-   '. Avoid these recent concepts and close titles: '+json.dumps(history[-30:]))
- if seconds>60 and image_count>20:
-  prompt=prompt.replace('TWENTY distinct reusable scene views','the first TWENTY distinct anchor scene views of a 100-image pool').replace('20 AI images are reused','100 AI images will be reused')
- prompt+=' Rain sound is a licensed real field recording, not AI synthesis; do not claim AI-generated rain. Source attribution will be added automatically.'
- prompt+=' Visual art direction: '+ART_DIRECTION+' Plan bright, vivid but relaxing lighting and palette; keep one consistent storybook look across all views.'
- planning_count=min(image_count,20) if seconds>60 else image_count
- schema=schema_for(seconds,planning_count)
- errors=[]
- for attempt in range(3):
-  response=request_story('chat/completions',dict(messages=[dict(role='user',content=prompt+' Corrections: '+'; '.join(errors))],response_format=dict(type='json_schema',json_schema=dict(schema=schema)),seed=seed_fn(run,500+attempt),max_completion_tokens=2500 if seconds==60 else 6000,validation_attempts=2))
-  data=json.loads(response['choices'][0]['message']['content'])
-  data['tags']=list(dict.fromkeys(' '.join(t.lower().split()) for t in data['tags']))
-  try:validate(data,history,seconds,planning_count);break
-  except (ValueError,ValidationError) as e:errors.append(str(e)[:300])
- else:raise ValueError('AI relaxation package failed validation after three attempts')
+ if saved and saved.get('planning_in_progress'):
+  if saved.get('run_id')!=run or saved.get('seconds')!=seconds or saved.get('image_count')!=image_count:raise ValueError('Planning checkpoint identity mismatch')
+  data=saved['data']
+ else:
+  prompt=('Create ONE original one-minute relaxation music preview, adults/general audience. '
+   'Niche stays calming piano music and nature rain ambience. Fresh idea, title, description, search-specific tags, setting, lighting, palette, six scene views and thumbnail headline. '
+   'All six views MUST belong to ONE coherent physical environment, weather and lighting, like six views of the same peaceful place. '
+   'Choose a NEW environment/concept unlike the history; alternatives include a misty highland lake, quiet coastal pine garden, Japanese maple courtyard, rainy cabin landscape or fern-lined mountain stream. '
+   'All scenes outdoors with gentle rain; no people, no indoor shelter/windows. No unrelated travel montage. '
+   'Keep MUSIC STYLE gentle sparse felt piano and warm pads, slow tempo, no drums, no vocals, no speech, no sudden loud notes. This successful piano style is required, but compose a new melody. '
+   'The rain prompt must describe only soft steady rain on leaves or water, no music, voices or thunder. '
+   'For every view, water_region specifies a conservative LOWER image region containing calm pond/lake water suitable for tiny ripples; use none for dry ground, rocks, strong waterfalls or flowing creeks. '
+   'Use varied slow camera movements. Six scenes of ten seconds each. Title must accurately say 1 Minute or 60 Seconds, with one uppercase mood power word such as CALM, PEACEFUL or SOOTHING; no cure, treatment, guaranteed sleep, frequency claims or fabricated research. '
+   'Description is original prose; timestamps will be added. Tags are 8-15 unique relevant search phrases under 450 total characters. '
+   'Thumbnail headline is 2-5 concise words, coherent with title, not sensational medical claims. concept_id is a meaningful unique slug. '
+   'Creative seed '+str(seed_fn(run,500))+'. Avoid recent episode concepts and similar titles: '+json.dumps(history[-30:]))
+  if seconds>60:
+   prompt=('Create a fresh THREE-HOUR relaxation piano and nature-rain video package, not a one-minute preview. '
+    'Stay in the calming piano and nature ambience niche. Choose ONE coherent outdoor setting, lighting, gentle rainy weather and colour palette, different from recent history. '
+    'Write an original 3 Hours or 180 Minutes title, original description, 8-15 unique relevant SEO tags under 450 combined characters, meaningful concept_id, environment, lighting, palette, '
+    'gentle sparse felt piano/warm pads music_prompt, steady gentle rain_prompt, thumbnail brief, TWENTY distinct reusable scene views, and TWELVE chapter_titles. '
+    'Chapters start every 15 minutes. They describe visual/mood progression within this same setting; do not claim ocean/waterfall/birds audio unless it is actually present. '
+    '20 AI images are reused over 1080 ten-second slots, with varied slow pan/zoom. Use camera enum and conservative water_region (none for dry ground, rocks, or flowing creeks). '
+    'Do not write 1080 image prompts. All twenty views are the SAME location, weather and lighting, no people, no indoor scenes. '
+    'No medical claims, guaranteed sleep, miracle frequencies, voices, thunder, loud sounds or drums. Keep a new gentle piano melody front and quiet steady rain below. '
+    'Use one uppercase mood word in the title, e.g. CALM. Chapters and all packaging must describe this actual piano/rain content, not an unrelated montage. '
+    'Thumbnail scene_index is 0-19. Chapter timestamps are added automatically. Creative seed '+str(seed_fn(run,500))+
+    '. Avoid these recent concepts and close titles: '+json.dumps(history[-30:]))
+  if seconds>60 and image_count>20:
+   prompt=prompt.replace('TWENTY distinct reusable scene views','the first TWENTY distinct anchor scene views of a 100-image pool').replace('20 AI images are reused','100 AI images will be reused')
+  prompt+=' Rain sound is a licensed real field recording, not AI synthesis; do not claim AI-generated rain. Source attribution will be added automatically.'
+  prompt+=' Visual art direction: '+ART_DIRECTION+' Plan bright, vivid but relaxing lighting and palette; keep one consistent storybook look across all views.'
+  planning_count=min(image_count,20) if seconds>60 else image_count
+  schema=schema_for(seconds,planning_count)
+  errors=[]
+  for attempt in range(3):
+   response=request_story('chat/completions',dict(messages=[dict(role='user',content=prompt+' Corrections: '+'; '.join(errors))],response_format=dict(type='json_schema',json_schema=dict(schema=schema)),seed=seed_fn(run,500+attempt),max_completion_tokens=2500 if seconds==60 else 6000,validation_attempts=2))
+   data=json.loads(response['choices'][0]['message']['content'])
+   data['tags']=list(dict.fromkeys(' '.join(t.lower().split()) for t in data['tags']))
+   try:validate(data,history,seconds,planning_count);break
+   except (ValueError,ValidationError) as e:errors.append(str(e)[:300])
+  else:raise ValueError('AI relaxation package failed validation after three attempts')
+ def save_progress():
+  store.save(checkpoint,dict(planning_in_progress=True,run_id=run,seconds=seconds,image_count=image_count,data=data))
+ save_progress()
  if image_count>len(data['scenes']):
-  # Expand in bounded batches instead of asking for 100 views in one response.
-  batch_schema=obj(scenes=SCHEMA['properties']['scenes'])
-  batch_schema['properties']['scenes']=copy.deepcopy(SCHEMA['properties']['scenes'])
-  batch_schema['properties']['scenes'].update(minItems=20,maxItems=20)
-  while len(data['scenes'])<image_count:
-   previous={normalize(s['view']) for s in data['scenes']}
-   extra_prompt=('Create 20 additional DISTINCT scene views for this same relaxation location: '+data['environment']+
-    '. Same lighting: '+data['lighting']+'. Same palette: '+data['palette']+
-    '. Visual style: '+ART_DIRECTION+'. Gentle rain. No people or indoor scenes. Each view needs chapter (short shot label), view (under 250 characters), camera and water_region. '
-    'Use none water_region when no still pond/lake water is visible. Avoid existing compositions: '+json.dumps([s['view'] for s in data['scenes']]))
-   for attempt in range(3):
-    response=request_story('chat/completions',dict(messages=[dict(role='user',content=extra_prompt)],response_format=dict(type='json_schema',json_schema=dict(schema=batch_schema)),seed=seed_fn(run,len(data['scenes'])+attempt+1500),max_completion_tokens=3000,validation_attempts=2))
+  # Retain unique results instead of discarding an entire imperfect AI batch.
+  stalled=0;calls=0
+  while len(data['scenes'])<image_count and calls<8 and stalled<3:
+   needed=min(20,image_count-len(data['scenes']))
+   batch_schema=obj(scenes=copy.deepcopy(SCHEMA['properties']['scenes']))
+   batch_schema['properties']['scenes'].update(minItems=needed,maxItems=needed)
+   extra_prompt=('Create '+str(needed)+' NEW distinct scene views for this same location: '+data['environment']+
+    '. Same lighting: '+data['lighting']+'. Palette: '+data['palette']+'. Style: '+ART_DIRECTION+
+    '. Gentle rain, outdoors, no people. Change foreground subject, viewpoint and framing. '
+    'Each view needs chapter, view, camera and water_region (none unless still water visible). '
+    'Do not repeat these existing views: '+json.dumps([x['view'] for x in data['scenes']])+
+    '. Previous duplicate views were rejected; generate genuinely new compositions, not this list again.')
+   calls+=1;added=0
+   try:
+    response=request_story('chat/completions',dict(messages=[dict(role='user',content=extra_prompt)],response_format=dict(type='json_schema',json_schema=dict(schema=batch_schema)),seed=seed_fn(run,1500+len(data['scenes'])*10+calls),max_completion_tokens=3000,validation_attempts=2))
     extra=json.loads(response['choices'][0]['message']['content']);check(extra,batch_schema)
-    views=[normalize(s['view']) for s in extra['scenes']]
-    if len(set(views))==20 and not set(views)&previous:break
-   else:raise ValueError('AI additional view batch repeated existing compositions')
-   data['scenes'].extend(extra['scenes'])
-  if len(data['scenes'])!=image_count:raise ValueError('Incorrect expanded image budget')
+    previous={normalize(x['view']) for x in data['scenes']}
+    for scene in extra['scenes']:
+     identity=normalize(scene['view'])
+     if identity not in previous:
+      data['scenes'].append(scene);previous.add(identity);added+=1
+   except (ValueError,ValidationError):
+    print(json.dumps(dict(stage='view_batch_retry',attempt=calls,reason='invalid_scene_batch')),flush=True)
+   stalled=0 if added else stalled+1
+   save_progress()
+   print(json.dumps(dict(stage='view_batch_checkpoint',attempt=calls,accepted=added,total=len(data['scenes']),target=image_count)),flush=True)
+  if len(data['scenes'])<image_count:
+   # Bounded recovery uses AI-authored locations with explicit new camera layouts.
+   # Images are still generated independently; no duplicate bitmap is inserted.
+   anchors=copy.deepcopy(data['scenes']);previous={normalize(x['view']) for x in anchors}
+   layouts=['Low viewpoint with foreground foliage framing the distant landscape',
+            'Elevated wide view across the landscape with layered distant vegetation',
+            'Close view of rain-wet foreground textures with softly distant scenery',
+            'Ground-level view from the left with a broad open middle distance',
+            'Wide view from the right with foreground branches framing the horizon',
+            'Medium view through leaves with deeper scenery visible beyond']
+   for layout in layouts:
+    for anchor in anchors:
+     scene=copy.deepcopy(anchor);scene['view']=layout+'. '+anchor['view']
+     identity=normalize(scene['view'])
+     if identity in previous:continue
+     previous.add(identity);scene['chapter']=anchor['chapter'];scene['water_region']='none'
+     data['scenes'].append(scene)
+     if len(data['scenes'])==image_count:break
+    if len(data['scenes'])==image_count:break
+   print(json.dumps(dict(stage='view_layout_recovery',total=len(data['scenes']),target=image_count)),flush=True)
+   save_progress()
+  if len(data['scenes'])!=image_count:raise ValueError('Image budget incomplete; saved planning checkpoint retained')
   # The package thumbnail may still select any of the first twenty anchor views.
  data.update(run_id=run,seconds=seconds,fps=24,resolution=[1280,720],publish=False,
   models=dict(planning=MODEL_ID,images='segmind/SSD-1B',music='ACE-Step/Ace-Step1.5',nature='Licensed rain ambience recording by alex36917, edited by Porrumentzio',depth='depth-anything/Depth-Anything-V2-Small-hf'),

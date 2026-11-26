@@ -135,3 +135,14 @@ Rerun failed jobs on the original Actions run to retain the same episode identit
 Saved upload IDs are reused; an ambiguous YouTube upload without a saved ID stops
 for reconciliation instead of risking a duplicate. Failed publication preserves Drive media.
 The one-minute preview remains unpublished.
+
+### AI scene planning recovery
+
+Each accepted planning batch is checkpointed to Drive. Duplicate views are discarded
+individually while valid new views are retained. Requests target only the remaining
+image budget and include corrective feedback. After bounded repeated AI failures,
+remaining prompts use distinct foreground/viewpoint layouts around the AI-authored
+scene anchors; each image still receives its own AI generation and seed. This
+prevents repeated text in one batch from aborting all 100 images. Failed-job retries
+resume the original run's accepted planning progress. Progress logs report accepted
+view counts and when composition recovery was used.
