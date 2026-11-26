@@ -34,8 +34,11 @@ def validate(data,history,seconds=60,image_count=6):
  if len({normalize(s['view']) for s in data['scenes']})!=image_count:raise ValueError('Distinct camera views are required for the image pool')
  for old in history:
   if normalize(old['concept_id'])==normalize(data['concept_id']):raise ValueError('Repeated episode concept')
-  if SequenceMatcher(None,normalize(old['title']),normalize(data['title'])).ratio()>.85:raise ValueError('Title too close to a previous episode')
-  if SequenceMatcher(None,normalize(old['idea']),normalize(data['idea'])).ratio()>.85:raise ValueError('Idea too close to a previous episode')
+  same_environment=not old.get('environment') or SequenceMatcher(None,normalize(old['environment']),normalize(data['environment'])).ratio()>.85
+  same_title=normalize(old['title'])==normalize(data['title'])
+  same_idea=normalize(old['idea'])==normalize(data['idea'])
+  if same_title or (same_environment and SequenceMatcher(None,normalize(old['title']),normalize(data['title'])).ratio()>.85):raise ValueError('Title too close to a previous episode')
+  if same_idea or (same_environment and SequenceMatcher(None,normalize(old['idea']),normalize(data['idea'])).ratio()>.85):raise ValueError('Idea too close to a previous episode')
  return data
 
 def generate(out,run,seed_fn,seconds=60,image_count=6):
@@ -81,14 +84,43 @@ def generate(out,run,seed_fn,seconds=60,image_count=6):
   prompt+=' SEO: write for people searching for relaxing piano music with gentle rain and nature sounds. Lead the title with a clear relevant search phrase, then this episode-specific setting or mood and exact duration; keep it readable and original, with one uppercase mood word. The first two description sentences must naturally explain the actual piano, recorded rain, setting and duration. Include relevant relaxation, reading, study or unwinding use cases only when appropriate; no guaranteed outcomes, keyword stuffing, fabricated claims or invented audio. Tags should combine a few accurate broad terms with setting-specific long-tail searches. Chapter titles should each be distinct, readable search-friendly phrases describing this chapter’s actual nature views or calm piano/rain mood, not a repeated keyword list. Never label chapters ocean, waterfall, birds or other sound sources not present in the audio.'
   planning_count=min(image_count,20) if seconds>60 else image_count
   schema=schema_for(seconds,planning_count)
-  errors=[]
+  errors=[];diagnostics=[]
+  out.mkdir(parents=True,exist_ok=True)
   for attempt in range(3):
-   response=request_story('chat/completions',dict(messages=[dict(role='user',content=prompt+' Corrections: '+'; '.join(errors))],response_format=dict(type='json_schema',json_schema=dict(schema=schema)),seed=seed_fn(run,500+attempt),max_completion_tokens=2500 if seconds==60 else 6000,validation_attempts=2))
-   data=json.loads(response['choices'][0]['message']['content'])
-   data['tags']=list(dict.fromkeys(' '.join(t.lower().split()) for t in data['tags']))
-   try:validate(data,history,seconds,planning_count);break
-   except (ValueError,ValidationError) as e:errors.append(str(e)[:300])
-  else:raise ValueError('AI relaxation package failed validation after three attempts')
+   response=request_story('chat/completions',dict(messages=[dict(role='user',content=prompt+' Corrections from rejected attempts: '+'; '.join(errors))],response_format=dict(type='json_schema',json_schema=dict(schema=schema)),seed=seed_fn(run,500+attempt),max_completion_tokens=2500 if seconds==60 else 6000,validation_attempts=2))
+   try:
+    data=json.loads(response['choices'][0]['message']['content'])
+    check(data,schema)
+    # Normalize safe formatting defects, preserving AI-authored subject matter.
+    data['tags']=list(dict.fromkeys(' '.join(t.lower().split()) for t in data['tags']))
+    while len(','.join(data['tags']))>450 and len(data['tags'])>8:
+     data['tags'].pop(max(range(len(data['tags'])),key=lambda i:len(data['tags'][i])))
+    previous=set()
+    viewpoints=['Low foreground viewpoint','Elevated wide viewpoint','Close rain-wet foreground','Wide left-side viewpoint','Right-side view through foliage','Ground-level distant panorama']
+    layouts=[v+', '+focus for v in viewpoints for focus in ['focus on wet foliage','focus on landscape depth','focus on natural textures','focus on distant vegetation']]
+    for index,scene in enumerate(data['scenes']):
+     identity=normalize(scene['view'])
+     if identity in previous:
+      for layout in layouts:
+       candidate=(layout+'. '+scene['view'])[:250]
+       if normalize(candidate) not in previous:
+        scene['view']=candidate;identity=normalize(candidate);break
+     previous.add(identity)
+    validate(data,history,seconds,planning_count)
+    diagnostics.append(dict(attempt=attempt+1,accepted=True))
+    (out/'planning-diagnostics.json').write_text(json.dumps(diagnostics,indent=2))
+    break
+   except (ValueError,ValidationError,KeyError,TypeError) as error:
+    if isinstance(error,ValidationError):
+     reason='Schema '+str(error.validator)+' at '+'.'.join(map(str,error.absolute_path))+': '+error.message[:200]
+    elif isinstance(error,json.JSONDecodeError):reason='AI response was not valid JSON'
+    elif isinstance(error,(KeyError,TypeError)):reason='AI package structure was incomplete'
+    else:reason=str(error)[:300]
+    errors.append(reason)
+    diagnostics.append(dict(attempt=attempt+1,accepted=False,reason=reason))
+    (out/'planning-diagnostics.json').write_text(json.dumps(diagnostics,indent=2))
+    print(json.dumps(dict(stage='package_validation_retry',attempt=attempt+1,reason=reason)),flush=True)
+  else:raise ValueError('AI relaxation package failed validation: '+'; '.join(errors))
  def save_progress():
   store.save(checkpoint,dict(planning_in_progress=True,run_id=run,seconds=seconds,image_count=image_count,data=data))
  save_progress()

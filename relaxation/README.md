@@ -188,3 +188,12 @@ delay scheduled jobs during load. This is the generation start time; publishing
 follows successful processing. The concurrency group prevents overlapping full
 production runs from executing simultaneously. Recovery and preview workflows
 remain manual/marker-triggered.
+
+Package validation logs a bounded, explicit rejection reason for every attempt and
+writes `planning-diagnostics.json`; the workflow uploads this even if planning
+fails. Invalid JSON is retried with corrective feedback. Duplicate anchor views
+receive distinct viewpoint/foreground compositions before validation; excess tags
+are trimmed only while preserving the minimum eight. Exact repeated concepts,
+titles and ideas remain blocked. Fuzzy wording similarity is checked together with
+setting similarity, so standard piano/rain SEO phrasing alone does not reject an
+otherwise different environment. A genuinely invalid package still stops safely.
