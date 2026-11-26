@@ -1,7 +1,10 @@
-name: Three-hour AI relaxation draft · 20 parallel workers
-run-name: Three-hour relaxation draft · ${{ github.run_id }} · no publishing
+name: Three-hour relaxation · publish and cleanup
+run-name: Three-hour relaxation · ${{ github.run_id }} · YouTube + Facebook
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.generation/relaxation-production-request.json]
 permissions:
   contents: read
 concurrency:
@@ -13,8 +16,26 @@ env:
   HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
   OMP_NUM_THREADS: '4'
   MKL_NUM_THREADS: '4'
+  UPLOAD_MODE: public
+  EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID || vars.EXPECTED_CHANNEL_ID || 'UCztvMrNCT34DO3DtzLPgWaw' }}
+  YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+  DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+  DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+  FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
 jobs:
+  preflight:
+    name: Verify publishing accounts before generation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python -u -m relaxation.publication preflight --episode "$GITHUB_RUN_ID"
   plan:
+    needs: preflight
     name: AI three-hour concept, one hundred views, twelve chapters and SEO
     runs-on: ubuntu-24.04
     timeout-minutes: 100
@@ -123,7 +144,7 @@ jobs:
           overwrite: true
           retention-days: 7
   rain:
-    name: AI rain candidates · parallel with piano and images
+    name: Natural recorded rain · parallel with piano and images
     needs: plan
     runs-on: ubuntu-24.04
     timeout-minutes: 100
@@ -136,9 +157,8 @@ jobs:
           python-version: '3.12'
       - run: |
           sudo apt-get update
-          sudo apt-get install -y libsndfile1
-          pip install --no-cache-dir torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
-          pip install --no-cache-dir -r requirements-relaxation.txt
+          sudo apt-get install -y ffmpeg libsndfile1
+          pip install --no-cache-dir numpy Pillow scipy soundfile
       - uses: actions/download-artifact@v4
         with:
           name: long-plan
@@ -151,6 +171,7 @@ jobs:
           path: |
             output/relaxation-production/rain*.wav
             output/relaxation-production/rain-review.json
+            output/relaxation-production/rain-provenance.json
             output/relaxation-production/nature-license.txt
           overwrite: true
           retention-days: 7
@@ -231,7 +252,7 @@ jobs:
           overwrite: true
           retention-days: 7
   assemble:
-    name: Fast concat · 3 hours · chapters and metadata · no publishing
+    name: Fast concat · 3 hours · chapters and metadata
     needs: [plan, images, clips, audio]
     runs-on: ubuntu-24.04
     timeout-minutes: 40
@@ -254,7 +275,7 @@ jobs:
       - run: python -u -m relaxation.production assemble --out "$RELAX_OUT"
       - uses: actions/upload-artifact@v4
         with:
-          name: three-hour-relaxation-draft-${{ github.run_id }}
+          name: three-hour-relaxation-${{ github.run_id }}
           path: |
             output/relaxation-production/relaxation-3-hours.mp4
             output/relaxation-production/thumbnail.jpg
@@ -262,6 +283,57 @@ jobs:
             output/relaxation-production/plan.json
             output/relaxation-production/chapters.txt
             output/relaxation-production/production-report.json
+            output/relaxation-production/rain-provenance.json
             output/relaxation-production/nature-license.txt
           compression-level: 0
           retention-days: 7
+  youtube:
+    name: Publish and verify YouTube
+    needs: assemble
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - uses: actions/download-artifact@v4
+        with:
+          name: three-hour-relaxation-${{ github.run_id }}
+          path: output/relaxation-production
+      - run: python -u -m relaxation.publication youtube --episode "$GITHUB_RUN_ID"
+  facebook:
+    name: Publish and verify Facebook
+    needs: youtube
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: python -u -m relaxation.publication facebook --episode "$GITHUB_RUN_ID"
+  cleanup:
+    name: Clean Drive after both publications
+    needs: facebook
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    concurrency:
+      group: dudi-drive-cleanup
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: python -u -m relaxation.publication cleanup --episode "$GITHUB_RUN_ID"

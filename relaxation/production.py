@@ -5,6 +5,7 @@ No publication. Music/rain source license still prevents commercial rollout.
 import argparse,json,random,subprocess,math
 from pathlib import Path
 from .preview import seed,image_at,atmospheric,thumbnail,extend
+from .editing import FEATURES
 from PIL import Image
 import numpy as np
 
@@ -52,10 +53,15 @@ def clip_worker(out,index):
  data=json.loads((out/'plan.json').read_text());scene=data['scenes'][index]
  with Image.open(out/f'scene-{index:02d}.png') as im:source=im.convert('RGB')
  with Image.open(out/f'depth-{index:02d}.png') as d:depth=d.convert('L')
+ advanced=data.get('editing_profile')=='nature-polish-v1'
+ if advanced:
+  from .editing import SceneRenderer
+  renderer=SceneRenderer(source,depth,scene,seed(data['run_id'],index+1200))
  rng=np.random.default_rng(seed(data['run_id'],index+1100));points=[(float(rng.uniform(0,1280)),float(rng.uniform(0,720)),float(rng.uniform(100,240))) for _ in range(70)]
  count=len(data['scenes']);order=[r['image'] for r in data['timeline'][:count]];position=order.index(index);next_index=order[(position+1)%count]
  with Image.open(out/f'scene-{next_index:02d}.png') as im:next_source=im.convert('RGB')
  with Image.open(out/f'depth-{next_index:02d}.png') as d:next_depth=d.convert('L')
+ if advanced:next_renderer=SceneRenderer(next_source,next_depth,data['scenes'][next_index],seed(data['run_id'],next_index+1200))
  cameras=['pan_left','pan_right','zoom_in','zoom_out']
  for variant,camera in enumerate(cameras):
   row=dict(scene,camera=camera);target=out/f'clip-{index:02d}-{variant}.mp4'
@@ -63,12 +69,17 @@ def clip_worker(out,index):
   proc=subprocess.Popen(cmd,stdin=subprocess.PIPE)
   next_variant=(variant+1)%4 if position==count-1 else variant
   next_row=dict(data['scenes'][next_index],camera=cameras[next_variant])
-  next_frame=image_at([next_source]*6,0,[next_row]*6)
-  next_frame=atmospheric(next_frame,image_at([next_depth]*6,0,[next_row]*6),0,next_row,points)
+  if advanced:next_frame=next_renderer.frame(0,cameras[next_variant])
+  else:
+   next_frame=image_at([next_source]*6,0,[next_row]*6)
+   next_frame=atmospheric(next_frame,image_at([next_depth]*6,0,[next_row]*6),0,next_row,points)
   try:
    for f in range(240):
-    t=f/24;im=image_at([source]*6,t,[row]*6);d=image_at([depth]*6,t,[row]*6)
-    im=atmospheric(im,d,t,row,points)
+    t=f/24
+    if advanced:im=renderer.frame(t,camera)
+    else:
+     im=image_at([source]*6,t,[row]*6);d=image_at([depth]*6,t,[row]*6)
+     im=atmospheric(im,d,t,row,points)
     if t>8:
      fraction=(t-8)/2;fraction=fraction*fraction*(3-2*fraction)
      im=Image.blend(im,next_frame,fraction)
@@ -85,7 +96,7 @@ def audio_worker(out):
  # compositor's global end fades. No need for a 3-hour NumPy/WAV allocation.
  from scipy.signal import resample_poly
  tracks=[]
- for filename,db in [('music-original.wav',-25),('rain-original.wav',-33)]:
+ for filename,db in [('music-original.wav',-25),('rain-original.wav',-31 if data.get('nature_backend')=='field_recording' else -33)]:
   pcm,sr=sf.read(out/filename,dtype='float32',always_2d=True);pcm=extend(pcm,sr,seconds=70,fade_seconds=4)
   g=math.gcd(sr,48000);pcm=resample_poly(pcm,48000//g,sr//g,axis=0)
   rms=max(float(np.sqrt(np.mean(pcm.astype(float)**2))),1e-6);tracks.append(pcm*min(8,10**(db/20)/rms))
@@ -99,14 +110,35 @@ def audio_worker(out):
  seconds=data['seconds']
  subprocess.run(['ffmpeg','-v','error','-y','-stream_loop','-1','-i',str(out/'production-loop.wav'),'-t',str(seconds),'-af',f'afade=t=in:d=4,afade=t=out:st={seconds-5}:d=5,alimiter=limit=0.89:level=false','-c:a','aac','-b:a','192k',str(out/'production-audio.m4a')],check=True)
 
+def label_clip(base,target,text):
+ from .editing import title_overlay
+ reader=subprocess.Popen(['ffmpeg','-v','error','-i',str(base),'-an','-f','rawvideo','-pix_fmt','rgb24','pipe:1'],stdout=subprocess.PIPE)
+ writer=subprocess.Popen(['ffmpeg','-v','error','-y','-f','rawvideo','-pix_fmt','rgb24','-s','1280x720','-r','24','-i','pipe:0','-an','-c:v','libx264','-preset','fast','-crf','20','-pix_fmt','yuv420p','-video_track_timescale','24000',str(target)],stdin=subprocess.PIPE)
+ try:
+  for frame in range(240):
+   raw=reader.stdout.read(1280*720*3)
+   if len(raw)!=1280*720*3:raise ValueError('Incomplete reusable clip for chapter label')
+   if frame<96:raw=title_overlay(Image.frombytes('RGB',(1280,720),raw),text,frame/24).tobytes()
+   writer.stdin.write(raw)
+ finally:reader.stdout.close();writer.stdin.close()
+ if reader.wait()!=0 or writer.wait()!=0:raise RuntimeError('Chapter label encoding failed')
+
 def assemble(out):
  data=json.loads((out/'plan.json').read_text());rows=data['timeline']
  if len(rows)!=1080 or data['seconds']!=10800:raise ValueError('Expected exact three-hour timeline')
  for a,b in zip(rows,rows[1:]):
   if a['image']==b['image']:raise ValueError('Adjacent duplicate image in production timeline')
+ labeled={}
+ if data.get('editing_profile')=='nature-polish-v1':
+  from .editing import font
+  for chapter in range(12):
+   slot=chapter*90;row=rows[slot];base=out/f"clip-{row['image']:02d}-{row['variant']}.mp4"
+   label=data['title'] if chapter==0 else data['chapter_titles'][chapter]
+   labeled[slot]=out/f'chapter-labeled-{chapter:02d}.mp4'
+   label_clip(base,labeled[slot],label)
  with (out/'concat.txt').open('w') as f:
-  for row in rows:
-   path=out/f"clip-{row['image']:02d}-{row['variant']}.mp4"
+  for slot,row in enumerate(rows):
+   path=labeled.get(slot) or out/f"clip-{row['image']:02d}-{row['variant']}.mp4"
    if not path.exists():raise ValueError('Missing reusable clip '+str(path))
    f.write("file '"+path.name+"'\n")
  target=out/'relaxation-3-hours.mp4'
@@ -126,7 +158,7 @@ def assemble(out):
  if len(probe.get('chapters',[]))!=12:raise ValueError('Embedded chapters are missing')
  images=[Image.open(out/f'scene-{i:02d}.png').convert('RGB') for i in range(len(data['scenes']))];thumbnail(out,images,data)
  (out/'chapters.txt').write_text(data['chapters']+'\n')
- (out/'production-report.json').write_text(json.dumps(dict(seconds=10800,frames=259200,unique_images=len(data['scenes']),reusable_clips=len(data['scenes'])*4,slots=1080,adjacent_duplicate_images=False,chapters=12,publication=False,transitions='Two-second smooth dissolves baked into reusable clips'),indent=2))
+ (out/'production-report.json').write_text(json.dumps(dict(seconds=10800,frames=259200,unique_images=len(data['scenes']),reusable_clips=len(data['scenes'])*4,slots=1080,adjacent_duplicate_images=False,chapters=12,publication=False,editing_features=FEATURES if data.get('editing_profile')=='nature-polish-v1' else [],transitions='Two-second smooth dissolves baked into reusable clips'),indent=2))
 if __name__=='__main__':
  p=argparse.ArgumentParser();p.add_argument('stage',choices=['plan','images','clips','audio','assemble']);p.add_argument('--out',type=Path,default=Path('output/relaxation-production'));p.add_argument('--run-id',default='local');p.add_argument('--index',type=int,choices=range(20),default=0);a=p.parse_args();a.out.mkdir(parents=True,exist_ok=True)
  if a.stage=='plan':

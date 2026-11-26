@@ -52,4 +52,4 @@ jobs:
           retention-days: 14
       - run: |
           echo '## Relaxation preview ready' >> "$GITHUB_STEP_SUMMARY"
-          echo 'Original AI images, music and rain reused. Download the relaxation-preview-60s artifact. This noncommercial review sample is not published.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Original AI images, music and rain reused. Download the relaxation-preview-60s artifact. This review sample is not published; see nature-license.txt for source-specific terms.' >> "$GITHUB_STEP_SUMMARY"

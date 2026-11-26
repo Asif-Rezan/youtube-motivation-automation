@@ -33,7 +33,7 @@ def verify_public(client, state):
                                 id=state['video_id']).execute(num_retries=3).get('items', [])
     if len(items) != 1:
         raise CleanupNotEligible('video_unavailable')
-    if state.get('wildlife') and not state.get('facebook_verified'):
+    if (state.get('wildlife') or state.get('relaxation')) and not state.get('facebook_verified'):
         raise CleanupNotEligible('wildlife_facebook_publication_pending')
     video = items[0]
     snippet, status = video.get('snippet', {}), video.get('status', {})

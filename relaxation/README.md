@@ -3,7 +3,7 @@
 Run `.github/workflows/relaxation-preview.yml` manually or update
 `.generation/relaxation-preview-request.json` on main. This creates a 60-second
 review sample without YouTube/Facebook publishing or a recurring schedule.
-Existing production publishing and Drive cleanup workflows are unchanged.
+The full relaxation workflow publishes to the configured YouTube channel and Facebook Page, then cleans its temporary Drive media after publication verification.
 
 ## Episode planning and diversity
 
@@ -41,25 +41,50 @@ masks. These are approximations, not validated water segmentation or actual
 simulation. Inspect visual masks before production. No text is drawn on the
 relaxation film; a separate 1920×1080 thumbnail uses the AI brief.
 
-## Sound
+## Sound and provenance
 
-Keep the successful sparse felt-piano/warm-pad style while generating a new
-ACE-Step 24-second instrumental. AudioLDM produces three distinct accepted
-15-second rain takes (up to four candidates, 40 inference steps). Each take is
-trimmed to its steadiest ten-second window. Numerical screening rejects silence,
-large peaks and unstable energy; it cannot reliably reject voices or establish
-naturalness. Original takes and the review report are kept for listening.
+The successful sparse felt-piano/warm-pad style remains an original ACE-Step
+composition. Natural rain now defaults to a real recording, rather than the
+AudioLDM output that did not pass the user's listening review.
 
-A gentle 90–5800 Hz filter softens rumble/hiss; soft peak control reduces
-spikes. Three selected clips overlap for four seconds each, yielding a
-22-second bed, which is extended with further overlaps. Piano is foreground,
-rain quieter; the full mix gets three-second fades and peak limiting. No
-procedural replacement sound or static fallback package is silently used.
+`assets/rain-alex36917-blanket.ogg` is pinned to a verified Git blob and SHA-256.
+It comes from “rain ambience” by alex36917 (Freesound #524605), edited by
+Porrumentzio for Blanket, under CC BY 4.0. `assets/rain-source.json` holds the
+source, mirror revision, checksum, license URL and complete credit. The sound
+credit and processing disclosure are included in the AI description and
+`nature-license.txt`. Attribution must remain with published derivatives.
+Source: https://freesound.org/people/alex36917/sounds/524605/ .
 
-**AudioLDM small-v2 is CC-BY-NC-SA-4.0. This is a noncommercial evaluation
-sample. Do not publish or monetize it.** Replace this sound model with a
-suitably licensed source or obtain rights before commercial rollout.
-Source: https://huggingface.co/cvssp/audioldm-s-full-v2 .
+The selector excludes the final 30 seconds of the recording (the original
+page mentions a distant train horn near its end) and chooses a steady one-minute
+window. It gently filters 55–7600 Hz, keeps recorded stereo, places the rain
+below the piano and uses long loop overlaps and global end fades. Numerical
+selection does not guarantee the absence of every external sound; listen before
+publication. `rain-provenance.json` records the selected interval.
+
+Legacy saved AudioLDM plans remain readable, but their original noncommercial
+restriction still applies. The legacy artifact name `relaxation-ai-rain` is
+retained for recovery compatibility; the new job, plan, provenance and credits
+correctly identify field-recorded rain.
+
+## Editing profile: nature-polish-v1
+
+All ten requested edits are connected to previews and reusable production
+clips: slow depth parallax, moving distant mist, masked foliage sway, masked
+water texture/reflection movement and ripples, three wind/rain layers, subtle
+light drift, four safe camera framings, two-second scene dissolves and smooth
+audio transitions, consistent brighter colour grading, and minimal labels.
+
+The preview intro title fades after four seconds; preview scene labels are
+brief. Production labels are applied only at the twelve actual fifteen-minute
+chapter boundaries, not on every repeated image. Only those twelve clips are
+encoded again; the rest still use fast concatenation.
+
+Depth/colour/texture masks are approximations. A still image does not contain
+hidden surfaces or actual plant/water geometry. Keep shifts small and review
+mask placement before production; this is gentle 2.5D motion, not physically
+accurate 3D animation or a transformation of old photographs into new artwork.
+New AI generations retain the requested bright 3D storybook visual direction.
 
 ## Outputs and recovery
 
@@ -72,7 +97,7 @@ by the compositor. Model inference still takes CPU time; no real-time inference
 or guaranteed rain-quality claim is made.
 
 
-## Three-hour draft workflow (manual only)
+## Three-hour production workflow
 
 `relaxation-production.yml` is configured for exactly 10,800 seconds, with up to
 20 parallel image/depth workers (five images per worker) and up to 20 parallel reusable-clip workers,
@@ -90,10 +115,23 @@ hours again. Chapters start at 00:00, 15:00, …, 02:45:00 and appear both in th
 AI description and embedded MP4 chapter metadata. Titles must match the actual
 shared piano/rain theme; no invented ocean/waterfall audio is claimed.
 
-The draft reuses the generated short piano/rain beds to cover three hours; it
-does not generate three hours of distinct original composition. Intermediate
-artifacts expire in seven days. This workflow has no publishing or schedule and
-was not triggered when adding these settings: the one-minute review remains
-the current preview. Signal/schedule tests and a synthetic full-duration concat test validate
-three-hour timing and embedded chapters; a real three-hour AI production render
-has not been run. The noncommercial nature-model restriction still applies.
+The production video reuses generated short piano/rain beds to cover three hours;
+it does not generate three hours of distinct original composition. Intermediate
+artifacts expire in seven days. No recurring schedule is enabled by this workflow.
+
+### Full publication and cleanup
+
+Updating `.generation/relaxation-production-request.json` on main, or manually dispatching
+`relaxation-production.yml`, starts an explicitly authorized full production run.
+A preflight verifies the configured YouTube channel, Facebook Page and Drive credentials.
+After assembly, the full episode and thumbnail are backed up to Drive. YouTube is
+published as Music, English, not made for kids, no paid placement, with AI disclosure.
+The AI description retains all twelve chapters and the recorded rain attribution.
+Facebook publication follows verified YouTube publication. Cleanup requires both platform
+receipts plus fresh Facebook/YouTube checks; only this episode's temporary media are
+deleted. AI idea history, upload IDs and cleanup journals remain in Drive.
+
+Rerun failed jobs on the original Actions run to retain the same episode identity.
+Saved upload IDs are reused; an ambiguous YouTube upload without a saved ID stops
+for reconciliation instead of risking a duplicate. Failed publication preserves Drive media.
+The one-minute preview remains unpublished.

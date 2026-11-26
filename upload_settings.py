@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 SETTINGS = Path(__file__).with_name('upload_settings.json')
 
-def load_settings(now=None, *, wildlife=False, domain=None):
+def load_settings(now=None, *, wildlife=False, domain=None, relaxation=False):
     settings = json.loads(SETTINGS.read_text())
     for env, field in [('UPLOAD_MODE','mode'),('PUBLISH_AT','publish_at'),('VIDEO_LANGUAGE','language'),
                        ('AUDIO_LANGUAGE','audio_language'),('VIDEO_CATEGORY_ID','category_id')]:
@@ -19,6 +19,8 @@ def load_settings(now=None, *, wildlife=False, domain=None):
         category = '15' if domain == 'wildlife' else '27'
         settings.update(language='en',audio_language='en',category_id=category,
                         made_for_kids=False,paid_product_placement=False)
+    if relaxation:
+        settings.update(language='en',audio_language='en',category_id='10',made_for_kids=False,paid_product_placement=False)
     if settings['mode'] not in ('public', 'scheduled'):
         raise ValueError('Upload mode must be public or scheduled')
     for field in ('language','audio_language'):
@@ -30,7 +32,7 @@ def load_settings(now=None, *, wildlife=False, domain=None):
                   'notify_subscribers','paid_product_placement'):
         if type(settings[field]) is not bool:
             raise ValueError('Expected boolean setting: ' + field)
-    if (not wildlife and not settings['made_for_kids']) or not settings['contains_synthetic_media']:
+    if (not wildlife and not relaxation and not settings['made_for_kids']) or not settings['contains_synthetic_media']:
         raise ValueError('Kids and AI disclosures are required for this pipeline')
     if settings['license'] not in ('youtube','creativeCommon'):
         raise ValueError('Invalid license')

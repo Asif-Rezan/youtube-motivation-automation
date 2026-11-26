@@ -72,6 +72,7 @@ def generate(out,run,seed_fn,seconds=60,image_count=6):
    '. Avoid these recent concepts and close titles: '+json.dumps(history[-30:]))
  if seconds>60 and image_count>20:
   prompt=prompt.replace('TWENTY distinct reusable scene views','the first TWENTY distinct anchor scene views of a 100-image pool').replace('20 AI images are reused','100 AI images will be reused')
+ prompt+=' Rain sound is a licensed real field recording, not AI synthesis; do not claim AI-generated rain. Source attribution will be added automatically.'
  prompt+=' Visual art direction: '+ART_DIRECTION+' Plan bright, vivid but relaxing lighting and palette; keep one consistent storybook look across all views.'
  planning_count=min(image_count,20) if seconds>60 else image_count
  schema=schema_for(seconds,planning_count)
@@ -104,9 +105,9 @@ def generate(out,run,seed_fn,seconds=60,image_count=6):
   if len(data['scenes'])!=image_count:raise ValueError('Incorrect expanded image budget')
   # The package thumbnail may still select any of the first twenty anchor views.
  data.update(run_id=run,seconds=seconds,fps=24,resolution=[1280,720],publish=False,
-  models=dict(planning=MODEL_ID,images='segmind/SSD-1B',music='ACE-Step/Ace-Step1.5',nature='cvssp/audioldm-s-full-v2',depth='depth-anything/Depth-Anything-V2-Small-hf'),
-  nature_license='CC-BY-NC-SA-4.0: noncommercial evaluation only; do not publish or monetize this preview',
-  audio_design='Original AI piano plus three distinct AI rain takes with quality-screened segments and long overlaps',image_source_size=[1024,576],art_style=STYLE_ID,version=2)
+  models=dict(planning=MODEL_ID,images='segmind/SSD-1B',music='ACE-Step/Ace-Step1.5',nature='Licensed rain ambience recording by alex36917, edited by Porrumentzio',depth='depth-anything/Depth-Anything-V2-Small-hf'),
+  nature_license='CC-BY-4.0; attribution required',nature_backend='field_recording',rain_seconds=60,
+  audio_design='Original AI piano plus verified licensed real rain, quiet-window selection and long overlaps',image_source_size=[1024,576],art_style=STYLE_ID,editing_profile='nature-polish-v1',version=3)
  for i,s in enumerate(data['scenes']):
   s.update(index=i,start=i*10,duration=10,seed=seed_fn(run,i),prompt=f"Bright polished 3D storybook nature illustration, vivid colours. {data['environment']}. {s['view']}. Soft luminous light, dimensional foliage, rich balanced colours, layered depth. {data['lighting']}. Palette: {data['palette']}. Gentle rain, no people or text.")
  data['music_prompt']='Gentle sparse felt piano, warm ambient pads, slow peaceful tempo, no drums, no vocals or speech. '+data['music_prompt']
@@ -118,9 +119,12 @@ def generate(out,run,seed_fn,seconds=60,image_count=6):
   data['chapters']=chapter_text(data['chapter_titles'],seconds)
   for scene in data['scenes']:
    scene.pop('start',None);scene.pop('duration',None)
- data['description']+='\n\nChapters\n'+data['chapters']+'\n\nAI-generated imagery, piano music and nature ambience. Noncommercial evaluation draft; no therapeutic claims.'
+ data['description']+='\n\nChapters\n'+data['chapters']+'\n\nAI-generated imagery and piano music, with licensed recorded rain ambience. No therapeutic claims.'
+ from .field_rain import ASSETS
+ credits=json.loads((ASSETS/'rain-source.json').read_text())
+ data['description']+='\n\nSound credit: '+credits['credit']+' '+credits['source']+' '+credits['license_url']
  data['youtube']=dict(snippet=dict(title=data['title'],description=data['description'],tags=data['tags'],categoryId='10',defaultLanguage='en',defaultAudioLanguage='en'),status=dict(privacyStatus='private',selfDeclaredMadeForKids=False,containsSyntheticMedia=True),paidProductPlacementDetails=dict(hasPaidProductPlacement=False))
- data['publishing_blocked']='Review only; AudioLDM nature model is noncommercial'
+ data['publishing_blocked']='Review approval required before publication'
  out.mkdir(parents=True,exist_ok=True);(out/'plan.json').write_text(json.dumps(data,indent=2));(out/'metadata.json').write_text(json.dumps(data['youtube'],indent=2))
  store.save(key,(history+[dict(run_id=run,title=data['title'],idea=data['idea'],concept_id=data['concept_id'],environment=data['environment'],thumbnail=data['thumbnail']['headline'])])[-200:])
  store.save(checkpoint,data)

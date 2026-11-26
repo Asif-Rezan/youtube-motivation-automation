@@ -107,7 +107,7 @@ jobs:
       - name: Prepare CPU audio runtime and swap
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg libsndfile1
+          sudo apt-get install -y ffmpeg libsndfile1 fonts-dejavu-core
           sudo fallocate -l 16G /swapfile-relax-music
           sudo chmod 600 /swapfile-relax-music
           sudo mkswap /swapfile-relax-music
@@ -130,7 +130,7 @@ jobs:
           overwrite: true
           retention-days: 7
   nature:
-    name: AI gentle rain · AudioLDM CPU · private evaluation
+    name: Natural rain · verified CC BY field recording
     needs: plan
     runs-on: ubuntu-24.04
     timeout-minutes: 100
@@ -141,16 +141,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install CPU nature sound model runtime
+      - name: Prepare licensed natural rain ambience
         run: |
           sudo apt-get update
-          sudo apt-get install -y libsndfile1
-          sudo fallocate -l 8G /swapfile-relax-rain
-          sudo chmod 600 /swapfile-relax-rain
-          sudo mkswap /swapfile-relax-rain
-          sudo swapon /swapfile-relax-rain
-          pip install --no-cache-dir torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
-          pip install --no-cache-dir -r requirements-relaxation.txt
+          sudo apt-get install -y ffmpeg libsndfile1 fonts-dejavu-core
+          pip install --no-cache-dir numpy Pillow scipy soundfile
       - uses: actions/download-artifact@v4
         with:
           name: relaxation-plan
@@ -163,6 +158,7 @@ jobs:
           path: |
             output/relaxation-preview/rain*.wav
             output/relaxation-preview/rain-review.json
+            output/relaxation-preview/rain-provenance.json
             output/relaxation-preview/nature-license.txt
           overwrite: true
           retention-days: 7
@@ -180,7 +176,7 @@ jobs:
           python-version: '3.12'
       - run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg libsndfile1
+          sudo apt-get install -y ffmpeg libsndfile1 fonts-dejavu-core
           pip install numpy Pillow scipy soundfile
       - uses: actions/download-artifact@v4
         with:
@@ -199,6 +195,7 @@ jobs:
             output/relaxation-preview/plan.json
             output/relaxation-preview/quality-report.json
             output/relaxation-preview/nature-license.txt
+            output/relaxation-preview/rain-provenance.json
           overwrite: true
           retention-days: 14
       - name: Summarize private preview
@@ -208,5 +205,5 @@ jobs:
           from pathlib import Path
           data=json.loads(Path('output/relaxation-preview/plan.json').read_text())
           with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
-              f.write('## '+data['title']+'\n\n60 seconds · 720p · 24 FPS · six AI-directed coherent 1024×576 images, changing every 10 seconds with two-second dissolves, slow varied cameras and depth-aware effects.\n\nNew Qwen idea/title/description/tags/thumbnail and saved idea history. ACE-Step piano + three quality-screened AudioLDM rain takes, softly filtered below the music and crossfaded to full length. No narration, Blender, publication or recurring schedule.\n\nDownload the relaxation-preview-60s artifact. AudioLDM rain uses CC-BY-NC-SA-4.0; private noncommercial evaluation only. Replace this sound model or obtain suitable rights before commercial production.\n')
+              f.write('## '+data['title']+'\n\n60 seconds · 720p · 24 FPS · six AI-directed coherent 1024×576 images, changing every 10 seconds with two-second dissolves, slow varied cameras and depth-aware effects.\n\nNew Qwen idea/title/description/tags/thumbnail and saved idea history. ACE-Step piano + licensed real rain recording, softly filtered below the music and crossfaded to full length. Parallax, drifting mist, foliage sway, masked water effects, layered rain, soft light, bright grading and brief labels. No narration, Blender, publication or recurring schedule.\n\nDownload the relaxation-preview-60s artifact. Recorded rain is CC BY 4.0; attribution is included in the AI description and nature-license.txt. Human review is still required before publication.\n')
           PY

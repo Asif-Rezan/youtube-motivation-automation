@@ -1,0 +1,12 @@
+{
+  "name": "rain ambience",
+  "author": "alex36917",
+  "editor": "Porrumentzio",
+  "source": "https://freesound.org/people/alex36917/sounds/524605/",
+  "mirror": "https://raw.githubusercontent.com/rafaelmardojai/blanket/2eaca9ba5a1b624adf90b6ccee1008efc46f0273/data/resources/sounds/rain.ogg",
+  "mirror_revision": "2eaca9ba5a1b624adf90b6ccee1008efc46f0273",
+  "license": "CC-BY-4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "sha256": "b84c1daf259a24283be40b7663656d17676df4eb60c1e0332820570db891848a",
+  "credit": "Rain ambience by alex36917 (Freesound #524605), edited by Porrumentzio for Blanket, licensed CC BY 4.0. Further trimmed, filtered, looped and mixed for this video."
+}

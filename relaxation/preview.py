@@ -57,6 +57,10 @@ def depth_mask(out,index,target):
  Image.fromarray((d*255).astype('uint8')).resize((1024,576),Image.Resampling.BICUBIC).save(out/f'depth-{index:02d}.png')
 
 def nature(out):
+ data=json.loads((out/'plan.json').read_text())
+ if data.get('nature_backend')=='field_recording':
+  from .field_rain import prepare
+  return prepare(out,data['run_id'])
  import torch,soundfile as sf
  from scipy.signal import butter,sosfiltfilt
  from diffusers import AudioLDMPipeline
@@ -130,8 +134,8 @@ def mixed_audio(out):
  import soundfile as sf
  from scipy.signal import resample_poly
  rate=48000;tracks=[]
- version=json.loads((out/'plan.json').read_text()).get('version',1)
- for filename,expected,target_db in [('music-original.wav',24,-25),('rain-original.wav',22 if version>=2 else 10,-33)]:
+ audio_plan=json.loads((out/'plan.json').read_text());version=audio_plan.get('version',1)
+ for filename,expected,target_db in [('music-original.wav',24,-25),('rain-original.wav',audio_plan.get('rain_seconds',22 if version>=2 else 10),-31 if audio_plan.get('nature_backend')=='field_recording' else -33)]:
   pcm,sr=sf.read(out/filename,dtype='float32',always_2d=True);validate_audio(pcm,sr,expected)
   pcm=extend(pcm,sr,fade_seconds=4 if filename.startswith('rain') else 3);g=math.gcd(sr,rate);pcm=resample_poly(pcm,rate//g,sr//g,axis=0)
   rms=np.sqrt(np.mean(pcm.astype(float)**2));pcm*=min(8,10**(target_db/20)/rms);tracks.append(pcm)
@@ -204,6 +208,10 @@ def compose(out):
   elif data.get('version',1)>=2:raise ValueError('Missing generated depth mask')
   else:depths.append(Image.new('L',(1024,576),128))
  if 'thumbnail' in data:thumbnail(out,images,data)
+ advanced=data.get('editing_profile')=='nature-polish-v1';renderers=[]
+ if advanced:
+  from .editing import SceneRenderer,render_sequence,title_overlay,FEATURES
+  renderers=[SceneRenderer(im,d,scene,seed(data['run_id'],1200+i)) for i,(im,d,scene) in enumerate(zip(images,depths,data['scenes']))]
  rng=np.random.default_rng(seed(data['run_id'],801));points=[(float(rng.uniform(0,1280)),float(rng.uniform(0,720)),float(rng.uniform(100,240))) for _ in range(95)]
  started=time.monotonic()
  target=out/'rain-garden-60s.mp4';tmp=out/'rain-garden-60s.partial.mp4'
@@ -211,9 +219,15 @@ def compose(out):
  proc=subprocess.Popen(cmd,stdin=subprocess.PIPE)
  try:
   for f in range(SECONDS*FPS):
-   t=f/FPS;im=image_at(images,t,data['scenes']);depth=image_at(depths,t,data['scenes'])
-   if data.get('version',1)>=2:im=atmospheric(im,depth,t,data['scenes'][min(5,int(t//10))],points)
-   # No narration, workout graphics or persistent text over the relaxing scenes.
+   t=f/FPS
+   if advanced:
+    im=render_sequence(renderers,data['scenes'],t)
+    if t<4:im=title_overlay(im,data['title'],t)
+    elif int(t//10)>0 and t%10<2.5:im=title_overlay(im,data['scenes'][int(t//10)]['chapter'],t%10,duration=2.5)
+   else:
+    im=image_at(images,t,data['scenes']);depth=image_at(depths,t,data['scenes'])
+    if data.get('version',1)>=2:im=atmospheric(im,depth,t,data['scenes'][min(5,int(t//10))],points)
+   # No narration or persistent text; short titles fade away.
    proc.stdin.write(im.tobytes())
    if f%(FPS*10)==0:print('COMPOSE_SECONDS',f//FPS,flush=True)
  finally:proc.stdin.close()
@@ -223,7 +237,7 @@ def compose(out):
  if (video['width'],video['height'])!=SIZE or int(video['nb_frames'])!=1440 or abs(float(probe['format']['duration'])-60)>.05:raise ValueError('Final preview dimensions/duration mismatch')
  subprocess.run(['ffmpeg','-v','error','-i',str(tmp),'-f','null','-'],check=True)
  tmp.replace(target)
- report=dict(seconds=60,frames=1440,resolution=SIZE,scene_change_seconds=10,ai_images=6,source_image_resolution=[1024,576],dissolve_seconds=2,depth_aware_effects=data.get('version',1)>=2,publish=False,compose_seconds=round(time.monotonic()-started,2),**audio_report)
+ report=dict(seconds=60,frames=1440,resolution=SIZE,scene_change_seconds=10,ai_images=6,source_image_resolution=[1024,576],dissolve_seconds=2,depth_aware_effects=data.get('version',1)>=2,publish=False,compose_seconds=round(time.monotonic()-started,2),editing_features=FEATURES if advanced else [],**audio_report)
  (out/'quality-report.json').write_text(json.dumps(report,indent=2))
  # One honest preview contact sheet for browsing the result.
  sheet=Image.new('RGB',(1280,1080))

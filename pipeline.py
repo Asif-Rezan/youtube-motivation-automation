@@ -159,7 +159,9 @@ def publish(client, root, song, state, save, upload_thumbnail=True, metadata_kin
         if state.get('upload_started'):
             raise RuntimeError('Ambiguous upload; reconcile YouTube before retry to avoid duplicates')
         from upload_settings import load_settings, upload_body
-        if state.get('wildlife'):
+        if state.get('relaxation'):
+            settings = load_settings(relaxation=True)
+        elif state.get('wildlife'):
             settings = load_settings(wildlife=True, domain=state.get('episode_domain'))
         else:
             settings = load_settings()
