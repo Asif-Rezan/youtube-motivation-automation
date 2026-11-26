@@ -1,0 +1,268 @@
+name: "Recover full relaxation \xB7 saved AI assets \xB7 publish and cleanup"
+run-name: "Full relaxation recovery \xB7 audio fix \xB7 saved AI assets"
+permissions:
+  contents: read
+  actions: write
+concurrency:
+  group: relaxation-full-recovery
+  cancel-in-progress: false
+env:
+  RELAX_OUT: output/relaxation-production
+  HF_HUB_DISABLE_XET: '1'
+  HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+  OMP_NUM_THREADS: '4'
+  MKL_NUM_THREADS: '4'
+  UPLOAD_MODE: public
+  EXPECTED_CHANNEL_ID: ${{ secrets.EXPECTED_CHANNEL_ID || vars.EXPECTED_CHANNEL_ID || 'UCztvMrNCT34DO3DtzLPgWaw' }}
+  YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+  DRIVE_TOKEN_JSON: ${{ secrets.DRIVE_TOKEN_JSON }}
+  DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+  FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+  RELAX_EPISODE: '45760947655'
+jobs:
+  preflight:
+    name: Verify publishing accounts before generation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - run: pip install -r requirements.txt
+    - run: python -u -m relaxation.publication preflight --episode "$RELAX_EPISODE"
+  plan:
+    name: Restore original AI plan, 100 images, piano and rain
+    needs: preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - id: source
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: python -u -m relaxation.production_recover_wait
+    - uses: actions/download-artifact@v4
+      with:
+        github-token: ${{ github.token }}
+        run-id: ${{ steps.source.outputs.source_run }}
+        pattern: long-*
+        merge-multiple: true
+        path: output/relaxation-production
+    - run: python -u -m relaxation.production_recover_wait --verify
+    - uses: actions/upload-artifact@v4
+      with:
+        name: long-restored
+        path: output/relaxation-production
+        compression-level: 0
+        retention-days: 7
+    - env:
+        GH_TOKEN: ${{ github.token }}
+      run: python -u -m relaxation.production_recover_wait --stop-source
+  clips:
+    name: "Reusable clips \xB7 ${{ matrix.shard }} \xB7 five images \xD7 four takes"
+    needs:
+    - plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        shard:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        - 8
+        - 9
+        - 10
+        - 11
+        - 12
+        - 13
+        - 14
+        - 15
+        - 16
+        - 17
+        - 18
+        - 19
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - run: 'sudo apt-get update
+
+        sudo apt-get install -y ffmpeg fonts-dejavu-core
+
+        pip install numpy Pillow
+
+        '
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: long-*
+        merge-multiple: true
+        path: output/relaxation-production
+    - env:
+        IMAGE_INDEX: ${{ matrix.shard }}
+      run: python -u -m relaxation.production clips --out "$RELAX_OUT" --index "$IMAGE_INDEX"
+    - uses: actions/upload-artifact@v4
+      with:
+        name: long-clips-${{ matrix.shard }}
+        path: output/relaxation-production/clip-*.mp4
+        overwrite: true
+        retention-days: 7
+  audio:
+    name: "Continuous three-hour audio \xB7 parallel with clip rendering"
+    needs:
+    - plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - run: 'sudo apt-get update
+
+        sudo apt-get install -y ffmpeg libsndfile1
+
+        pip install numpy Pillow scipy soundfile
+
+        '
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: long-*
+        merge-multiple: true
+        path: output/relaxation-production
+    - run: python -u -m relaxation.production audio --out "$RELAX_OUT"
+    - uses: actions/upload-artifact@v4
+      with:
+        name: long-audio
+        path: 'output/relaxation-production/production-audio.m4a
+
+          output/relaxation-production/nature-license.txt
+
+          '
+        overwrite: true
+        retention-days: 7
+  assemble:
+    name: "Fast concat \xB7 3 hours \xB7 chapters and metadata"
+    needs:
+    - plan
+    - clips
+    - audio
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - run: 'sudo apt-get update
+
+        sudo apt-get install -y ffmpeg fonts-dejavu-core
+
+        pip install numpy Pillow
+
+        '
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: long-*
+        merge-multiple: true
+        path: output/relaxation-production
+    - run: python -u -m relaxation.production assemble --out "$RELAX_OUT"
+    - uses: actions/upload-artifact@v4
+      with:
+        name: three-hour-relaxation-${{ github.run_id }}
+        path: 'output/relaxation-production/relaxation-3-hours.mp4
+
+          output/relaxation-production/thumbnail.jpg
+
+          output/relaxation-production/metadata.json
+
+          output/relaxation-production/plan.json
+
+          output/relaxation-production/chapters.txt
+
+          output/relaxation-production/production-report.json
+
+          output/relaxation-production/rain-provenance.json
+
+          output/relaxation-production/nature-license.txt
+
+          '
+        compression-level: 0
+        retention-days: 7
+  youtube:
+    name: Publish and verify YouTube
+    needs: assemble
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - run: pip install -r requirements.txt
+    - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+    - uses: actions/download-artifact@v4
+      with:
+        name: three-hour-relaxation-${{ github.run_id }}
+        path: output/relaxation-production
+    - run: python -u -m relaxation.publication youtube --episode "$RELAX_EPISODE"
+  facebook:
+    name: Publish and verify Facebook
+    needs: youtube
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - run: pip install -r requirements.txt
+    - run: python -u -m relaxation.publication facebook --episode "$RELAX_EPISODE"
+  cleanup:
+    name: Clean Drive after both publications
+    needs: facebook
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    concurrency:
+      group: dudi-drive-cleanup
+      cancel-in-progress: false
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - run: pip install -r requirements.txt
+    - run: python -u -m relaxation.publication cleanup --episode "$RELAX_EPISODE"
+'on':
+  push:
+    branches:
+    - main
+    paths:
+    - .generation/relaxation-production-recovery.json
+  workflow_dispatch: null

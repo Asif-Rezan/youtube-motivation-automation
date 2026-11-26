@@ -146,3 +146,17 @@ scene anchors; each image still receives its own AI generation and seed. This
 prevents repeated text in one batch from aborting all 100 images. Failed-job retries
 resume the original run's accepted planning progress. Progress logs report accepted
 view counts and when composition recovery was used.
+
+### Recover an existing full run after compositor fixes
+
+The production CLI routes stages explicitly to their worker functions; the audio
+command invokes `audio_worker`. Regression coverage exercises every worker command
+and actually encodes an audio sample with FFmpeg. Audio is published as a completed
+artifact only after duration, stereo and 48 kHz readback validation.
+
+`.github/workflows/relaxation-production-recovery.yml` restores source inputs named
+in `.generation/relaxation-production-recovery.json`. Keep `RELAX_EPISODE` equal to
+that source run ID so Drive checkpoints and duplicate-upload protection retain the
+original episode identity. Recovery waits up to 95 minutes for all 20 image artifacts,
+plan, piano and rain, validates completeness, then performs rendering, assembly,
+YouTube/Facebook publication and guarded Drive cleanup using updated code.

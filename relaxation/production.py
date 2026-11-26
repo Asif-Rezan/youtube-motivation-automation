@@ -1,7 +1,4 @@
-"""Three-hour draft: 100 AI images, reusable ten-second clips and timed chapters.
-
-No publication. Music/rain source license still prevents commercial rollout.
-"""
+"""Three-hour relaxation media generation using reusable CPU-rendered clips."""
 import argparse,json,random,subprocess,math
 from pathlib import Path
 from .preview import seed,image_at,atmospheric,thumbnail,extend
@@ -108,7 +105,15 @@ def audio_worker(out):
  a=np.concatenate([join,bed[n:60*48000]])
  sf.write(out/'production-loop.wav',a,48000,subtype='PCM_16')
  seconds=data['seconds']
- subprocess.run(['ffmpeg','-v','error','-y','-stream_loop','-1','-i',str(out/'production-loop.wav'),'-t',str(seconds),'-af',f'afade=t=in:d=4,afade=t=out:st={seconds-5}:d=5,alimiter=limit=0.89:level=false','-c:a','aac','-b:a','192k',str(out/'production-audio.m4a')],check=True)
+ target=out/'production-audio.m4a';pending=out/'production-audio.partial.m4a'
+ print(json.dumps(dict(stage='audio_encoding',seconds=seconds)),flush=True)
+ subprocess.run(['ffmpeg','-v','error','-y','-stream_loop','-1','-i',str(out/'production-loop.wav'),'-t',str(seconds),'-af',f'afade=t=in:d=4,afade=t=out:st={seconds-5}:d=5,alimiter=limit=0.89:level=false','-c:a','aac','-b:a','192k',str(pending)],check=True,timeout=1800)
+ report=json.loads(subprocess.check_output(['ffprobe','-v','error','-show_format','-show_streams','-of','json',str(pending)]))
+ stream=next(x for x in report['streams'] if x['codec_type']=='audio')
+ if abs(float(report['format']['duration'])-seconds)>.1 or stream['channels']!=2 or int(stream['sample_rate'])!=48000:
+  raise ValueError('Encoded production audio failed duration/stereo validation')
+ pending.replace(target)
+ print(json.dumps(dict(stage='audio_verified',seconds=seconds,channels=2,sample_rate=48000)),flush=True)
 
 def label_clip(base,target,text):
  from .editing import title_overlay
@@ -159,11 +164,15 @@ def assemble(out):
  images=[Image.open(out/f'scene-{i:02d}.png').convert('RGB') for i in range(len(data['scenes']))];thumbnail(out,images,data)
  (out/'chapters.txt').write_text(data['chapters']+'\n')
  (out/'production-report.json').write_text(json.dumps(dict(seconds=10800,frames=259200,unique_images=len(data['scenes']),reusable_clips=len(data['scenes'])*4,slots=1080,adjacent_duplicate_images=False,chapters=12,publication=False,editing_features=FEATURES if data.get('editing_profile')=='nature-polish-v1' else [],transitions='Two-second smooth dissolves baked into reusable clips'),indent=2))
-if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('stage',choices=['plan','images','clips','audio','assemble']);p.add_argument('--out',type=Path,default=Path('output/relaxation-production'));p.add_argument('--run-id',default='local');p.add_argument('--index',type=int,choices=range(20),default=0);a=p.parse_args();a.out.mkdir(parents=True,exist_ok=True)
+def main(argv=None):
+ p=argparse.ArgumentParser();p.add_argument('stage',choices=['plan','images','clips','audio','assemble']);p.add_argument('--out',type=Path,default=Path('output/relaxation-production'));p.add_argument('--run-id',default='local');p.add_argument('--index',type=int,choices=range(20),default=0);a=p.parse_args(argv);a.out.mkdir(parents=True,exist_ok=True)
  if a.stage=='plan':
   from .planning import generate
-  generate(a.out,a.run_id,seed,seconds=10800,image_count=100)
- elif a.stage=='images':image_shard(a.out,a.index)
- elif a.stage=='clips':clip_shard(a.out,a.index)
- else:globals()[a.stage](a.out)
+  return generate(a.out,a.run_id,seed,seconds=10800,image_count=100)
+ if a.stage=='images':return image_shard(a.out,a.index)
+ if a.stage=='clips':return clip_shard(a.out,a.index)
+ if a.stage=='audio':return audio_worker(a.out)
+ if a.stage=='assemble':return assemble(a.out)
+ raise ValueError('Unsupported production stage')
+
+if __name__=='__main__':main()
